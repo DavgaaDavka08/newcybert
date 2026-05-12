@@ -1,0 +1,497 @@
+// src/app/(auth)/login/page.tsx
+"use client";
+import { useState, useEffect, Suspense } from "react";
+import { signIn, useSession } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
+
+const PROVINCES = [
+  "Улаанбаатар","Архангай","Баян-Өлгий","Баянхонгор","Булган","Говь-Алтай",
+  "Говьсүмбэр","Дархан-Уул","Дорноговь","Дорнод","Дундговь","Завхан","Орхон",
+  "Өвөрхангай","Өмнөговь","Сүхбаатар","Сэлэнгэ","Төв","Увс","Ховд","Хөвсгөл","Хэнтий",
+];
+
+/* ─── Decorative shapes on the right bg ─── */
+type Shape = { type: string; x: number; y: number; size: number; color: string; rot?: number };
+const BG_SHAPES: Shape[] = [
+  { type: "circle",   x: 88, y:  8, size: 120, color: "rgba(94,206,186,0.10)" },
+  { type: "circle",   x: 60, y: 85, size:  90, color: "rgba(185,245,220,0.18)" },
+  { type: "triangle", x: 95, y: 50, size:  56, color: "rgba(94,206,186,0.16)", rot: -12 },
+  { type: "triangle", x: 65, y: 12, size:  44, color: "rgba(56,189,160,0.13)", rot: 20 },
+  { type: "rect",     x: 70, y: 68, size:  48, color: "rgba(94,206,186,0.16)", rot: 18 },
+  { type: "star",     x: 78, y: 30, size:  20, color: "rgba(56,189,160,0.40)" },
+  { type: "star",     x: 92, y: 72, size:  16, color: "rgba(94,206,186,0.45)" },
+  { type: "star",     x: 58, y: 55, size:  14, color: "rgba(56,189,160,0.30)" },
+];
+
+function StarSvg({ size, color }: { size: number; color: string }) {
+  const s = size / 2;
+  const pts = Array.from({ length: 5 }, (_, i) => {
+    const o   = (i * 72 - 90) * (Math.PI / 180);
+    const inn = o + 36 * (Math.PI / 180);
+    return `${s + s * Math.cos(o)},${s + s * Math.sin(o)} ${s + s * 0.4 * Math.cos(inn)},${s + s * 0.4 * Math.sin(inn)}`;
+  }).join(" ");
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <polygon points={pts} fill={color} />
+    </svg>
+  );
+}
+
+/* ─── input / label shared styles ─── */
+const inp: React.CSSProperties = {
+  width: "100%", padding: "11px 14px", borderRadius: 10,
+  border: "1.5px solid rgba(255,255,255,0.1)",
+  background: "rgba(255,255,255,0.04)", color: "#E2E8F0",
+  fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box",
+};
+const lbl: React.CSSProperties = {
+  fontSize: 12, color: "#94A3B8", fontWeight: 700,
+  marginBottom: 5, display: "block", letterSpacing: 0.3,
+};
+
+/* ─── Google icon ─── */
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24">
+      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+    </svg>
+  );
+}
+
+/* ════════════════════════════════════════════
+   LOGIN FORM
+════════════════════════════════════════════ */
+function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl: string }) {
+  const router = useRouter();
+  const [email, setEmail]       = useState("");
+  const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState("");
+  const [showPass, setShowPass] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(""); setLoading(true);
+    const res = await signIn("credentials", { email, password, redirect: false });
+    setLoading(false);
+    if (res?.error) setError("И-мэйл эсвэл нууц үг буруу байна");
+    else router.push(callbackUrl);
+  }
+
+  return (
+    <>
+      {/* Google */}
+      <button
+        type="button"
+        onClick={() => signIn("google", { callbackUrl })}
+        style={{
+          width: "100%", padding: "11px", borderRadius: 10, cursor: "pointer",
+          border: "1.5px solid rgba(255,255,255,0.12)",
+          background: "rgba(255,255,255,0.04)", color: "#E2E8F0",
+          fontWeight: 700, fontSize: 14, display: "flex", alignItems: "center",
+          justifyContent: "center", gap: 10, marginBottom: 18, fontFamily: "inherit",
+        }}
+      >
+        <GoogleIcon /> Google-ээр нэвтрэх
+      </button>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+        <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+        <span style={{ color: "#475569", fontSize: 12 }}>эсвэл</span>
+        <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+      </div>
+
+      {error && (
+        <div style={{
+          background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
+          borderRadius: 8, padding: "10px 12px", marginBottom: 14,
+          color: "#FCA5A5", fontSize: 13,
+        }}>⚠ {error}</div>
+      )}
+
+      <form onSubmit={handleSubmit}>
+        <div style={{ marginBottom: 12 }}>
+          <label style={lbl}>И-МЭЙЛ</label>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+            placeholder="example@mail.com" required style={inp} />
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={lbl}>НУУЦ ҮГ</label>
+          <div style={{ position: "relative" }}>
+            <input type={showPass ? "text" : "password"}
+              value={password} onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••" required
+              style={{ ...inp, paddingRight: 40 }} />
+            <button type="button" onClick={() => setShowPass(v => !v)} style={{
+              position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
+              background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 15,
+            }}>
+              {showPass ? "🙈" : "👁"}
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: 13, color: "#64748B" }}>
+            <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)}
+              style={{ accentColor: "#4361EE" }} />
+            Намайг санах
+          </label>
+          <a href="/forgot-password" style={{ fontSize: 12, color: "#4361EE", textDecoration: "none", fontWeight: 700 }}>
+            Нууц үг мартсан?
+          </a>
+        </div>
+
+        <button type="submit" disabled={loading} style={{
+          width: "100%", padding: "12px", borderRadius: 10, border: "none",
+          background: loading ? "#2d52c4" : "#4361EE",
+          color: "#fff", fontWeight: 800, fontSize: 15,
+          cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit",
+          boxShadow: "0 4px 18px rgba(67,97,238,0.35)",
+          transition: "background .2s",
+        }}>
+          {loading ? "Нэвтэрч байна..." : "Нэвтрэх"}
+        </button>
+      </form>
+
+      <p style={{ textAlign: "center", marginTop: 14, fontSize: 13, color: "#64748B" }}>
+        Бүртгэл байхгүй юу?{" "}
+        <button onClick={onSwitch} style={{
+          color: "#4361EE", fontWeight: 700, background: "none",
+          border: "none", cursor: "pointer", fontSize: 13, fontFamily: "inherit",
+        }}>
+          Бүртгүүлэх →
+        </button>
+      </p>
+
+      <p style={{ textAlign: "center", marginTop: 6, fontSize: 12 }}>
+        <a href="/admin-login" style={{ color: "#475569", textDecoration: "none" }}>🔐 Admin нэвтрэх</a>
+      </p>
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════
+   REGISTER FORM
+════════════════════════════════════════════ */
+function RegisterTab({ onSwitch }: { onSwitch: () => void }) {
+  const router = useRouter();
+  const [form, setForm] = useState({
+    firstName: "", lastName: "", email: "", password: "",
+    phone: "", province: "", school: "", role: "student",
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState("");
+  const [success, setSuccess] = useState("");
+  const [showPass, setShowPass] = useState(false);
+
+  function upd(k: string, v: string) { setForm(p => ({ ...p, [k]: v })); }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(""); setSuccess(""); setLoading(true);
+    const res  = await fetch("/api/auth/register", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+    const data = await res.json();
+    setLoading(false);
+    if (!res.ok) { setError(data.error); return; }
+    setSuccess(data.message);
+    setTimeout(() => {
+      signIn("credentials", { email: form.email, password: form.password, callbackUrl: "/dashboard" });
+    }, 1200);
+  }
+
+  return (
+    <>
+      {error && (
+        <div style={{
+          background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
+          borderRadius: 8, padding: "10px 12px", marginBottom: 14, color: "#FCA5A5", fontSize: 13,
+        }}>⚠ {error}</div>
+      )}
+      {success && (
+        <div style={{
+          background: "rgba(94,206,186,0.1)", border: "1px solid rgba(94,206,186,0.3)",
+          borderRadius: 8, padding: "10px 12px", marginBottom: 14, color: "#5ECEBA", fontSize: 13,
+        }}>✅ {success}</div>
+      )}
+
+      <form onSubmit={handleSubmit}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <div>
+            <label style={lbl}>ОВОГ</label>
+            <input value={form.lastName} onChange={e => upd("lastName", e.target.value)}
+              placeholder="Дорж" required style={inp} />
+          </div>
+          <div>
+            <label style={lbl}>НЭР</label>
+            <input value={form.firstName} onChange={e => upd("firstName", e.target.value)}
+              placeholder="Болд" required style={inp} />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 10 }}>
+          <label style={lbl}>И-МЭЙЛ</label>
+          <input type="email" value={form.email} onChange={e => upd("email", e.target.value)}
+            placeholder="example@mail.com" required style={inp} />
+        </div>
+
+        <div style={{ marginBottom: 10 }}>
+          <label style={lbl}>НУУЦ ҮГ</label>
+          <div style={{ position: "relative" }}>
+            <input type={showPass ? "text" : "password"}
+              value={form.password} onChange={e => upd("password", e.target.value)}
+              placeholder="••••• (6+ тэмдэгт)" required
+              style={{ ...inp, paddingRight: 40 }} />
+            <button type="button" onClick={() => setShowPass(v => !v)} style={{
+              position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+              background: "none", border: "none", color: "#475569", cursor: "pointer",
+            }}>
+              {showPass ? "🙈" : "👁"}
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <div>
+            <label style={lbl}>УТАСНЫ ДУГААР</label>
+            <input value={form.phone} onChange={e => upd("phone", e.target.value)}
+              placeholder="9900XXXX" style={inp} />
+          </div>
+          <div>
+            <label style={lbl}>АЙМАГ / НИЙСЛЭЛ</label>
+            <select value={form.province} onChange={e => upd("province", e.target.value)}
+              style={{ ...inp, cursor: "pointer" }}>
+              <option value="">-- Сонгох --</option>
+              {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={lbl}>СУРГУУЛЬ</label>
+          <input value={form.school} onChange={e => upd("school", e.target.value)}
+            placeholder="Сургуулийн нэр" style={inp} />
+        </div>
+
+        <div style={{ marginBottom: 18 }}>
+          <label style={lbl}>ДҮР СОНГОХ</label>
+          <div style={{ display: "flex", gap: 8 }}>
+            {[
+              { v: "student", label: "Сурагч", sub: "Асуулт бодно, XP цуглуулна" },
+              { v: "teacher", label: "Багш",   sub: "Анги удирдана, тайлан харна" },
+            ].map(opt => (
+              <button key={opt.v} type="button" onClick={() => upd("role", opt.v)} style={{
+                flex: 1, padding: "10px 8px", borderRadius: 10, cursor: "pointer", textAlign: "left",
+                border: `1.5px solid ${form.role === opt.v ? "#4361EE" : "rgba(255,255,255,0.1)"}`,
+                background: form.role === opt.v ? "rgba(67,97,238,0.12)" : "rgba(255,255,255,0.03)",
+                color: form.role === opt.v ? "#A5B4FC" : "#94A3B8",
+                fontFamily: "inherit", transition: "all .2s",
+              }}>
+                <div style={{ fontWeight: 800, fontSize: 13 }}>{opt.label}</div>
+                <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2, lineHeight: 1.3 }}>{opt.sub}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button type="submit" disabled={loading} style={{
+          width: "100%", padding: "12px", borderRadius: 10, border: "none",
+          background: loading ? "#2d52c4" : "#4361EE",
+          color: "#fff", fontWeight: 800, fontSize: 15,
+          cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit",
+          boxShadow: "0 4px 18px rgba(67,97,238,0.35)",
+        }}>
+          {loading ? "Бүртгэж байна..." : "Бүртгүүлэх →"}
+        </button>
+      </form>
+
+      <p style={{ textAlign: "center", marginTop: 14, fontSize: 13, color: "#64748B" }}>
+        Бүртгэлтэй юу?{" "}
+        <button onClick={onSwitch} style={{
+          color: "#4361EE", fontWeight: 700, background: "none",
+          border: "none", cursor: "pointer", fontSize: 13, fontFamily: "inherit",
+        }}>
+          Нэвтрэх →
+        </button>
+      </p>
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════
+   MAIN CONTENT (uses useSearchParams)
+════════════════════════════════════════════ */
+function AuthContent() {
+  const { data: session } = useSession();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<"login" | "register">("login");
+
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
+
+  useEffect(() => {
+    if (searchParams.get("register") === "1") setTab("register");
+  }, [searchParams]);
+
+  return (
+    <div style={{
+      display: "flex", minHeight: "100vh",
+      fontFamily: "Nunito, 'Plus Jakarta Sans', sans-serif",
+      background: "#0D0D15",
+    }}>
+      {/* ── LEFT PANEL ── */}
+      <div style={{
+        width: "50%", flexShrink: 0, position: "relative", overflow: "hidden",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        background: "linear-gradient(160deg, #0D0D18 0%, #0a0a14 100%)",
+        borderRight: "1px solid rgba(255,255,255,0.05)",
+      }}>
+        {/* Glow behind mascot */}
+        <div style={{
+          position: "absolute", width: 360, height: 360, borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(255,210,63,0.15) 0%, rgba(94,206,186,0.06) 50%, transparent 70%)",
+          top: "30%", left: "50%", transform: "translate(-50%,-50%)",
+          pointerEvents: "none",
+        }} />
+
+        {/* Left scattered shapes */}
+        {[
+          { x: 10, y: 10, size: 70, color: "rgba(94,206,186,0.08)", type: "circle" },
+          { x: 85, y: 80, size: 50, color: "rgba(94,206,186,0.08)", type: "circle" },
+          { x: 15, y: 75, size: 40, color: "rgba(94,206,186,0.12)", type: "rect", rot: 15 },
+          { x: 80, y: 15, size: 35, color: "rgba(56,189,160,0.15)", type: "triangle", rot: -10 },
+        ].map((sh, i) => (
+          <div key={i} style={{
+            position: "absolute", left: `${sh.x}%`, top: `${sh.y}%`,
+            transform: `translate(-50%,-50%) rotate(${sh.rot ?? 0}deg)`, pointerEvents: "none",
+          }}>
+            {sh.type === "circle" && (
+              <div style={{ width: sh.size, height: sh.size, borderRadius: "50%", background: sh.color }} />
+            )}
+            {sh.type === "rect" && (
+              <div style={{
+                width: sh.size, height: sh.size, borderRadius: 6, background: "transparent",
+                border: `2.5px solid ${sh.color}`,
+              }} />
+            )}
+            {sh.type === "triangle" && (
+              <svg width={sh.size} height={sh.size} viewBox="0 0 60 60">
+                <polygon points="30,4 56,56 4,56" fill="transparent" stroke={sh.color} strokeWidth="4" strokeLinejoin="round" />
+              </svg>
+            )}
+          </div>
+        ))}
+
+        {/* Logo */}
+        <div style={{ position: "absolute", top: 28, left: 28 }}>
+          <img src="/cyberphysic-logo.png" alt="CyberPhysic"
+            style={{ height: 36, filter: "brightness(0) invert(1)", opacity: 0.9 }} />
+        </div>
+
+        {/* Mascot */}
+        <div style={{ position: "relative", zIndex: 1, textAlign: "center" }}>
+          <div style={{ animation: "float 4s ease-in-out infinite", display: "inline-block", marginBottom: 20 }}>
+            <img src="/cyberpysics.png" alt="mascot"
+              style={{
+                width: 200, height: 200, objectFit: "contain",
+                mixBlendMode: "screen",
+                filter: "drop-shadow(0 0 40px rgba(255,210,63,0.5))",
+              }} />
+          </div>
+          <h2 style={{ fontSize: 22, fontWeight: 900, color: "#E2E8F0", marginBottom: 10 }}>
+            CyberPhysics
+          </h2>
+          <p style={{ color: "#64748B", fontSize: 14, lineHeight: 1.7, maxWidth: 260 }}>
+            Физикийг тоглоомоор сур.<br />XP цуглуул. Streak хадгал.
+          </p>
+        </div>
+
+        <style>{`@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }`}</style>
+      </div>
+
+      {/* ── RIGHT PANEL ── */}
+      <div style={{
+        width: "50%", position: "relative",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "32px 48px", overflowY: "auto", overflowX: "hidden",
+        background: "#0D0D15",
+      }}>
+        {/* Background shapes */}
+        {BG_SHAPES.map((sh, i) => (
+          <div key={i} style={{
+            position: "absolute", left: `${sh.x}%`, top: `${sh.y}%`,
+            transform: `translate(-50%,-50%) rotate(${sh.rot ?? 0}deg)`,
+            pointerEvents: "none", zIndex: 0,
+          }}>
+            {sh.type === "circle" && (
+              <div style={{ width: sh.size, height: sh.size, borderRadius: "50%", background: sh.color }} />
+            )}
+            {sh.type === "rect" && (
+              <div style={{
+                width: sh.size, height: sh.size, borderRadius: 8, background: "transparent",
+                border: `3px solid ${sh.color}`,
+              }} />
+            )}
+            {sh.type === "triangle" && (
+              <svg width={sh.size} height={sh.size} viewBox="0 0 60 60">
+                <polygon points="30,4 56,56 4,56" fill="transparent" stroke={sh.color} strokeWidth="5" strokeLinejoin="round" />
+              </svg>
+            )}
+            {sh.type === "star" && <StarSvg size={sh.size} color={sh.color} />}
+          </div>
+        ))}
+
+        {/* Form card */}
+        <div style={{
+          position: "relative", zIndex: 1, width: "100%", maxWidth: 420,
+          background: "#13131F", borderRadius: 22, padding: "32px 30px",
+          boxShadow: "0 8px 48px rgba(0,0,0,0.4)",
+          border: "1px solid rgba(255,255,255,0.07)",
+        }}>
+          {/* Tabs */}
+          <div style={{
+            display: "flex", background: "rgba(255,255,255,0.05)",
+            borderRadius: 10, padding: 4, marginBottom: 24,
+          }}>
+            {(["login", "register"] as const).map(t => (
+              <button key={t} onClick={() => setTab(t)} style={{
+                flex: 1, padding: "9px", borderRadius: 8,
+                background: tab === t ? "#fff" : "transparent",
+                color: tab === t ? "#0D0D15" : "#64748B",
+                fontWeight: 800, fontSize: 14, border: "none",
+                cursor: "pointer", fontFamily: "inherit",
+                transition: "all .2s",
+              }}>
+                {t === "login" ? "Нэвтрэх" : "Бүртгүүлэх"}
+              </button>
+            ))}
+          </div>
+
+          {tab === "login"
+            ? <LoginTab onSwitch={() => setTab("register")} callbackUrl={callbackUrl} />
+            : <RegisterTab onSwitch={() => setTab("login")} />
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════
+   PAGE EXPORT (Suspense wrapper)
+════════════════════════════════════════════ */
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", background: "#0D0D15" }} />}>
+      <AuthContent />
+    </Suspense>
+  );
+}
