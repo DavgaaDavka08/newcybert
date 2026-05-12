@@ -2,6 +2,65 @@
 
 export type UserRole = "student" | "teacher" | "admin";
 
+// ── App state (client-side game state) ──────────────────────
+export interface AppState {
+  xp: number;
+  level: number;
+  coins: number;
+  lives: number;
+  streak: number;
+  name: string;
+}
+
+export type Screen = 'dashboard' | 'game';
+
+// ── Navigation ───────────────────────────────────────────────
+export interface NavItem {
+  id: string;
+  label: string;
+  icon: string;
+  path: string;
+}
+
+// ── Rank ─────────────────────────────────────────────────────
+export interface Rank {
+  name: string;
+  min: number;
+  color: string;
+}
+
+// ── Mock data types ───────────────────────────────────────────
+export interface Student { name: string; xp: number; score: number; weak: string; streak: number; }
+export interface ClassRoom { id: string; name: string; subject: string; students: number; avgXP: number; avgScore: number; }
+export interface Exam { id: number; year: string; q: number; time: number; cost: number; diff: string; }
+export interface Question { q: string; img?: boolean; opts: string[]; correct: number; }
+export interface Lesson { title: string; topic: string; type: string; dur: string; xp: number; }
+
+// ── Live game session (realtime) ─────────────────────────────
+export interface LiveGameSession {
+  id: string;
+  pin: string;
+  hostId: string;
+  status: 'waiting' | 'active' | 'paused' | 'finished';
+  topic: string;
+  currentQuestion: number;
+  timerSeconds: number;
+  players: LivePlayer[];
+  createdAt: Date;
+}
+
+export interface LivePlayer {
+  id: string;
+  name: string;
+  avatar?: string;
+  score: number;
+  streak: number;
+  isConnected: boolean;
+  answers: number[];
+}
+
+export type AuthScreen = 'login' | 'register' | 'teacherVerify' | 'forgot' | 'admin';
+
 export interface IUser {
   _id: string;
   firstName: string;

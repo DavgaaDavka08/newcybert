@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { MainApp } from "@/components/layout/MainApp";
 
-export default function DashboardPage() {
+export default function DashboardGamePage() {
   const { status } = useSession();
   const router = useRouter();
 
@@ -14,9 +14,9 @@ export default function DashboardPage() {
 
   if (status === "loading") return (
     <div style={{
-      minHeight: "100vh", background: "#F0F4F8",
+      minHeight: "100vh", background: "#050d1d",
       display: "flex", alignItems: "center", justifyContent: "center",
-      color: "#94A3B8", fontFamily: "Plus Jakarta Sans, sans-serif",
+      color: "#9fb2cf", fontFamily: "Plus Jakarta Sans, sans-serif",
     }}>
       Ачаалж байна...
     </div>

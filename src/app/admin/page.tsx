@@ -3,8 +3,12 @@
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
+import { LiveGameControl } from "@/components/admin/LiveGameControl";
+import { ConnectedStudents } from "@/components/admin/ConnectedStudents";
+import { LiveLeaderboard } from "@/components/admin/LiveLeaderboard";
+import { AnalyticsCards } from "@/components/admin/AnalyticsCards";
 
-type Tab = "overview" | "users" | "questions" | "categories" | "payments";
+type Tab = "overview" | "users" | "questions" | "categories" | "payments" | "live";
 
 interface Stats {
   totalUsers: number;
@@ -171,11 +175,12 @@ export default function AdminPage() {
   };
 
   const navItems: { id: Tab; icon: string; label: string }[] = [
-    { id: "overview", icon: "📊", label: "Тойм" },
-    { id: "users", icon: "👥", label: "Хэрэглэгчид" },
-    { id: "questions", icon: "❓", label: "Асуултууд" },
+    { id: "overview",   icon: "📊", label: "Тойм" },
+    { id: "live",       icon: "🎮", label: "Шууд тоглолт" },
+    { id: "users",      icon: "👥", label: "Хэрэглэгчид" },
+    { id: "questions",  icon: "❓", label: "Асуултууд" },
     { id: "categories", icon: "📚", label: "Сэдвүүд" },
-    { id: "payments", icon: "💳", label: "Төлбөр" },
+    { id: "payments",   icon: "💳", label: "Төлбөр" },
   ];
 
   return (
@@ -211,6 +216,21 @@ export default function AdminPage() {
 
       {/* Main content */}
       <main style={S.main}>
+        {/* ── LIVE GAME ────────────────────────────────── */}
+        {tab === "live" && (
+          <div>
+            <h1 style={{ fontSize: 26, fontWeight: 900, marginBottom: 8, color: "#E2E8F0" }}>🎮 Шууд тоглолт</h1>
+            <p style={{ color: "#64748B", marginBottom: 28 }}>Сурагчидтай шууд тоглолт явуулах, хянах</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 20, alignItems: "start" }}>
+              <LiveGameControl />
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <LiveLeaderboard live />
+                <ConnectedStudents sessionActive />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── OVERVIEW ─────────────────────────────────── */}
         {tab === "overview" && (
           <div>

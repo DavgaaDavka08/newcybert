@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     const user = await User.findById(session!.user.id);
     if (user) {
       if (isCorrect) {
-        user.xp    = (user.xp ?? 0) + question.xpReward;
+        user.xp = (user.xp ?? 0) + question.xpReward;
         user.coins = (user.coins ?? 0) + question.coinReward;
         user.calculateLevel();
       } else {
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     isCorrect,
     correctIndex: question.correctIndex,
     explanation: question.explanation,
-    xpEarned:  isCorrect ? question.xpReward : 0,
+    xpEarned: isCorrect ? question.xpReward : 0,
     coinEarned: isCorrect ? question.coinReward : 0,
   });
 }
