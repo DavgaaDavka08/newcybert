@@ -1,182 +1,170 @@
-// src/app/admin/page.tsx
 "use client";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { LiveGameControl } from "@/components/admin/LiveGameControl";
-import { ConnectedStudents } from "@/components/admin/ConnectedStudents";
-import { LiveLeaderboard } from "@/components/admin/LiveLeaderboard";
-import { AnalyticsCards } from "@/components/admin/AnalyticsCards";
 
-type Tab = "overview" | "users" | "questions" | "categories" | "payments" | "live";
+/* ─── Types ─────────────────────────────────────────────── */
+type Tab = "overview" | "live" | "users" | "questions" | "categories" | "payments";
 
 interface Stats {
-  totalUsers: number;
-  premiumUsers: number;
-  todayActive: number;
-  totalRevenue: number;
-  newUsersLast7: number;
+  totalUsers: number; premiumUsers: number; todayActive: number;
+  totalRevenue: number; newUsersLast7: number;
   byProvince: { _id: string; count: number }[];
-  recentPayments: any[];
+  recentPayments: PayRow[];
 }
-
 interface User {
-  _id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  role: string;
-  isPremium: boolean;
-  xp: number;
-  coins: number;
-  streak: number;
-  createdAt: string;
+  _id: string; firstName: string; lastName: string; email: string;
+  role: string; isPremium: boolean; xp: number; coins: number; streak: number; createdAt: string;
 }
-
 interface Question {
-  _id: string;
-  question: string;
-  difficulty: string;
-  level: number;
-  xpReward: number;
-  categoryId: { name: string; icon: string };
+  _id: string; question: string; difficulty: string; level: number;
+  xpReward: number; categoryId: { name: string; icon: string };
 }
-
 interface Category {
-  _id: string;
-  name: string;
-  icon: string;
-  color: string;
-  totalLevels: number;
-  isActive: boolean;
-  order: number;
+  _id: string; name: string; icon: string; color: string;
+  totalLevels: number; isActive: boolean; order: number;
+}
+interface PayRow {
+  _id: string; userId: { firstName?: string; lastName?: string; email?: string } | string;
+  amount: number; type: string; status: string; method: string; createdAt: string;
 }
 
+/* ─── Q Form ─────────────────────────────────────────────── */
+const DEFAULT_QFORM = {
+  categoryId: "", level: 1, question: "", options: ["", "", "", ""],
+  correctIndex: 0, explanation: "", difficulty: "medium", xpReward: 10, coinReward: 5,
+};
+const DEFAULT_CATFORM = { name: "", icon: "⚡", color: "#4F46E5", totalLevels: 5, order: 0 };
+
+/* ─── Live game local mock ─────────────────────────────────── */
+const MOCK_Q = {
+  text: "Ом-ын хуулийн томьёо аль нь вэ?",
+  options: ["V = IR", "F = ma", "P = IV", "E = mc²"],
+  correct: 0,
+  votes: [72, 12, 10, 6],
+};
+const MOCK_PLAYERS = [
+  { name: "Батбаяр Э.", initials: "БЭ", score: 1840, streak: 4 },
+  { name: "Номин С.",   initials: "НС", score: 1760, streak: 5 },
+  { name: "Саруул Д.", initials: "СД", score: 1640, streak: 3 },
+  { name: "Энхжин Б.", initials: "ЭБ", score: 1520, streak: 0 },
+  { name: "Мөнхбат Т.", initials: "МТ", score: 1380, streak: 2 },
+  { name: "Дөлгөөн О.", initials: "ДО", score: 1200, streak: 1 },
+];
+const CHART_DATA = [45, 72, 38, 91, 64, 83, 57];
+
+/* ─── Helpers ─────────────────────────────────────────────── */
+function initials(u: User) {
+  return `${u.firstName?.[0] ?? ""}${u.lastName?.[0] ?? ""}`.toUpperCase() || "?";
+}
+function fmtDate(s: string) {
+  return new Date(s).toLocaleDateString("mn-MN", { year: "numeric", month: "short", day: "numeric" });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MAIN COMPONENT
+═══════════════════════════════════════════════════════════ */
 export default function AdminPage() {
   const { data: session, status } = useSession();
-  const router = useRouter();
-  const [tab, setTab]       = useState<Tab>("overview");
+  const router  = useRouter();
+  const [tab, setTab]   = useState<Tab>("overview");
   const [stats, setStats]   = useState<Stats | null>(null);
   const [users, setUsers]   = useState<User[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  // Question form state
-  const [qForm, setQForm] = useState({
-    categoryId: "", level: 1, question: "", options: ["", "", "", ""],
-    correctIndex: 0, explanation: "", difficulty: "medium", xpReward: 10, coinReward: 5,
-  });
+  const [userRoleFilter, setUserRoleFilter] = useState("all");
+  const [qCatFilter, setQCatFilter] = useState("all");
+  const [qDiffFilter, setQDiffFilter] = useState("all");
   const [qModal, setQModal] = useState(false);
   const [catModal, setCatModal] = useState(false);
-  const [catForm, setCatForm] = useState({ name: "", icon: "⚡", color: "#FFD23F", totalLevels: 5, order: 0 });
+  const [qForm, setQForm] = useState(DEFAULT_QFORM);
+  const [catForm, setCatForm] = useState(DEFAULT_CATFORM);
+  const [submitting, setSubmitting] = useState(false);
+
+  /* Live game state */
+  const [livePhase, setLivePhase] = useState<"setup"|"active">("active");
+  const [liveTopic, setLiveTopic] = useState("");
+  const [liveTimer, setLiveTimer] = useState(30);
+  const [liveCountdown, setLiveCountdown] = useState(18);
+  const [liveRevealed, setLiveRevealed] = useState(false);
+  const [liveQIdx, setLiveQIdx] = useState(4);
+  const LIVE_PIN = "847291";
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
     if (status === "authenticated" && session?.user?.role !== "admin") router.replace("/dashboard");
   }, [status, session, router]);
 
+  useEffect(() => {
+    if (livePhase !== "active" || liveRevealed) return;
+    const t = setInterval(() => {
+      setLiveCountdown(c => { if (c <= 1) { setLiveRevealed(true); return 0; } return c - 1; });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [livePhase, liveRevealed]);
+
   const loadStats = useCallback(async () => {
-    const res = await fetch("/api/admin/stats");
-    if (res.ok) setStats(await res.json());
+    const r = await fetch("/api/admin/stats");
+    if (r.ok) setStats(await r.json());
   }, []);
-
   const loadUsers = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch(`/api/admin/users?search=${search}`);
-    if (res.ok) { const d = await res.json(); setUsers(d.users); }
-    setLoading(false);
-  }, [search]);
-
-  const loadQuestions = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch("/api/admin/questions");
-    if (res.ok) { const d = await res.json(); setQuestions(d.questions); }
-    setLoading(false);
+    const r = await fetch("/api/admin/users");
+    if (r.ok) { const d = await r.json(); setUsers(d.users ?? []); }
   }, []);
-
+  const loadQuestions = useCallback(async () => {
+    const r = await fetch("/api/admin/questions");
+    if (r.ok) { const d = await r.json(); setQuestions(d.questions ?? []); }
+  }, []);
   const loadCategories = useCallback(async () => {
-    const res = await fetch("/api/admin/categories");
-    if (res.ok) { const d = await res.json(); setCategories(d.categories); }
+    const r = await fetch("/api/admin/categories");
+    if (r.ok) { const d = await r.json(); setCategories(d.categories ?? []); }
   }, []);
 
   useEffect(() => {
     if (tab === "overview") loadStats();
-    if (tab === "users") loadUsers();
+    if (tab === "users") { loadUsers(); }
     if (tab === "questions") { loadQuestions(); loadCategories(); }
     if (tab === "categories") loadCategories();
   }, [tab, loadStats, loadUsers, loadQuestions, loadCategories]);
 
-  async function togglePremium(userId: string, isPremium: boolean) {
-    await fetch("/api/admin/users", {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId, updates: {
-          isPremium: !isPremium,
-          premiumUntil: !isPremium ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null,
-        },
-      }),
-    });
+  async function saveQuestion() {
+    setSubmitting(true);
+    await fetch("/api/admin/questions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(qForm) });
+    setSubmitting(false); setQModal(false); setQForm(DEFAULT_QFORM); loadQuestions();
+  }
+  async function saveCategory() {
+    setSubmitting(true);
+    await fetch("/api/admin/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(catForm) });
+    setSubmitting(false); setCatModal(false); setCatForm(DEFAULT_CATFORM); loadCategories();
+  }
+  async function togglePremium(id: string, current: boolean) {
+    await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: id, isPremium: !current }) });
     loadUsers();
   }
 
-  async function submitQuestion() {
-    const res = await fetch("/api/admin/questions", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(qForm),
-    });
-    if (res.ok) { setQModal(false); loadQuestions(); }
-  }
-
-  async function deleteQuestion(id: string) {
-    if (!confirm("Устгах уу?")) return;
-    await fetch(`/api/admin/questions?id=${id}`, { method: "DELETE" });
-    loadQuestions();
-  }
-
-  async function submitCategory() {
-    const res = await fetch("/api/admin/categories", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(catForm),
-    });
-    if (res.ok) { setCatModal(false); loadCategories(); }
-  }
-
   if (status === "loading") return (
-    <div style={{ minHeight: "100vh", background: "#07070D", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748B" }}>
+    <div style={{ minHeight: "100vh", background: "#F7F8FA", display: "flex", alignItems: "center", justifyContent: "center", color: "#6B7280", fontFamily: "Inter, system-ui, sans-serif" }}>
       Ачаалж байна...
     </div>
   );
 
-  const S = {
-    container: { minHeight: "100vh", background: "#07070D", fontFamily: "Plus Jakarta Sans, sans-serif", color: "#E2E8F0" } as React.CSSProperties,
-    sidebar: {
-      position: "fixed" as const, left: 0, top: 0, bottom: 0, width: 220,
-      background: "#13131F", borderRight: "1px solid rgba(255,255,255,0.07)",
-      display: "flex", flexDirection: "column" as const, padding: "20px 0",
-    },
-    main: { marginLeft: 220, padding: "32px 36px", minHeight: "100vh" } as React.CSSProperties,
-    card: {
-      background: "#13131F", borderRadius: 16, border: "1px solid rgba(255,255,255,0.07)",
-      padding: "20px 24px",
-    } as React.CSSProperties,
-    btn: (active = false) => ({
-      display: "flex", alignItems: "center", gap: 10, padding: "10px 16px",
-      margin: "2px 12px", borderRadius: 10, border: "none", cursor: "pointer",
-      background: active ? "rgba(255,210,63,0.12)" : "transparent",
-      color: active ? "#FFD23F" : "#64748B", fontWeight: active ? 700 : 500,
-      fontSize: 14, width: "calc(100% - 24px)", textAlign: "left" as const,
-      transition: "all 0.2s",
-    }),
-    table: { width: "100%", borderCollapse: "collapse" as const },
-    th: { padding: "12px 14px", textAlign: "left" as const, fontSize: 12, color: "#475569", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" as const, borderBottom: "1px solid rgba(255,255,255,0.06)" },
-    td: { padding: "12px 14px", fontSize: 14, borderBottom: "1px solid rgba(255,255,255,0.04)" },
-  };
+  const filteredUsers = users.filter(u => {
+    if (userRoleFilter !== "all" && u.role !== userRoleFilter) return false;
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(q);
+  });
+  const filteredQs = questions.filter(q => {
+    if (qCatFilter !== "all" && q.categoryId?.name !== qCatFilter) return false;
+    if (qDiffFilter !== "all" && q.difficulty !== qDiffFilter) return false;
+    if (search && !q.question.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
 
-  const navItems: { id: Tab; icon: string; label: string }[] = [
+  const NAV: { id: Tab; icon: string; label: string; badge?: string }[] = [
     { id: "overview",   icon: "📊", label: "Тойм" },
-    { id: "live",       icon: "🎮", label: "Шууд тоглолт" },
+    { id: "live",       icon: "🎮", label: "Шууд тоглолт", badge: "LIVE" },
     { id: "users",      icon: "👥", label: "Хэрэглэгчид" },
     { id: "questions",  icon: "❓", label: "Асуултууд" },
     { id: "categories", icon: "📚", label: "Сэдвүүд" },
@@ -184,407 +172,842 @@ export default function AdminPage() {
   ];
 
   return (
-    <div style={S.container}>
-      {/* Sidebar */}
-      <aside style={S.sidebar}>
-        <div style={{ padding: "0 24px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)", marginBottom: 12 }}>
-          <div style={{ fontSize: 22, marginBottom: 4 }}>⚡</div>
-          <div style={{ fontWeight: 900, fontSize: 15, color: "#E2E8F0" }}>CyberPhysics</div>
-          <div style={{ fontSize: 11, color: "#FFD23F", fontWeight: 700 }}>ADMIN PANEL</div>
-        </div>
+    <>
+      <style>{`
+        :root {
+          --bg:#F7F8FA;--surface:#fff;--surface-alt:#F9FAFB;
+          --border:#E5E7EB;--border-soft:#F3F4F6;
+          --text:#111827;--text-2:#374151;--muted:#6B7280;--muted-2:#9CA3AF;
+          --indigo:#4F46E5;--indigo-50:#EEF2FF;--indigo-100:#E0E7FF;
+          --green:#16A34A;--green-bg:#ECFDF5;--green-text:#065F46;--green-border:#A7F3D0;
+          --red:#DC2626;--red-bg:#FEF2F2;--red-text:#991B1B;
+          --amber:#D97706;--amber-bg:#FFFBEB;--amber-text:#92400E;
+          --purple-bg:#F5F3FF;--purple-text:#6D28D9;
+        }
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+        button{font-family:inherit;cursor:pointer;border:0}
+        input,select,textarea{font-family:inherit}
+        .shell{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+        .sidebar{position:sticky;top:0;height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 12px}
+        .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 16px}
+        .brand-logo{width:32px;height:32px;border-radius:8px;background:var(--indigo);display:grid;place-items:center;color:#fff;font-size:16px;flex:none}
+        .nav-section{font-size:10px;font-weight:500;letter-spacing:.1em;color:var(--muted-2);text-transform:uppercase;padding:16px 12px 6px}
+        .nav-item{display:flex;align-items:center;gap:10px;padding:8px 12px;margin:1px 0;border-radius:6px;cursor:pointer;color:var(--text-2);font-weight:500;font-size:14px;background:transparent;width:100%;text-align:left;transition:background .1s,color .1s}
+        .nav-item:hover{background:var(--surface-alt)}
+        .nav-item.active{background:var(--indigo-50);color:var(--indigo)}
+        .main{min-width:0;padding:24px}
+        .topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:24px}
+        .topbar h1{font-size:22px;font-weight:600;color:var(--text);letter-spacing:-.01em}
+        .topbar .sub{font-size:13px;color:var(--muted);margin-top:2px}
+        .card{background:var(--surface);border:1px solid var(--border);border-radius:8px}
+        .card-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
+        .card-head h3{font-size:14px;font-weight:600;color:var(--text)}
+        .card-head .sub{font-size:12px;color:var(--muted);margin-top:2px}
+        .card-body{padding:16px}
+        .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
+        .stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px}
+        .stat-label{font-size:12px;color:var(--muted);font-weight:500}
+        .stat-value{font-size:24px;font-weight:600;color:var(--text);margin:10px 0 4px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+        .stat-trend{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px}
+        .stat-trend.green{color:var(--green)}.stat-trend.red{color:var(--red)}
+        .row{display:grid;gap:16px}.row.c2{grid-template-columns:1.5fr 1fr}.row.c3{grid-template-columns:repeat(3,1fr)}
+        .badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;padding:2px 8px;border-radius:4px;background:var(--surface-alt);color:var(--text-2);border:1px solid transparent}
+        .badge.indigo{background:var(--indigo-50);color:#3730A3}.badge.purple{background:var(--purple-bg);color:var(--purple-text)}
+        .badge.green{background:var(--green-bg);color:var(--green-text)}.badge.red{background:var(--red-bg);color:var(--red-text)}
+        .badge.amber{background:var(--amber-bg);color:var(--amber-text)}.badge.gray{background:#F3F4F6;color:#374151}
+        .badge.dot::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+        .btn{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;font-size:13px;font-weight:500;background:var(--surface);color:var(--text-2);border:1px solid var(--border);border-radius:6px;transition:background .1s,border-color .1s}
+        .btn:hover{background:var(--surface-alt)}.btn.primary{background:var(--indigo);color:#fff;border-color:var(--indigo)}.btn.primary:hover{background:#4338CA;border-color:#4338CA}
+        .btn.danger{color:var(--red)}.btn.danger:hover{background:var(--red-bg);border-color:var(--red)}
+        .btn.sm{height:32px;padding:0 10px;font-size:12px}.btn:disabled{opacity:.5;cursor:not-allowed}
+        .search-box{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--muted);font-size:13px}
+        .search-box input{border:0;background:transparent;outline:none;flex:1;color:var(--text);font-size:13px}
+        .tab-actions{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+        .tab-actions .spacer{flex:1}
+        .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+        .table{width:100%;border-collapse:collapse}
+        .table th{font-size:11px;font-weight:500;letter-spacing:.04em;color:var(--muted);text-transform:uppercase;padding:10px 14px;text-align:left;background:var(--surface-alt);border-bottom:1px solid var(--border)}
+        .table td{padding:12px 14px;font-size:13px;color:var(--text-2);border-bottom:1px solid var(--border-soft);vertical-align:middle}
+        .table tbody tr:last-child td{border-bottom:0}
+        .table tbody tr:hover td{background:#FAFBFC}
+        .table .actions{display:flex;gap:4px;opacity:0;transition:opacity .1s}.table tr:hover .actions{opacity:1}
+        .pager{display:flex;align-items:center;padding:12px 16px;border-top:1px solid var(--border)}
+        .pager-info{font-size:13px;color:var(--muted)}.pager .spacer{flex:1}
+        .pager-btns{display:flex;gap:4px}
+        .pager-btn{min-width:32px;height:32px;padding:0 8px;border:1px solid var(--border);background:var(--surface);border-radius:6px;font-size:13px;color:var(--text-2);display:inline-flex;align-items:center;justify-content:center}
+        .pager-btn:hover{background:var(--surface-alt)}.pager-btn.active{background:var(--indigo);color:#fff;border-color:var(--indigo)}.pager-btn:disabled{opacity:.4;cursor:not-allowed}
+        .input,.select,.textarea{width:100%;height:36px;padding:0 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none;transition:border-color .1s,box-shadow .1s}
+        .textarea{height:auto;padding:10px;resize:vertical;line-height:1.5;font-size:14px}
+        .input:focus,.select:focus,.textarea:focus{border-color:var(--indigo);box-shadow:0 0 0 3px rgba(79,70,229,.12)}
+        .label{display:block;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+        .field{margin-bottom:14px}
+        .modal-overlay{position:fixed;inset:0;background:rgba(17,24,39,.4);display:grid;place-items:center;z-index:100;padding:24px;animation:fadeIn .12s ease}
+        .modal{background:var(--surface);border-radius:12px;width:100%;max-width:540px;max-height:85vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.15);animation:pop .14s ease}
+        .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border)}
+        .modal-head h2{font-size:18px;font-weight:600;color:var(--text)}
+        .modal-body{padding:20px 24px}
+        .modal-foot{display:flex;gap:8px;padding:14px 24px;border-top:1px solid var(--border);justify-content:flex-end}
+        .icon-btn{width:28px;height:28px;border-radius:6px;background:transparent;color:var(--muted);display:grid;place-items:center;transition:background .1s,color .1s;font-size:16px}
+        .icon-btn:hover{background:var(--surface-alt);color:var(--text)}
+        .seg{display:inline-flex;padding:2px;gap:2px;background:var(--surface-alt);border:1px solid var(--border);border-radius:6px}
+        .seg-btn{padding:5px 12px;font-size:12px;font-weight:500;border-radius:4px;color:var(--text-2);background:transparent}
+        .seg-btn.active{background:var(--surface);color:var(--indigo);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+        .avatar{width:32px;height:32px;border-radius:50%;background:var(--indigo-50);display:grid;place-items:center;color:var(--indigo);font-size:12px;font-weight:600;flex:none}
+        .user-card{margin-top:auto;padding:12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
+        .link{font-size:13px;color:var(--indigo);font-weight:500;background:transparent}
+        .link:hover{text-decoration:underline}
+        .scrollbar::-webkit-scrollbar{width:6px;height:6px}
+        .scrollbar::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:8px}
+        .scrollbar::-webkit-scrollbar-track{background:transparent}
+        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+        @keyframes pop{from{transform:scale(.97);opacity:0}to{transform:scale(1);opacity:1}}
+      `}</style>
 
-        {navItems.map(item => (
-          <button key={item.id} onClick={() => setTab(item.id)} style={S.btn(tab === item.id)}>
-            <span style={{ fontSize: 16 }}>{item.icon}</span>
-            {item.label}
-          </button>
-        ))}
-
-        <div style={{ flex: 1 }} />
-        <div style={{ padding: "0 12px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12 }}>
-          <div style={{ padding: "10px 16px", fontSize: 13, color: "#64748B" }}>
-            <div style={{ fontWeight: 700, color: "#94A3B8" }}>{session?.user?.name}</div>
-            <div style={{ fontSize: 11 }}>{session?.user?.email}</div>
-          </div>
-          <button onClick={() => signOut({ callbackUrl: "/login" })} style={{
-            ...S.btn(), color: "#EF4444", width: "100%",
-          }}>
-            🚪 Гарах
-          </button>
-        </div>
-      </aside>
-
-      {/* Main content */}
-      <main style={S.main}>
-        {/* ── LIVE GAME ────────────────────────────────── */}
-        {tab === "live" && (
-          <div>
-            <h1 style={{ fontSize: 26, fontWeight: 900, marginBottom: 8, color: "#E2E8F0" }}>🎮 Шууд тоглолт</h1>
-            <p style={{ color: "#64748B", marginBottom: 28 }}>Сурагчидтай шууд тоглолт явуулах, хянах</p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 20, alignItems: "start" }}>
-              <LiveGameControl />
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <LiveLeaderboard live />
-                <ConnectedStudents sessionActive />
-              </div>
+      <div className="shell">
+        {/* ── SIDEBAR ── */}
+        <aside className="sidebar">
+          <div className="brand">
+            <div className="brand-logo">⚡</div>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text)", letterSpacing: "-.01em" }}>CyberPhysics</div>
+              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".08em", color: "var(--indigo)", textTransform: "uppercase", marginTop: 1 }}>Admin</div>
             </div>
           </div>
-        )}
 
-        {/* ── OVERVIEW ─────────────────────────────────── */}
-        {tab === "overview" && (
-          <div>
-            <h1 style={{ fontSize: 26, fontWeight: 900, marginBottom: 8 }}>Тойм</h1>
-            <p style={{ color: "#64748B", marginBottom: 28 }}>CyberPhysics платформын өнөөдрийн байдал</p>
+          <div className="nav-section">Удирдлага</div>
+          {NAV.map(n => (
+            <button key={n.id} className={`nav-item${tab === n.id ? " active" : ""}`} onClick={() => setTab(n.id)}>
+              <span style={{ fontSize: 16 }}>{n.icon}</span>
+              <span style={{ flex: 1 }}>{n.label}</span>
+              {n.badge && (
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".06em", background: "#DCFCE7", color: "#15803D", padding: "2px 5px", borderRadius: 4 }}>
+                  {n.badge}
+                </span>
+              )}
+            </button>
+          ))}
 
-            {stats ? (
-              <>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-                  {[
-                    { label: "Нийт хэрэглэгч", value: stats.totalUsers, icon: "👥", color: "#5ECEBA" },
-                    { label: "Premium", value: stats.premiumUsers, icon: "⭐", color: "#FFD23F" },
-                    { label: "Өнөөдөр идэвхтэй", value: stats.todayActive, icon: "🔥", color: "#FB923C" },
-                    { label: "Нийт орлого", value: `${stats.totalRevenue.toLocaleString()}₮`, icon: "💰", color: "#A78BFA" },
-                  ].map(stat => (
-                    <div key={stat.label} style={S.card}>
-                      <div style={{ fontSize: 28, marginBottom: 8 }}>{stat.icon}</div>
-                      <div style={{ fontSize: 26, fontWeight: 900, color: stat.color }}>{stat.value}</div>
-                      <div style={{ fontSize: 13, color: "#64748B", marginTop: 4 }}>{stat.label}</div>
-                    </div>
-                  ))}
+          <div className="user-card">
+            <div className="avatar" style={{ fontSize: 11 }}>
+              {session?.user?.name?.[0]?.toUpperCase() ?? "A"}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>{session?.user?.name ?? "Admin"}</div>
+              <div style={{ fontSize: 11, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session?.user?.email}</div>
+            </div>
+            <button className="icon-btn" onClick={() => signOut({ callbackUrl: "/login" })} title="Гарах">⎋</button>
+          </div>
+        </aside>
+
+        {/* ── MAIN ── */}
+        <main className="main scrollbar" style={{ overflowY: "auto" }}>
+
+          {/* ══ OVERVIEW ══════════════════════════════════ */}
+          {tab === "overview" && (
+            <div>
+              <div className="topbar">
+                <div>
+                  <h1>Тойм</h1>
+                  <div className="sub">CyberPhysics платформын өнөөдрийн байдал</div>
                 </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="btn sm" onClick={loadStats}>↻ Шинэчлэх</button>
+                </div>
+              </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-                  <div style={S.card}>
-                    <h3 style={{ marginBottom: 16, fontSize: 15, fontWeight: 700 }}>Аймгаар</h3>
-                    {stats.byProvince.map(p => (
-                      <div key={p._id} style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-                        <span style={{ fontSize: 14, color: "#94A3B8" }}>{p._id || "Тодорхойгүй"}</span>
-                        <span style={{ fontWeight: 700, color: "#FFD23F" }}>{p.count}</span>
+              {stats ? (
+                <>
+                  <div className="stat-grid">
+                    {[
+                      { icon: "👥", label: "Нийт хэрэглэгч",    value: stats.totalUsers.toLocaleString(),                       trend: `+${stats.newUsersLast7} энэ 7 хоногт`,     trendColor: "green" },
+                      { icon: "⭐", label: "Premium хэрэглэгч",  value: stats.premiumUsers.toLocaleString(),                     trend: `${Math.round(stats.premiumUsers/Math.max(stats.totalUsers,1)*100)}% нийтийн` },
+                      { icon: "📡", label: "Өнөөдөр идэвхтэй",   value: stats.todayActive.toLocaleString(),                      trend: "Өнөөдрийн идэвхтэй" },
+                      { icon: "💰", label: "Нийт орлого",         value: `${(stats.totalRevenue/1000000).toFixed(2)}M₮`,         trend: "Нийт цуглуулсан",                           trendColor: "green" },
+                    ].map((s, i) => (
+                      <div key={i} className="stat">
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                          <span className="stat-label">{s.label}</span>
+                          <span style={{ fontSize: 20 }}>{s.icon}</span>
+                        </div>
+                        <div className="stat-value">{s.value}</div>
+                        <div className={`stat-trend ${s.trendColor ?? ""}`}>{s.trend}</div>
                       </div>
                     ))}
                   </div>
 
-                  <div style={S.card}>
-                    <h3 style={{ marginBottom: 16, fontSize: 15, fontWeight: 700 }}>Сүүлийн төлбөрүүд</h3>
-                    {stats.recentPayments.length === 0 && (
-                      <p style={{ color: "#475569", fontSize: 14 }}>Одоогоор байхгүй</p>
-                    )}
-                    {stats.recentPayments.map((p: any) => (
-                      <div key={p._id} style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                  <div className="row c2" style={{ marginBottom: 16 }}>
+                    {/* Line chart */}
+                    <div className="card">
+                      <div className="card-head">
                         <div>
-                          <div style={{ fontSize: 13, fontWeight: 600 }}>{p.userId?.firstName} {p.userId?.lastName}</div>
-                          <div style={{ fontSize: 11, color: "#64748B" }}>{p.type}</div>
+                          <h3>Шинэ хэрэглэгч — сүүлийн 7 хоног</h3>
+                          <div className="sub">Өдөр бүрийн шинэ бүртгэлийн тоо</div>
                         </div>
-                        <div style={{ fontWeight: 700, color: "#5ECEBA" }}>{p.amount.toLocaleString()}₮</div>
+                        <div className="seg">
+                          <button className="seg-btn active">7 хоног</button>
+                          <button className="seg-btn">30 хоног</button>
+                        </div>
                       </div>
-                    ))}
+                      <div className="card-body">
+                        <LineChart data={CHART_DATA} labels={["Да","Мя","Лх","Пү","Ба","Бя","Ня"]} />
+                      </div>
+                    </div>
+                    {/* System status */}
+                    <div className="card">
+                      <div className="card-head">
+                        <h3>Системийн төлөв</h3>
+                        <span className="badge green dot">Хэвийн</span>
+                      </div>
+                      <div className="card-body" style={{ padding: 0 }}>
+                        {[
+                          { label: "MongoDB Atlas",   value: "Холбогдсон" },
+                          { label: "API хариу",        value: "~140ms"      },
+                          { label: "Google OAuth",     value: "Идэвхтэй"   },
+                          { label: "Gmail SMTP",       value: "Идэвхтэй"   },
+                          { label: "QPay",             value: "Идэвхтэй"   },
+                        ].map((it, i, arr) => (
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: i < arr.length-1 ? "1px solid var(--border-soft)" : 0, fontSize: 13 }}>
+                            <span style={{ color: "var(--text-2)" }}>{it.label}</span>
+                            <span style={{ color: "var(--green)", display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 500, fontSize: 12 }}>
+                              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--green)", display: "inline-block" }} />
+                              {it.value}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </>
-            ) : (
-              <div style={{ color: "#64748B" }}>Ачаалж байна...</div>
-            )}
-          </div>
-        )}
 
-        {/* ── USERS ─────────────────────────────────────── */}
-        {tab === "users" && (
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <h1 style={{ fontSize: 26, fontWeight: 900 }}>Хэрэглэгчид</h1>
-              <input
-                value={search} onChange={e => setSearch(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && loadUsers()}
-                placeholder="Хайх... (Enter)"
-                style={{
-                  padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)",
-                  background: "rgba(255,255,255,0.04)", color: "#E2E8F0", fontSize: 14, width: 240, outline: "none",
-                }}
-              />
-            </div>
-
-            <div style={{ ...S.card, padding: 0, overflow: "hidden" }}>
-              <table style={S.table}>
-                <thead>
-                  <tr style={{ background: "rgba(255,255,255,0.02)" }}>
-                    <th style={S.th}>Нэр</th>
-                    <th style={S.th}>И-мэйл</th>
-                    <th style={S.th}>Дүр</th>
-                    <th style={S.th}>XP</th>
-                    <th style={S.th}>Streak</th>
-                    <th style={S.th}>Premium</th>
-                    <th style={S.th}>Үйлдэл</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr><td colSpan={7} style={{ ...S.td, textAlign: "center", color: "#64748B" }}>Ачаалж байна...</td></tr>
-                  ) : users.map(u => (
-                    <tr key={u._id} style={{ transition: "background 0.1s" }}>
-                      <td style={S.td}>
-                        <div style={{ fontWeight: 700 }}>{u.lastName} {u.firstName}</div>
-                      </td>
-                      <td style={{ ...S.td, color: "#64748B", fontSize: 13 }}>{u.email}</td>
-                      <td style={S.td}>
-                        <span style={{
-                          padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700,
-                          background: u.role === "admin" ? "rgba(167,139,250,0.15)" : u.role === "teacher" ? "rgba(94,206,186,0.15)" : "rgba(255,255,255,0.06)",
-                          color: u.role === "admin" ? "#A78BFA" : u.role === "teacher" ? "#5ECEBA" : "#94A3B8",
-                        }}>
-                          {u.role === "admin" ? "Admin" : u.role === "teacher" ? "Багш" : "Сурагч"}
-                        </span>
-                      </td>
-                      <td style={{ ...S.td, color: "#FFD23F", fontWeight: 700 }}>{u.xp}</td>
-                      <td style={{ ...S.td, color: "#FB923C" }}>{u.streak}🔥</td>
-                      <td style={S.td}>
-                        <button onClick={() => togglePremium(u._id, u.isPremium)} style={{
-                          padding: "4px 12px", borderRadius: 20, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700,
-                          background: u.isPremium ? "rgba(255,210,63,0.15)" : "rgba(255,255,255,0.06)",
-                          color: u.isPremium ? "#FFD23F" : "#64748B",
-                        }}>
-                          {u.isPremium ? "⭐ Premium" : "Энгийн"}
-                        </button>
-                      </td>
-                      <td style={S.td}>
-                        <button onClick={() => {/* view detail */}} style={{
-                          padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)",
-                          background: "transparent", color: "#94A3B8", cursor: "pointer", fontSize: 12,
-                        }}>Дэлгэрэнгүй</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ── QUESTIONS ─────────────────────────────────── */}
-        {tab === "questions" && (
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <h1 style={{ fontSize: 26, fontWeight: 900 }}>Асуултууд</h1>
-              <button onClick={() => setQModal(true)} style={{
-                padding: "10px 20px", borderRadius: 10, border: "none",
-                background: "#FFD23F", color: "#07070D", fontWeight: 800, fontSize: 14, cursor: "pointer",
-              }}>
-                + Асуулт нэмэх
-              </button>
-            </div>
-
-            <div style={{ ...S.card, padding: 0, overflow: "hidden" }}>
-              <table style={S.table}>
-                <thead>
-                  <tr style={{ background: "rgba(255,255,255,0.02)" }}>
-                    <th style={S.th}>Асуулт</th>
-                    <th style={S.th}>Сэдэв</th>
-                    <th style={S.th}>Level</th>
-                    <th style={S.th}>Хүнд</th>
-                    <th style={S.th}>XP</th>
-                    <th style={S.th}>Үйлдэл</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr><td colSpan={6} style={{ ...S.td, textAlign: "center", color: "#64748B" }}>Ачаалж байна...</td></tr>
-                  ) : questions.map(q => (
-                    <tr key={q._id}>
-                      <td style={{ ...S.td, maxWidth: 300 }}>
-                        <div style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {q.question}
+                  <div className="row c2">
+                    {/* By province */}
+                    <div className="card">
+                      <div className="card-head">
+                        <div><h3>Аймгаар харах</h3><div className="sub">Сурагчдын тоо</div></div>
+                        <span className="badge">Нийт</span>
+                      </div>
+                      <div className="card-body">
+                        {(stats.byProvince ?? []).slice(0,6).map((p, i) => {
+                          const max = stats.byProvince[0]?.count ?? 1;
+                          return (
+                            <div key={i} style={{ marginBottom: i < 5 ? 12 : 0 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                                <span style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>{p._id || "Тодорхойгүй"}</span>
+                                <span style={{ fontSize: 12, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{p.count}</span>
+                              </div>
+                              <div style={{ height: 6, background: "var(--border-soft)", borderRadius: 3 }}>
+                                <div style={{ width: `${(p.count/max)*100}%`, height: "100%", background: "var(--indigo)", borderRadius: 3 }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {/* Recent payments */}
+                    <div className="card">
+                      <div className="card-head">
+                        <div><h3>Сүүлийн төлбөрүүд</h3><div className="sub">QPay болон Khan Bank</div></div>
+                      </div>
+                      <div className="card-body" style={{ padding: 0 }}>
+                        {(stats.recentPayments ?? []).slice(0,5).map((p: any, i: number, arr: any[]) => (
+                          <div key={p._id ?? i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", borderBottom: i < arr.length-1 ? "1px solid var(--border-soft)" : 0 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>
+                                {typeof p.userId === "object" ? `${p.userId?.firstName ?? ""} ${p.userId?.lastName ?? ""}`.trim() || p.userId?.email : "Хэрэглэгч"}
+                              </div>
+                              <div style={{ fontSize: 12, color: "var(--muted-2)" }}>{fmtDate(p.createdAt)}</div>
+                            </div>
+                            <span className={`badge ${p.method === "qpay" ? "indigo" : "amber"}`}>{p.method?.toUpperCase()}</span>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", minWidth: 76, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                              {(p.amount ?? 0).toLocaleString()}₮
+                            </div>
+                          </div>
+                        ))}
+                        <div style={{ padding: "10px 16px", display: "flex", justifyContent: "flex-end", borderTop: "1px solid var(--border-soft)" }}>
+                          <button className="link" onClick={() => setTab("payments")}>Бүгдийг харах →</button>
                         </div>
-                      </td>
-                      <td style={S.td}>
-                        {q.categoryId ? `${q.categoryId.icon} ${q.categoryId.name}` : "—"}
-                      </td>
-                      <td style={S.td}>{q.level}</td>
-                      <td style={S.td}>
-                        <span style={{
-                          padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700,
-                          background: q.difficulty === "hard" ? "rgba(239,68,68,0.15)" : q.difficulty === "medium" ? "rgba(251,146,60,0.15)" : "rgba(94,206,186,0.15)",
-                          color: q.difficulty === "hard" ? "#EF4444" : q.difficulty === "medium" ? "#FB923C" : "#5ECEBA",
-                        }}>
-                          {q.difficulty === "hard" ? "Хэцүү" : q.difficulty === "medium" ? "Дунд" : "Хялбар"}
-                        </span>
-                      </td>
-                      <td style={{ ...S.td, color: "#FFD23F", fontWeight: 700 }}>+{q.xpReward}</td>
-                      <td style={S.td}>
-                        <button onClick={() => deleteQuestion(q._id)} style={{
-                          padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(239,68,68,0.3)",
-                          background: "rgba(239,68,68,0.1)", color: "#EF4444", cursor: "pointer", fontSize: 12,
-                        }}>Устгах</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ── CATEGORIES ─────────────────────────────────── */}
-        {tab === "categories" && (
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <h1 style={{ fontSize: 26, fontWeight: 900 }}>Сэдвүүд</h1>
-              <button onClick={() => setCatModal(true)} style={{
-                padding: "10px 20px", borderRadius: 10, border: "none",
-                background: "#FFD23F", color: "#07070D", fontWeight: 800, fontSize: 14, cursor: "pointer",
-              }}>
-                + Сэдэв нэмэх
-              </button>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-              {categories.map(cat => (
-                <div key={cat._id} style={{ ...S.card, borderLeft: `3px solid ${cat.color}` }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div style={{ fontSize: 32, marginBottom: 8 }}>{cat.icon}</div>
-                    <span style={{
-                      padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700,
-                      background: cat.isActive ? "rgba(94,206,186,0.15)" : "rgba(255,255,255,0.06)",
-                      color: cat.isActive ? "#5ECEBA" : "#64748B",
-                    }}>
-                      {cat.isActive ? "Идэвхтэй" : "Идэвхгүй"}
-                    </span>
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 4 }}>{cat.name}</div>
-                  <div style={{ fontSize: 13, color: "#64748B" }}>{cat.totalLevels} level</div>
+                </>
+              ) : (
+                <div style={{ textAlign: "center", padding: "80px 0", color: "var(--muted)" }}>
+                  <div style={{ fontSize: 32, marginBottom: 12 }}>📊</div>
+                  Ачаалж байна...
                 </div>
-              ))}
+              )}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ── PAYMENTS ─────────────────────────────────── */}
-        {tab === "payments" && (
-          <div>
-            <h1 style={{ fontSize: 26, fontWeight: 900, marginBottom: 24 }}>Төлбөрийн түүх</h1>
-            <div style={{ ...S.card, padding: "20px", textAlign: "center", color: "#64748B" }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>💳</div>
-              <p>QPay болон Khan Bank интеграцийг тохируулсны дараа энд харагдана.</p>
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* ── Question Modal ─────────────────────────────── */}
-      {qModal && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 200,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <div style={{
-            background: "#13131F", borderRadius: 20, border: "1px solid rgba(255,255,255,0.1)",
-            padding: "32px", width: "100%", maxWidth: 560, maxHeight: "90vh", overflowY: "auto",
-          }}>
-            <h2 style={{ marginBottom: 20, fontWeight: 900 }}>Асуулт нэмэх</h2>
-
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 13, color: "#94A3B8", fontWeight: 600, display: "block", marginBottom: 6 }}>Сэдэв</label>
-              <select value={qForm.categoryId} onChange={e => setQForm({...qForm, categoryId: e.target.value})}
-                style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "#1A1A2E", color: "#E2E8F0", fontSize: 14 }}>
-                <option value="">-- Сонгоно уу --</option>
-                {categories.map(c => <option key={c._id} value={c._id}>{c.icon} {c.name}</option>)}
-              </select>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={{ fontSize: 13, color: "#94A3B8", fontWeight: 600, display: "block", marginBottom: 6 }}>Level</label>
-                <input type="number" min="1" value={qForm.level} onChange={e => setQForm({...qForm, level: +e.target.value})}
-                  style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "#1A1A2E", color: "#E2E8F0", fontSize: 14 }} />
+          {/* ══ LIVE GAME ══════════════════════════════════ */}
+          {tab === "live" && (
+            <div>
+              <div className="topbar">
+                <div>
+                  <h1>Шууд тоглолт</h1>
+                  <div className="sub">Сурагчидтай шууд PIN-д нэгдсэн тоглолт удирдах</div>
+                </div>
+                <span className="badge green dot">Идэвхтэй сесс</span>
               </div>
-              <div>
-                <label style={{ fontSize: 13, color: "#94A3B8", fontWeight: 600, display: "block", marginBottom: 6 }}>Хүндвэр</label>
-                <select value={qForm.difficulty} onChange={e => setQForm({...qForm, difficulty: e.target.value})}
-                  style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "#1A1A2E", color: "#E2E8F0", fontSize: 14 }}>
+
+              <div className="row" style={{ gridTemplateColumns: "1.5fr 1fr", alignItems: "start" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  {/* Session card */}
+                  <div className="card">
+                    <div className="card-head">
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <h3>Идэвхтэй сесс</h3>
+                        <span className="badge green dot">Идэвхтэй</span>
+                      </div>
+                      <span className="badge indigo">Цахилгаан · Lvl 1</span>
+                    </div>
+                    <div className="card-body">
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 24, alignItems: "center" }}>
+                        <div>
+                          <div className="label" style={{ marginBottom: 4 }}>JOIN PIN</div>
+                          <div style={{ fontFamily: "'JetBrains Mono',ui-monospace,monospace", fontSize: 44, fontWeight: 600, letterSpacing: "0.08em", color: "var(--text)", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                            {LIVE_PIN}
+                          </div>
+                          <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+                            <button className="btn sm" onClick={() => navigator.clipboard?.writeText(LIVE_PIN)}>📋 Хуулах</button>
+                          </div>
+                          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 10 }}>
+                            Сурагчид{" "}
+                            <span style={{ color: "var(--indigo)", fontWeight: 500 }}>cyberphysics.mn/join</span>
+                            {" "}хаягаар орж PIN оруулна
+                          </div>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,auto)", gap: 16, columnGap: 28 }}>
+                          {[
+                            { label: "Асуулт",    value: `${liveQIdx}/10` },
+                            { label: "Сурагчид",  value: MOCK_PLAYERS.length },
+                            { label: "Хариулсан", value: `${liveRevealed ? MOCK_PLAYERS.length : Math.floor(MOCK_PLAYERS.length*.78)}/${MOCK_PLAYERS.length}` },
+                          ].map((m, i) => (
+                            <div key={i}>
+                              <div className="label" style={{ marginBottom: 2 }}>{m.label}</div>
+                              <div style={{ fontSize: 22, fontWeight: 600, color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>{m.value}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, padding: "12px 16px", borderTop: "1px solid var(--border)", background: "var(--surface-alt)" }}>
+                      <button className="btn">⏸ Зогсоох</button>
+                      <button className="btn danger">⏹ Дуусгах</button>
+                      <div style={{ flex: 1 }} />
+                      <button className="btn primary" onClick={() => { setLiveQIdx(i => Math.min(i+1,10)); setLiveCountdown(liveTimer); setLiveRevealed(false); }}>
+                        Дараагийн асуулт →
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Active question */}
+                  <div className="card">
+                    <div className="card-head">
+                      <h3>Идэвхтэй асуулт</h3>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontSize: 12, color: "var(--muted)" }}>Хугацаа</span>
+                        <CountdownRing value={liveCountdown} max={liveTimer} />
+                      </div>
+                    </div>
+                    <div className="card-body">
+                      <div style={{ fontSize: 17, fontWeight: 500, color: "var(--text)", marginBottom: 16, lineHeight: 1.4 }}>{MOCK_Q.text}</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                        {MOCK_Q.options.map((opt, i) => {
+                          const isCorrect = i === MOCK_Q.correct;
+                          const pct = MOCK_Q.votes[i];
+                          const reveal = liveRevealed && isCorrect;
+                          return (
+                            <div key={i} style={{ position: "relative", padding: "12px 14px", border: `1px solid ${reveal ? "var(--green)" : "var(--border)"}`, background: reveal ? "var(--green-bg)" : "var(--surface)", borderRadius: 6, overflow: "hidden" }}>
+                              <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${pct}%`, background: reveal ? "rgba(22,163,74,.10)" : "rgba(79,70,229,.06)", transition: "width .6s ease" }} />
+                              <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10 }}>
+                                <div style={{ width: 24, height: 24, borderRadius: 4, background: reveal ? "var(--green)" : "var(--border-soft)", color: reveal ? "#fff" : "var(--text-2)", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 600, flex: "none" }}>{"ABCD"[i]}</div>
+                                <div style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "var(--text)" }}>{opt}</div>
+                                {reveal && <span style={{ color: "var(--green)" }}>✓</span>}
+                                <div style={{ fontSize: 13, fontWeight: 600, color: reveal ? "var(--green)" : "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{pct}%</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {liveRevealed && (
+                        <div style={{ marginTop: 12, padding: 10, borderRadius: 6, background: "var(--green-bg)", border: "1px solid var(--green-border)", fontSize: 13, color: "var(--green-text)", display: "flex", alignItems: "center", gap: 8 }}>
+                          ✓ Зөв хариулт: <strong>A · V = IR</strong> · {MOCK_Q.votes[MOCK_Q.correct]}% сурагч зөв хариуллаа
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* New session */}
+                  <div className="card">
+                    <div className="card-head"><h3>Шинэ тоглолт үүсгэх</h3></div>
+                    <div className="card-body" style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                      <div style={{ flex: 1 }}>
+                        <label className="label">Сэдэв</label>
+                        <select className="select" value={liveTopic} onChange={e => setLiveTopic(e.target.value)}>
+                          <option value="">— Сонгох —</option>
+                          {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ width: 140 }}>
+                        <label className="label">Хугацаа</label>
+                        <select className="select" value={liveTimer} onChange={e => setLiveTimer(+e.target.value)}>
+                          {[15,20,30,45,60].map(t => <option key={t} value={t}>{t} секунд</option>)}
+                        </select>
+                      </div>
+                      <button className="btn primary">▶ Шинэ PIN үүсгэх</button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Leaderboard */}
+                <div className="card">
+                  <div className="card-head">
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <h3>Тэргүүлэгчид</h3>
+                      <span className="badge green dot">Шууд</span>
+                    </div>
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>{MOCK_PLAYERS.length} холбогдсон</span>
+                  </div>
+                  <div className="scrollbar" style={{ maxHeight: 520, overflowY: "auto" }}>
+                    <table className="table">
+                      <thead><tr><th style={{ width: 40 }}>#</th><th>Сурагч</th><th style={{ textAlign: "right", paddingRight: 16 }}>Оноо</th></tr></thead>
+                      <tbody>
+                        {MOCK_PLAYERS.map((p, i) => (
+                          <tr key={i}>
+                            <td style={{ color: "var(--muted)", fontVariantNumeric: "tabular-nums", fontWeight: i < 3 ? 600 : 400 }}>
+                              {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i+1}
+                            </td>
+                            <td>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <div className="avatar" style={{ width: 28, height: 28, fontSize: 11 }}>{p.initials}</div>
+                                <div>
+                                  <div style={{ fontWeight: 500, color: "var(--text)" }}>{p.name}</div>
+                                  {p.streak > 0 && <div style={{ fontSize: 11, color: "var(--amber)" }}>🔥 {p.streak}d streak</div>}
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ textAlign: "right", fontWeight: 600, color: "var(--text)", fontVariantNumeric: "tabular-nums", paddingRight: 16 }}>{p.score.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ══ USERS ══════════════════════════════════════ */}
+          {tab === "users" && (
+            <div>
+              <div className="topbar">
+                <div><h1>Хэрэглэгчид</h1><div className="sub">Нийт {users.length} хэрэглэгч бүртгэлтэй</div></div>
+              </div>
+              <div className="tab-actions">
+                <div className="search-box" style={{ width: 240 }}>
+                  🔍
+                  <input placeholder="Нэр, и-мэйл хайх..." value={search} onChange={e => setSearch(e.target.value)} />
+                </div>
+                <select className="select" value={userRoleFilter} onChange={e => setUserRoleFilter(e.target.value)} style={{ width: 140 }}>
+                  <option value="all">Бүгд</option>
+                  <option value="student">Сурагч</option>
+                  <option value="teacher">Багш</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <div className="spacer" />
+                <button className="btn primary" onClick={loadUsers}>↻ Шинэчлэх</button>
+              </div>
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Хэрэглэгч</th>
+                      <th style={{ width: 90 }}>Дүр</th>
+                      <th style={{ width: 80 }}>XP</th>
+                      <th style={{ width: 80 }}>Streak</th>
+                      <th style={{ width: 100 }}>Premium</th>
+                      <th style={{ width: 120 }}>Нэмэгдсэн</th>
+                      <th style={{ width: 80, textAlign: "right" }}>Үйлдэл</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map(u => (
+                      <tr key={u._id}>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div className="avatar">{initials(u)}</div>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>{u.lastName} {u.firstName}</div>
+                              <div style={{ fontSize: 12, color: "var(--muted-2)" }}>{u.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`badge ${u.role === "admin" ? "purple" : u.role === "teacher" ? "indigo" : "gray"}`}>
+                            {u.role === "admin" ? "Admin" : u.role === "teacher" ? "Багш" : "Сурагч"}
+                          </span>
+                        </td>
+                        <td style={{ color: "var(--indigo)", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                          {u.role === "student" ? (u.xp ?? 0).toLocaleString() : "—"}
+                        </td>
+                        <td style={{ color: (u.streak ?? 0) > 7 ? "var(--amber)" : (u.streak ?? 0) > 0 ? "var(--text-2)" : "var(--muted-2)", fontVariantNumeric: "tabular-nums" }}>
+                          {(u.streak ?? 0) > 0 ? `${u.streak}d` : "—"}
+                        </td>
+                        <td>
+                          <button onClick={() => togglePremium(u._id, u.isPremium)} className="badge" style={{ cursor: "pointer", background: u.isPremium ? "var(--green-bg)" : "var(--surface)", color: u.isPremium ? "var(--green-text)" : "var(--muted)", border: `1px solid ${u.isPremium ? "var(--green-border)" : "var(--border)"}` }}>
+                            {u.isPremium ? "Premium" : "Энгийн"}
+                          </button>
+                        </td>
+                        <td style={{ color: "var(--muted)", fontSize: 12, fontVariantNumeric: "tabular-nums" }}>{fmtDate(u.createdAt)}</td>
+                        <td style={{ textAlign: "right" }}>
+                          <div className="actions" style={{ justifyContent: "flex-end" }}>
+                            <button className="icon-btn">✏️</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="pager">
+                  <span className="pager-info">Нийт {filteredUsers.length} хэрэглэгч</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ══ QUESTIONS ══════════════════════════════════ */}
+          {tab === "questions" && (
+            <div>
+              <div className="topbar">
+                <div><h1>Асуултууд</h1><div className="sub">Нийт {questions.length} асуулт</div></div>
+              </div>
+              <div className="tab-actions">
+                <select className="select" value={qCatFilter} onChange={e => setQCatFilter(e.target.value)} style={{ width: 160 }}>
+                  <option value="all">Бүх сэдэв</option>
+                  {categories.map(c => <option key={c._id}>{c.name}</option>)}
+                </select>
+                <select className="select" value={qDiffFilter} onChange={e => setQDiffFilter(e.target.value)} style={{ width: 120 }}>
+                  <option value="all">Бүх хүнд</option>
                   <option value="easy">Хялбар</option>
                   <option value="medium">Дунд</option>
                   <option value="hard">Хэцүү</option>
                 </select>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 13, color: "#94A3B8", fontWeight: 600, display: "block", marginBottom: 6 }}>Асуулт</label>
-              <textarea value={qForm.question} onChange={e => setQForm({...qForm, question: e.target.value})} rows={3}
-                style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "#1A1A2E", color: "#E2E8F0", fontSize: 14, resize: "vertical" }} />
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 13, color: "#94A3B8", fontWeight: 600, display: "block", marginBottom: 6 }}>Хариултууд (зөв хариултыг дугуйлна уу)</label>
-              {qForm.options.map((opt, i) => (
-                <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
-                  <input type="radio" name="correct" checked={qForm.correctIndex === i}
-                    onChange={() => setQForm({...qForm, correctIndex: i})}
-                    style={{ accentColor: "#FFD23F" }} />
-                  <input value={opt} onChange={e => {
-                    const opts = [...qForm.options]; opts[i] = e.target.value;
-                    setQForm({...qForm, options: opts});
-                  }}
-                    placeholder={`Хариулт ${i + 1}`}
-                    style={{ flex: 1, padding: "9px 12px", borderRadius: 8, border: `1px solid ${qForm.correctIndex === i ? "rgba(255,210,63,0.4)" : "rgba(255,255,255,0.1)"}`, background: "#1A1A2E", color: "#E2E8F0", fontSize: 13 }} />
+                <div className="search-box" style={{ width: 220 }}>
+                  🔍<input placeholder="Асуулт хайх..." value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
-              ))}
-            </div>
-
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 13, color: "#94A3B8", fontWeight: 600, display: "block", marginBottom: 6 }}>Тайлбар</label>
-              <textarea value={qForm.explanation} onChange={e => setQForm({...qForm, explanation: e.target.value})} rows={2}
-                style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "#1A1A2E", color: "#E2E8F0", fontSize: 14, resize: "vertical" }} />
-            </div>
-
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setQModal(false)} style={{
-                flex: 1, padding: 12, borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)",
-                background: "transparent", color: "#94A3B8", cursor: "pointer", fontWeight: 700,
-              }}>Болих</button>
-              <button onClick={submitQuestion} style={{
-                flex: 1, padding: 12, borderRadius: 10, border: "none",
-                background: "#FFD23F", color: "#07070D", fontWeight: 800, cursor: "pointer",
-              }}>Хадгалах</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Category Modal ─────────────────────────────── */}
-      {catModal && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 200,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <div style={{
-            background: "#13131F", borderRadius: 20, border: "1px solid rgba(255,255,255,0.1)",
-            padding: "32px", width: "100%", maxWidth: 420,
-          }}>
-            <h2 style={{ marginBottom: 20, fontWeight: 900 }}>Сэдэв нэмэх</h2>
-            {[
-              { label: "Нэр (монгол)", key: "name", placeholder: "Цахилгаан" },
-              { label: "Emoji дүрс", key: "icon", placeholder: "⚡" },
-              { label: "Өнгө (hex)", key: "color", placeholder: "#FFD23F" },
-            ].map(f => (
-              <div key={f.key} style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 13, color: "#94A3B8", fontWeight: 600, display: "block", marginBottom: 6 }}>{f.label}</label>
-                <input value={(catForm as any)[f.key]} onChange={e => setCatForm({...catForm, [f.key]: e.target.value})}
-                  placeholder={f.placeholder}
-                  style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "#1A1A2E", color: "#E2E8F0", fontSize: 14 }} />
+                <div className="spacer" />
+                <button className="btn primary" onClick={() => setQModal(true)}>＋ Асуулт нэмэх</button>
               </div>
-            ))}
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 13, color: "#94A3B8", fontWeight: 600, display: "block", marginBottom: 6 }}>Нийт level тоо</label>
-              <input type="number" min="1" value={catForm.totalLevels} onChange={e => setCatForm({...catForm, totalLevels: +e.target.value})}
-                style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "#1A1A2E", color: "#E2E8F0", fontSize: 14 }} />
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Асуулт</th>
+                      <th style={{ width: 140 }}>Сэдэв</th>
+                      <th style={{ width: 60 }}>Lvl</th>
+                      <th style={{ width: 90 }}>Хүнд</th>
+                      <th style={{ width: 60 }}>XP</th>
+                      <th style={{ width: 80, textAlign: "right" }}>Үйлдэл</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredQs.map(q => (
+                      <tr key={q._id}>
+                        <td style={{ maxWidth: 360 }}>
+                          <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.question}</div>
+                        </td>
+                        <td style={{ fontSize: 13, color: "var(--text-2)" }}>{q.categoryId?.name ?? "—"}</td>
+                        <td style={{ color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{q.level}</td>
+                        <td>
+                          <span className={`badge ${q.difficulty === "easy" ? "green" : q.difficulty === "hard" ? "red" : "amber"}`}>
+                            {q.difficulty === "easy" ? "Хялбар" : q.difficulty === "hard" ? "Хэцүү" : "Дунд"}
+                          </span>
+                        </td>
+                        <td style={{ color: "var(--indigo)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>+{q.xpReward}</td>
+                        <td style={{ textAlign: "right" }}>
+                          <div className="actions" style={{ justifyContent: "flex-end" }}>
+                            <button className="icon-btn">✏️</button>
+                            <button className="icon-btn" style={{ color: "var(--red)" }}>🗑</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="pager">
+                  <span className="pager-info">{filteredQs.length} / {questions.length} асуулт</span>
+                </div>
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setCatModal(false)} style={{ flex: 1, padding: 12, borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94A3B8", cursor: "pointer", fontWeight: 700 }}>Болих</button>
-              <button onClick={submitCategory} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "#FFD23F", color: "#07070D", fontWeight: 800, cursor: "pointer" }}>Хадгалах</button>
+          )}
+
+          {/* ══ CATEGORIES ══════════════════════════════════ */}
+          {tab === "categories" && (
+            <div>
+              <div className="topbar">
+                <div><h1>Сэдвүүд</h1><div className="sub">{categories.length} сэдэв нийт</div></div>
+              </div>
+              <div className="tab-actions">
+                <div className="spacer" />
+                <button className="btn primary" onClick={() => setCatModal(true)}>＋ Сэдэв нэмэх</button>
+              </div>
+              <div className="row c3">
+                {categories.map(c => (
+                  <div key={c._id} className="card">
+                    <div style={{ padding: 16 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 8, background: c.color + "22", color: c.color, display: "grid", placeItems: "center", fontSize: 20 }}>
+                          {c.icon}
+                        </div>
+                        <span className={`badge ${c.isActive ? "green dot" : "gray"}`}>{c.isActive ? "Идэвхтэй" : "Идэвхгүй"}</span>
+                      </div>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>{c.name}</div>
+                      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 14 }}>{c.totalLevels} level · Дараалал {c.order}</div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button className="btn sm" style={{ flex: 1 }}>✏️ Засах</button>
+                        <button className="btn sm" style={{ flex: 1 }}>📋 Асуултууд</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <button onClick={() => setCatModal(true)} style={{ background: "transparent", border: "1px dashed var(--border)", borderRadius: 8, padding: 16, color: "var(--muted)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, minHeight: 180, transition: "all .1s" }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--indigo)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--indigo)"; (e.currentTarget as HTMLButtonElement).style.background = "var(--indigo-50)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--muted)"; (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}>
+                  <span style={{ fontSize: 22 }}>＋</span>
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>Шинэ сэдэв нэмэх</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ══ PAYMENTS ══════════════════════════════════ */}
+          {tab === "payments" && (
+            <div>
+              <div className="topbar">
+                <div><h1>Төлбөр</h1><div className="sub">QPay болон Khan Bank гүйлгээнүүд</div></div>
+              </div>
+              <div className="stat-grid" style={{ marginBottom: 20 }}>
+                {[
+                  { icon: "💰", label: "Нийт орлого",       value: "8.42M₮",  trend: "Бүх цаг хугацаа" },
+                  { icon: "📈", label: "Энэ сарын орлого",   value: "2.15M₮",  trend: "+18.4% өмнөх сар", trendColor: "green" },
+                  { icon: "📱", label: "QPay орлого",         value: "4.92M₮",  trend: "58% эзлэх" },
+                  { icon: "🏦", label: "Khan Bank",           value: "3.50M₮",  trend: "42% эзлэх" },
+                ].map((s, i) => (
+                  <div key={i} className="stat">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                      <span className="stat-label">{s.label}</span>
+                      <span style={{ fontSize: 20 }}>{s.icon}</span>
+                    </div>
+                    <div className="stat-value">{s.value}</div>
+                    <div className={`stat-trend ${(s as any).trendColor ?? ""}`}>{s.trend}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="tab-actions">
+                <span style={{ fontSize: 13, color: "var(--muted)" }}>Саяхны гүйлгээнүүд</span>
+                <div className="spacer" />
+                <button className="btn">⬇ Excel экспорт</button>
+              </div>
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Хэрэглэгч</th>
+                      <th>Бүтээгдэхүүн</th>
+                      <th style={{ width: 110 }}>Арга</th>
+                      <th style={{ width: 130 }}>Огноо</th>
+                      <th style={{ width: 110, textAlign: "right" }}>Дүн</th>
+                      <th style={{ width: 110 }}>Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(stats?.recentPayments ?? []).map((p: any, i: number) => (
+                      <tr key={p._id ?? i}>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div className="avatar" style={{ width: 28, height: 28, fontSize: 11 }}>
+                              {typeof p.userId === "object" ? `${p.userId?.firstName?.[0] ?? ""}${p.userId?.lastName?.[0] ?? ""}` : "U"}
+                            </div>
+                            <span style={{ fontWeight: 500, color: "var(--text)" }}>
+                              {typeof p.userId === "object" ? `${p.userId?.firstName ?? ""} ${p.userId?.lastName ?? ""}`.trim() || "—" : "Хэрэглэгч"}
+                            </span>
+                          </div>
+                        </td>
+                        <td style={{ color: "var(--text-2)" }}>{p.type}</td>
+                        <td><span className={`badge ${p.method === "qpay" ? "indigo" : "amber"}`}>{p.method?.toUpperCase()}</span></td>
+                        <td style={{ color: "var(--muted)", fontSize: 12 }}>{fmtDate(p.createdAt)}</td>
+                        <td style={{ textAlign: "right", fontWeight: 600, color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>{(p.amount ?? 0).toLocaleString()}₮</td>
+                        <td>
+                          <span className={`badge ${p.status === "success" ? "green" : p.status === "pending" ? "amber" : p.status === "failed" ? "red" : "gray"}`}>
+                            {p.status === "success" ? "Амжилттай" : p.status === "pending" ? "Хүлээгдэж" : p.status === "failed" ? "Алдаа" : "Цуцлагдсан"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="pager">
+                  <span className="pager-info">{(stats?.recentPayments ?? []).length} гүйлгээ</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* ══ QUESTION MODAL ════════════════════════════════ */}
+      {qModal && (
+        <div className="modal-overlay" onClick={() => setQModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2>Асуулт нэмэх</h2>
+              <button className="icon-btn" onClick={() => setQModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 140px", gap: 12, marginBottom: 14 }}>
+                <div className="field" style={{ margin: 0 }}>
+                  <label className="label">Сэдэв</label>
+                  <select className="select" value={qForm.categoryId} onChange={e => setQForm(f => ({ ...f, categoryId: e.target.value }))}>
+                    <option value="">— Сонгох —</option>
+                    {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div className="field" style={{ margin: 0 }}>
+                  <label className="label">Level</label>
+                  <input type="number" className="input" value={qForm.level} min={1} onChange={e => setQForm(f => ({ ...f, level: +e.target.value }))} />
+                </div>
+                <div className="field" style={{ margin: 0 }}>
+                  <label className="label">Хүнд</label>
+                  <select className="select" value={qForm.difficulty} onChange={e => setQForm(f => ({ ...f, difficulty: e.target.value }))}>
+                    <option value="easy">Хялбар</option>
+                    <option value="medium">Дунд</option>
+                    <option value="hard">Хэцүү</option>
+                  </select>
+                </div>
+              </div>
+              <div className="field">
+                <label className="label">Асуулт</label>
+                <textarea className="textarea" rows={3} placeholder="Жишээ: Ом-ын хуулийн томьёо?" value={qForm.question} onChange={e => setQForm(f => ({ ...f, question: e.target.value }))} />
+              </div>
+              <div className="field">
+                <label className="label">Хариултууд</label>
+                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Зөв хариултыг сонгоно уу</div>
+                {qForm.options.map((o, i) => (
+                  <label key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                    <input type="radio" name="correct" checked={qForm.correctIndex === i} onChange={() => setQForm(f => ({ ...f, correctIndex: i }))} style={{ accentColor: "var(--indigo)", width: 16, height: 16, flex: "none" }} />
+                    <input className="input" placeholder={`Хариулт ${"ABCD"[i]}`} value={o} onChange={e => setQForm(f => ({ ...f, options: f.options.map((v, k) => k === i ? e.target.value : v) }))} style={{ borderColor: qForm.correctIndex === i ? "var(--indigo)" : "var(--border)" }} />
+                  </label>
+                ))}
+              </div>
+              <div className="field">
+                <label className="label">Тайлбар</label>
+                <textarea className="textarea" rows={2} placeholder="Зөв хариултын тайлбар..." value={qForm.explanation} onChange={e => setQForm(f => ({ ...f, explanation: e.target.value }))} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "100px 100px", gap: 12 }}>
+                <div className="field" style={{ margin: 0 }}>
+                  <label className="label">XP шагнал</label>
+                  <input type="number" className="input" value={qForm.xpReward} onChange={e => setQForm(f => ({ ...f, xpReward: +e.target.value }))} />
+                </div>
+                <div className="field" style={{ margin: 0 }}>
+                  <label className="label">Coin шагнал</label>
+                  <input type="number" className="input" value={qForm.coinReward} onChange={e => setQForm(f => ({ ...f, coinReward: +e.target.value }))} />
+                </div>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn" onClick={() => setQModal(false)}>Болих</button>
+              <button className="btn primary" disabled={submitting} onClick={saveQuestion}>{submitting ? "Хадгалж байна..." : "Хадгалах"}</button>
             </div>
           </div>
         </div>
       )}
+
+      {/* ══ CATEGORY MODAL ════════════════════════════════ */}
+      {catModal && (
+        <div className="modal-overlay" onClick={() => setCatModal(false)}>
+          <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2>Сэдэв нэмэх</h2>
+              <button className="icon-btn" onClick={() => setCatModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="field">
+                <label className="label">Нэр</label>
+                <input className="input" placeholder="Жишээ: Оптик" value={catForm.name} onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div className="field">
+                <label className="label">Icon (emoji)</label>
+                <input className="input" placeholder="⚡" value={catForm.icon} onChange={e => setCatForm(f => ({ ...f, icon: e.target.value }))} />
+              </div>
+              <div className="field">
+                <label className="label">Өнгө (hex)</label>
+                <input className="input" value={catForm.color} onChange={e => setCatForm(f => ({ ...f, color: e.target.value }))} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div className="field" style={{ margin: 0 }}>
+                  <label className="label">Нийт level тоо</label>
+                  <input type="number" className="input" value={catForm.totalLevels} min={1} onChange={e => setCatForm(f => ({ ...f, totalLevels: +e.target.value }))} />
+                </div>
+                <div className="field" style={{ margin: 0 }}>
+                  <label className="label">Дараалал</label>
+                  <input type="number" className="input" value={catForm.order} min={0} onChange={e => setCatForm(f => ({ ...f, order: +e.target.value }))} />
+                </div>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn" onClick={() => setCatModal(false)}>Болих</button>
+              <button className="btn primary" disabled={submitting} onClick={saveCategory}>{submitting ? "Хадгалж байна..." : "Хадгалах"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ─── Sub-components ─────────────────────────────────────── */
+function LineChart({ data, labels }: { data: number[]; labels: string[] }) {
+  const w = 560, h = 160, padL = 36, padR = 14, padT = 14, padB = 26;
+  const innerW = w - padL - padR, innerH = h - padT - padB;
+  const max = Math.max(...data, 10), min = 0;
+  const xs = data.map((_, i) => padL + (i / (data.length - 1)) * innerW);
+  const ys = data.map(v => padT + (1 - (v - min) / (max - min)) * innerH);
+  const path = xs.map((x, i) => `${i === 0 ? "M" : "L"} ${x} ${ys[i]}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", height: h, display: "block" }}>
+      {[0, Math.round(max/2), max].map(v => {
+        const y = padT + (1 - (v - min) / (max - min)) * innerH;
+        return (
+          <g key={v}>
+            <line x1={padL} x2={w - padR} y1={y} y2={y} stroke="#F3F4F6" strokeWidth="1" />
+            <text x={padL - 8} y={y + 3} fill="#9CA3AF" fontSize="11" textAnchor="end">{v}</text>
+          </g>
+        );
+      })}
+      <path d={path} fill="none" stroke="#4F46E5" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+      {xs.map((x, i) => <circle key={i} cx={x} cy={ys[i]} r="4" fill="#fff" stroke="#4F46E5" strokeWidth="2" />)}
+      {labels.map((lab, i) => <text key={i} x={xs[i]} y={h - 6} fill="#9CA3AF" fontSize="12" textAnchor="middle">{lab}</text>)}
+    </svg>
+  );
+}
+
+function CountdownRing({ value, max }: { value: number; max: number }) {
+  const r = 19, circ = 2 * Math.PI * r;
+  const stroke = value < 6 ? "#DC2626" : value < 12 ? "#D97706" : "#4F46E5";
+  return (
+    <div style={{ position: "relative", width: 44, height: 44 }}>
+      <svg viewBox="0 0 44 44" style={{ width: "100%", height: "100%", transform: "rotate(-90deg)" }}>
+        <circle cx="22" cy="22" r={r} fill="none" stroke="#F3F4F6" strokeWidth="3" />
+        <circle cx="22" cy="22" r={r} fill="none" stroke={stroke} strokeWidth="3" strokeLinecap="round"
+          strokeDasharray={circ}
+          strokeDashoffset={circ * (1 - value / max)}
+          style={{ transition: "stroke-dashoffset 1s linear, stroke .3s" }}
+        />
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", fontSize: 14, fontWeight: 600, color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
+        {value}
+      </div>
     </div>
   );
 }

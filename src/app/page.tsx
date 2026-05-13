@@ -117,16 +117,6 @@ export default function HomePage() {
             </span>
           </h1>
 
-          {/* Description */}
-          <p style={{
-            fontSize: 16, color: "#94A3B8", lineHeight: 1.75,
-            marginBottom: 40, maxWidth: 520, marginLeft: "auto", marginRight: "auto",
-          }}>
-            Сурагчид өөрсдийнхөө темпээр давтаж, XP цуглуулж, бодлого бүрт AI тайлбар авах боломжтой.{" "}
-            <span style={{ color: "#FFD23F", fontWeight: 700 }}>CyberPhysics</span>{" "}
-            — таны хувийн физикийн багш.
-          </p>
-
           {/* CTA buttons */}
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
             <button onClick={() => router.push("/login?register=1")} style={{
@@ -162,58 +152,12 @@ export default function HomePage() {
             </button>
           </div>
 
-          {/* Scroll arrow */}
-          <div style={{
-            marginTop: 56, color: "#475569",
-            animation: "bounce 2s ease-in-out infinite",
-            display: "flex", justifyContent: "center",
-          }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </div>
         </div>
       </main>
 
-      {/* ── Features ── */}
-      <section style={{ maxWidth: 960, margin: "0 auto", padding: "20px 24px 80px" }}>
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-          gap: 16,
-        }}>
-          {[
-            { icon: "🎮", title: "XP тоглоом", desc: "Асуулт бодоод XP, coin цуглуул" },
-            { icon: "🤖", title: "AI тайлбар", desc: "Буруу хариулт бүрт нарийвчилсан тайлбар" },
-            { icon: "🔥", title: "Streak", desc: "Өдөр бүр тоглосоор хадгал" },
-            { icon: "🏆", title: "Leaderboard", desc: "Найзуудтайгаа XP-ээр өрсөлд" },
-          ].map(f => (
-            <div key={f.title} style={{
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.07)",
-              borderRadius: 16, padding: "22px 20px",
-              transition: "border-color .2s, transform .2s",
-            }}
-              onMouseEnter={e => {
-                e.currentTarget.style.borderColor = "rgba(255,210,63,0.3)";
-                e.currentTarget.style.transform = "translateY(-3px)";
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
-            >
-              <div style={{ fontSize: 30, marginBottom: 10 }}>{f.icon}</div>
-              <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 6 }}>{f.title}</div>
-              <div style={{ color: "#64748B", fontSize: 13, lineHeight: 1.6 }}>{f.desc}</div>
-            </div>
-          ))}
-        </div>
-      </section>
 
       <style>{`
-        @keyframes float  { 0%,100%{transform:translateY(0)}  50%{transform:translateY(-18px)} }
-        @keyframes bounce { 0%,100%{transform:translateY(0)}  50%{transform:translateY(7px)}  }
+        @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-18px)} }
       `}</style>
     </div>
   );

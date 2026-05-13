@@ -5,12 +5,13 @@ import { useEffect } from "react";
 import { MainApp } from "@/components/layout/MainApp";
 
 export default function DashboardPage() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
-  }, [status, router]);
+    if (status === "authenticated" && session?.user?.role === "admin") router.replace("/admin");
+  }, [status, session, router]);
 
   if (status === "loading") return (
     <div style={{

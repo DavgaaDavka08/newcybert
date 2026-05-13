@@ -78,8 +78,18 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
     setError(""); setLoading(true);
     const res = await signIn("credentials", { email, password, redirect: false });
     setLoading(false);
-    if (res?.error) setError("И-мэйл эсвэл нууц үг буруу байна");
-    else router.push(callbackUrl);
+    if (res?.error) {
+      setError("И-мэйл эсвэл нууц үг буруу байна");
+      return;
+    }
+    // Check role after successful login
+    const { getSession } = await import("next-auth/react");
+    const sess = await getSession();
+    if (sess?.user?.role === "admin") {
+      router.push("/admin");
+    } else {
+      router.push(callbackUrl);
+    }
   }
 
   return (
