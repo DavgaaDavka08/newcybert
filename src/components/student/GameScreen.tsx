@@ -7,6 +7,7 @@ import {
   getTopics, getQuestions, getSettings, getLivesState, setLivesState,
   setNodeStars, calcStars, type GameQuestion, type GameTopic,
 } from '@/lib/game-data';
+import { useAppState } from '@/lib/app-state-context';
 import type { AppState, Screen } from '@/types';
 
 interface Props {
@@ -49,6 +50,7 @@ function NoLivesOverlay({ refillAt, coins, refillCoins, livesCount, onRefillCoin
 }
 
 export function GameScreen({ onNav: _onNav, state, setState }: Props) {
+  const { refreshStats } = useAppState();
   const [topicIdx, setTopicIdx]     = useState(0);
   const [phase, setPhase]           = useState<'map' | 'quiz' | 'result'>('map');
   const [selectedLv, setSelectedLv] = useState<{ topic: GameTopic; level: number } | null>(null);
@@ -92,6 +94,7 @@ export function GameScreen({ onNav: _onNav, state, setState }: Props) {
       if (currentQ >= questions.length - 1) {
         if (selectedLv) setNodeStars(selectedLv.topic.id, selectedLv.level - 1, calcStars(mistakes));
         setPhase('result');
+        refreshStats();
       } else {
         setCurrentQ(q => q + 1);
       }
@@ -104,6 +107,8 @@ export function GameScreen({ onNav: _onNav, state, setState }: Props) {
     if (ok) {
       setScore(s => s + 1);
       if (setState) setState(s => ({ ...s, xp: s.xp + settings.xpPerCorrect, coins: s.coins + settings.coinsPerCorrect }));
+      // Sync to server every correct answer
+      fetch('/api/user/award-xp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ xp: settings.xpPerCorrect, coins: settings.coinsPerCorrect, reason: 'practice_correct' }) }).catch(() => {});
     } else {
       setMistakes(m => m + 1);
       const newLives  = Math.max(0, lives - 1);

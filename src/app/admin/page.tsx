@@ -4,7 +4,15 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 
 /* ─── Types ─────────────────────────────────────────────── */
-type Tab = "overview" | "live" | "users" | "questions" | "categories" | "payments";
+type Tab = "overview" | "live" | "users" | "questions" | "categories" | "payments" | "exams";
+
+interface ExamOption { id: string; text: string; }
+interface ExamQuestion { id: string; question: string; options: ExamOption[]; correctAnswer: string; }
+interface ExamItem { _id: string; title: string; description?: string; duration: number; questions: ExamQuestion[]; createdAt: string; }
+interface AttemptRow { _id: string; studentId?: { firstName?: string; lastName?: string; email?: string }; score: number; totalQuestions: number; percentage?: number; finishedAt?: string; }
+
+const DEFAULT_EXAM_FORM = { title: "", description: "", duration: 60, questions: [{ id: "1", question: "", options: [{ id: "A", text: "" },{ id: "B", text: "" },{ id: "C", text: "" },{ id: "D", text: "" }], correctAnswer: "A" }] };
+function uid() { return Math.random().toString(36).slice(2); }
 
 interface Stats {
   totalUsers: number; premiumUsers: number; todayActive: number;
@@ -82,6 +90,13 @@ export default function AdminPage() {
   const [catForm, setCatForm] = useState(DEFAULT_CATFORM);
   const [submitting, setSubmitting] = useState(false);
 
+  /* Exam state */
+  const [exams, setExams] = useState<ExamItem[]>([]);
+  const [examForm, setExamForm] = useState(DEFAULT_EXAM_FORM);
+  const [examModal, setExamModal] = useState(false);
+  const [selectedExam, setSelectedExam] = useState<ExamItem | null>(null);
+  const [examAttempts, setExamAttempts] = useState<AttemptRow[]>([]);
+
   /* Live game state */
   const [livePhase, setLivePhase] = useState<"setup"|"active">("active");
   const [liveTopic, setLiveTopic] = useState("");
@@ -121,12 +136,18 @@ export default function AdminPage() {
     if (r.ok) { const d = await r.json(); setCategories(d.categories ?? []); }
   }, []);
 
+  const loadExams = useCallback(async () => {
+    const r = await fetch("/api/exam/exams");
+    if (r.ok) { const d = await r.json(); setExams(Array.isArray(d) ? d : []); }
+  }, []);
+
   useEffect(() => {
     if (tab === "overview") loadStats();
     if (tab === "users") { loadUsers(); }
     if (tab === "questions") { loadQuestions(); loadCategories(); }
     if (tab === "categories") loadCategories();
-  }, [tab, loadStats, loadUsers, loadQuestions, loadCategories]);
+    if (tab === "exams") loadExams();
+  }, [tab, loadStats, loadUsers, loadQuestions, loadCategories, loadExams]);
 
   async function saveQuestion() {
     setSubmitting(true);
@@ -138,6 +159,36 @@ export default function AdminPage() {
     await fetch("/api/admin/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(catForm) });
     setSubmitting(false); setCatModal(false); setCatForm(DEFAULT_CATFORM); loadCategories();
   }
+  async function saveExam() {
+    setSubmitting(true);
+    const r = await fetch("/api/exam/exams", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(examForm) });
+    setSubmitting(false);
+    if (r.ok) { setExamModal(false); setExamForm(DEFAULT_EXAM_FORM); loadExams(); }
+  }
+  async function deleteExam(id: string) {
+    if (!confirm("Шалгалтыг устгах уу?")) return;
+    await fetch(`/api/exam/exams/${id}`, { method: "DELETE" });
+    loadExams();
+    if (selectedExam?._id === id) { setSelectedExam(null); setExamAttempts([]); }
+  }
+  async function loadAttempts(examId: string) {
+    const r = await fetch(`/api/exam/attempts/exam/${examId}`);
+    if (r.ok) setExamAttempts(await r.json());
+  }
+
+  function addExamQuestion() {
+    setExamForm(f => ({ ...f, questions: [...f.questions, { id: uid(), question: "", options: [{ id: "A", text: "" },{ id: "B", text: "" },{ id: "C", text: "" },{ id: "D", text: "" }], correctAnswer: "A" }] }));
+  }
+  function removeExamQuestion(qid: string) {
+    setExamForm(f => ({ ...f, questions: f.questions.filter(q => q.id !== qid) }));
+  }
+  function updateExamQ(qid: string, field: string, val: string) {
+    setExamForm(f => ({ ...f, questions: f.questions.map(q => q.id === qid ? { ...q, [field]: val } : q) }));
+  }
+  function updateExamOpt(qid: string, oid: string, text: string) {
+    setExamForm(f => ({ ...f, questions: f.questions.map(q => q.id === qid ? { ...q, options: q.options.map(o => o.id === oid ? { ...o, text } : o) } : q) }));
+  }
+
   async function togglePremium(id: string, current: boolean) {
     await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: id, isPremium: !current }) });
     loadUsers();
@@ -169,6 +220,7 @@ export default function AdminPage() {
     { id: "questions",  icon: "❓", label: "Асуултууд" },
     { id: "categories", icon: "📚", label: "Сэдвүүд" },
     { id: "payments",   icon: "💳", label: "Төлбөр" },
+    { id: "exams",      icon: "📝", label: "Шалгалт" },
   ];
 
   return (
@@ -853,6 +905,139 @@ export default function AdminPage() {
               </div>
             </div>
           )}
+          {/* ══ EXAMS ══════════════════════════════════════ */}
+          {tab === "exams" && (
+            <div>
+              <div className="topbar">
+                <div>
+                  <h1>Шалгалтын удирдлага</h1>
+                  <div className="sub">Шалгалт үүсгэх, сурагчдын үр дүнг хянах</div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="btn" onClick={loadExams}>↻ Шинэчлэх</button>
+                  <button className="btn primary" onClick={() => { setExamForm(DEFAULT_EXAM_FORM); setExamModal(true); }}>＋ Шалгалт нэмэх</button>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: selectedExam ? "1fr 1fr" : "1fr", gap: 20 }}>
+                {/* Exam list */}
+                <div>
+                  {exams.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "60px 0", color: "var(--muted)", background: "var(--surface)", borderRadius: 8, border: "1px solid var(--border)" }}>
+                      <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+                      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Шалгалт байхгүй байна</div>
+                      <button className="btn primary" onClick={() => setExamModal(true)} style={{ marginTop: 12 }}>＋ Анхны шалгалтаа нэмэх</button>
+                    </div>
+                  ) : (
+                    <div className="table-wrap">
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th>Шалгалт</th>
+                            <th style={{ width: 80 }}>Асуулт</th>
+                            <th style={{ width: 80 }}>Хугацаа</th>
+                            <th style={{ width: 90 }}>Нэмэгдсэн</th>
+                            <th style={{ width: 100, textAlign: "right" }}>Үйлдэл</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {exams.map(exam => (
+                            <tr key={exam._id} style={{ cursor: "pointer" }} onClick={() => { setSelectedExam(exam); loadAttempts(exam._id); }}>
+                              <td>
+                                <div style={{ fontWeight: 600, color: "var(--text)", display: "flex", alignItems: "center", gap: 8 }}>
+                                  <span style={{ fontSize: 16 }}>📝</span>
+                                  {exam.title}
+                                </div>
+                                {exam.description && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{exam.description}</div>}
+                              </td>
+                              <td style={{ color: "var(--indigo)", fontWeight: 600 }}>{exam.questions?.length ?? 0}</td>
+                              <td style={{ color: "var(--text-2)" }}>{exam.duration}мин</td>
+                              <td style={{ fontSize: 12, color: "var(--muted)" }}>{fmtDate(exam.createdAt)}</td>
+                              <td style={{ textAlign: "right" }}>
+                                <div className="actions" style={{ justifyContent: "flex-end" }} onClick={e => e.stopPropagation()}>
+                                  <button className="icon-btn" style={{ color: "var(--red)" }} onClick={() => deleteExam(exam._id)}>🗑</button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <div className="pager"><span className="pager-info">{exams.length} шалгалт</span></div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Attempts for selected exam */}
+                {selectedExam && (
+                  <div>
+                    <div className="card" style={{ marginBottom: 12 }}>
+                      <div className="card-head">
+                        <div>
+                          <h3>📊 {selectedExam.title}</h3>
+                          <div className="sub">{examAttempts.length} оролдлого</div>
+                        </div>
+                        <button className="icon-btn" onClick={() => { setSelectedExam(null); setExamAttempts([]); }}>✕</button>
+                      </div>
+                    </div>
+
+                    {examAttempts.length === 0 ? (
+                      <div style={{ textAlign: "center", padding: "40px", color: "var(--muted)", background: "var(--surface)", borderRadius: 8, border: "1px solid var(--border)" }}>
+                        <div style={{ fontSize: 28, marginBottom: 8 }}>👤</div>
+                        Сурагчид одоогоор шалгалт өгөөгүй байна
+                      </div>
+                    ) : (
+                      <div className="table-wrap">
+                        <table className="table">
+                          <thead>
+                            <tr>
+                              <th>Сурагч</th>
+                              <th style={{ width: 80 }}>Оноо</th>
+                              <th style={{ width: 70 }}>Хувь</th>
+                              <th style={{ width: 90 }}>Огноо</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {examAttempts.map((a, i) => {
+                              const pct = a.percentage ?? (a.totalQuestions > 0 ? Math.round((a.score / a.totalQuestions) * 100) : 0);
+                              return (
+                                <tr key={a._id}>
+                                  <td>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                      <div className="avatar" style={{ width: 28, height: 28, fontSize: 11 }}>
+                                        {a.studentId?.firstName?.[0] ?? "?"}{a.studentId?.lastName?.[0] ?? ""}
+                                      </div>
+                                      <div>
+                                        <div style={{ fontWeight: 500, color: "var(--text)" }}>{a.studentId?.firstName ?? ""} {a.studentId?.lastName ?? ""}</div>
+                                        <div style={{ fontSize: 11, color: "var(--muted-2)" }}>{a.studentId?.email ?? ""}</div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td style={{ fontWeight: 600, color: "var(--indigo)", fontVariantNumeric: "tabular-nums" }}>
+                                    {a.score}/{a.totalQuestions}
+                                  </td>
+                                  <td>
+                                    <span className={`badge ${pct >= 75 ? "green" : pct >= 50 ? "amber" : "red"}`}>{pct}%</span>
+                                  </td>
+                                  <td style={{ fontSize: 12, color: "var(--muted)" }}>{a.finishedAt ? fmtDate(a.finishedAt) : "—"}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                        <div className="pager">
+                          <span className="pager-info">{examAttempts.length} оролдлого</span>
+                          <div style={{ flex: 1 }} />
+                          <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                            Дундаж: {examAttempts.length > 0 ? Math.round(examAttempts.reduce((s, a) => s + (a.percentage ?? 0), 0) / examAttempts.length) : 0}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </main>
       </div>
 
@@ -958,6 +1143,71 @@ export default function AdminPage() {
             <div className="modal-foot">
               <button className="btn" onClick={() => setCatModal(false)}>Болих</button>
               <button className="btn primary" disabled={submitting} onClick={saveCategory}>{submitting ? "Хадгалж байна..." : "Хадгалах"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ EXAM CREATION MODAL ═══════════════════════════ */}
+      {examModal && (
+        <div className="modal-overlay" onClick={() => setExamModal(false)}>
+          <div className="modal" style={{ maxWidth: 680 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2>📝 Шинэ шалгалт үүсгэх</h2>
+              <button className="icon-btn" onClick={() => setExamModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              {/* Basic info */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 12, marginBottom: 14 }}>
+                <div className="field" style={{ margin: 0 }}>
+                  <label className="label">Шалгалтын нэр</label>
+                  <input className="input" placeholder="Жишээ: Цахилгааны I шалгалт" value={examForm.title} onChange={e => setExamForm(f => ({ ...f, title: e.target.value }))} />
+                </div>
+                <div className="field" style={{ margin: 0 }}>
+                  <label className="label">Хугацаа (мин)</label>
+                  <input type="number" className="input" value={examForm.duration} min={5} onChange={e => setExamForm(f => ({ ...f, duration: +e.target.value }))} />
+                </div>
+              </div>
+              <div className="field">
+                <label className="label">Тайлбар</label>
+                <textarea className="textarea" rows={2} placeholder="Шалгалтын тухай товч тайлбар" value={examForm.description} onChange={e => setExamForm(f => ({ ...f, description: e.target.value }))} />
+              </div>
+
+              {/* Questions */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <div style={{ fontWeight: 600, color: "var(--text)" }}>Асуултууд ({examForm.questions.length})</div>
+                <button className="btn sm primary" onClick={addExamQuestion}>＋ Асуулт нэмэх</button>
+              </div>
+
+              <div style={{ maxHeight: 400, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+                {examForm.questions.map((q, qi) => (
+                  <div key={q.id} style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 14, background: "var(--surface-alt)" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                      <span style={{ fontWeight: 600, fontSize: 13, color: "var(--text)" }}>Асуулт {qi + 1}</span>
+                      {examForm.questions.length > 1 && (
+                        <button className="icon-btn" style={{ color: "var(--red)" }} onClick={() => removeExamQuestion(q.id)}>🗑</button>
+                      )}
+                    </div>
+                    <div className="field" style={{ marginBottom: 10 }}>
+                      <textarea className="textarea" rows={2} placeholder="Асуултаа оруулна уу" value={q.question} onChange={e => updateExamQ(q.id, "question", e.target.value)} />
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      {q.options.map(opt => (
+                        <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <input type="radio" name={`correct-${q.id}`} checked={q.correctAnswer === opt.id} onChange={() => updateExamQ(q.id, "correctAnswer", opt.id)} style={{ accentColor: "var(--indigo)", width: 15, height: 15, flex: "none" }} />
+                          <span style={{ display: "flex", width: 24, height: 24, borderRadius: 4, background: "var(--border-soft)", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flex: "none" }}>{opt.id}</span>
+                          <input className="input" placeholder={`Хариулт ${opt.id}`} value={opt.text} onChange={e => updateExamOpt(q.id, opt.id, e.target.value)} style={{ borderColor: q.correctAnswer === opt.id ? "var(--indigo)" : "var(--border)" }} />
+                        </label>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 6 }}>☝ Зөв хариулт: <b>{q.correctAnswer}</b></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn" onClick={() => setExamModal(false)}>Болих</button>
+              <button className="btn primary" disabled={submitting} onClick={saveExam}>{submitting ? "Хадгалж байна..." : "✅ Шалгалт хадгалах"}</button>
             </div>
           </div>
         </div>

@@ -1,25 +1,35 @@
 "use client";
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { T } from "@/styles/tokens";
-import { Badge, Label, Ic, Bar, Ring } from "@/components/ui";
+import { Label, Ic, Bar, Ring } from "@/components/ui";
 import { Topbar } from "@/components/layout/Topbar";
 import { getRank, LEADERBOARD } from "@/lib/mock-data";
 import type { AppState, Screen } from "@/types";
+
+interface ExamPreview {
+  _id: string; title: string; duration: number;
+  questions: { id: string }[]; hasAttempt: boolean;
+}
 
 interface Props {
   onNav: (s: Screen) => void;
   state: AppState;
 }
 
-const MISSIONS = [
-  { label: "5 асуулт зөв хариулах", done: 3, total: 5, xp: 20, color: T.blue },
-  { label: "1 сорил дуусгах", done: 0, total: 1, xp: 50, color: T.purple },
-  { label: "Streak хадгалах", done: 1, total: 1, xp: 10, color: T.amber },
-];
 
 export function DashboardScreen({ onNav, state }: Props) {
   const rank = getRank(state.xp);
   const xpInLevel = state.xp % 100;
+  const router = useRouter();
+  const [exams, setExams] = useState<ExamPreview[]>([]);
+
+  useEffect(() => {
+    fetch("/api/exam/exams")
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setExams(Array.isArray(d) ? d.slice(0, 3) : []))
+      .catch(() => {});
+  }, []);
 
   return (
     <div>
@@ -236,104 +246,6 @@ export function DashboardScreen({ onNav, state }: Props) {
         ))}
       </div>
 
-      {/* ── Daily missions ── */}
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: 16,
-          padding: "18px 20px",
-          border: `1px solid ${T.border}`,
-          boxShadow: T.shadow,
-          marginBottom: 22,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 14,
-          }}
-        >
-          <div style={{ fontWeight: 800, fontSize: 14, color: T.text }}>
-            🎯 Өдрийн даалгавар
-          </div>
-          <Badge color={T.purple}>+80 XP боломж</Badge>
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3,1fr)",
-            gap: 10,
-          }}
-        >
-          {MISSIONS.map((m, i) => {
-            const pct = Math.round((m.done / m.total) * 100);
-            const done = m.done >= m.total;
-            return (
-              <div
-                key={i}
-                style={{
-                  padding: "12px 14px",
-                  borderRadius: 12,
-                  border: `1px solid ${done ? m.color + "40" : T.border}`,
-                  background: done ? m.color + "08" : "#FAFBFC",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 8,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: done ? m.color : T.textSub,
-                    }}
-                  >
-                    {m.label}
-                  </span>
-                  {done && (
-                    <span
-                      style={{
-                        fontSize: 10,
-                        background: m.color,
-                        color: "#fff",
-                        padding: "2px 6px",
-                        borderRadius: 99,
-                        fontWeight: 700,
-                      }}
-                    >
-                      ✓
-                    </span>
-                  )}
-                </div>
-                <Bar pct={pct} color={m.color} height={4} />
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginTop: 6,
-                  }}
-                >
-                  <span style={{ fontSize: 10, color: T.muted }}>
-                    {m.done}/{m.total}
-                  </span>
-                  <span
-                    style={{ fontSize: 10, color: m.color, fontWeight: 700 }}
-                  >
-                    +{m.xp} XP
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
 
       {/* ── Bottom: level + leaderboard ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -446,6 +358,94 @@ export function DashboardScreen({ onNav, state }: Props) {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* ── Exam section ── */}
+      <div style={{ marginTop: 22 }}>
+        <div
+          style={{
+            background: "linear-gradient(120deg, #1e3a8a 0%, #4F46E5 100%)",
+            borderRadius: 18, padding: "20px 24px", marginBottom: 14,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            boxShadow: "0 6px 24px rgba(79,70,229,0.25)",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
+              📝 Шалгалтын систем
+            </div>
+            <div style={{ fontWeight: 900, fontSize: 18, color: "#fff", marginBottom: 4 }}>
+              Шалгалт өгч мэдлэгээ баталга
+            </div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)" }}>
+              Хугацаатай шалгалт, автомат үр дүн
+            </div>
+          </div>
+          <button
+            onClick={() => router.push("/dashboard/exam")}
+            style={{
+              padding: "10px 20px", borderRadius: 10, background: "#FFD23F",
+              color: "#1e3a8a", fontWeight: 800, fontSize: 13, border: "none",
+              cursor: "pointer", fontFamily: "Plus Jakarta Sans, sans-serif",
+              boxShadow: "0 4px 14px rgba(255,210,63,0.4)", whiteSpace: "nowrap",
+            }}
+          >
+            Бүгдийг харах →
+          </button>
+        </div>
+
+        {exams.length === 0 ? (
+          <div
+            style={{
+              background: "#fff", borderRadius: 14, padding: "24px",
+              border: `1px solid ${T.border}`, textAlign: "center", color: T.muted,
+            }}
+          >
+            <div style={{ fontSize: 24, marginBottom: 8 }}>📋</div>
+            <div style={{ fontSize: 13 }}>Одоогоор шалгалт байхгүй байна</div>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
+            {exams.map((exam) => (
+              <div
+                key={exam._id}
+                style={{
+                  background: "#fff", borderRadius: 14,
+                  border: `1.5px solid ${exam.hasAttempt ? T.green + "40" : T.border}`,
+                  padding: "16px 18px", boxShadow: T.shadow,
+                }}
+              >
+                <div style={{ fontWeight: 700, fontSize: 13, color: T.text, marginBottom: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {exam.title}
+                </div>
+                <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+                  <span style={{ fontSize: 11, color: T.muted, display: "flex", alignItems: "center", gap: 3 }}>
+                    <Ic n="history" size={11} color={T.muted} /> {exam.duration}мин
+                  </span>
+                  <span style={{ fontSize: 11, color: T.muted, display: "flex", alignItems: "center", gap: 3 }}>
+                    <Ic n="task" size={11} color={T.muted} /> {exam.questions?.length ?? 0}
+                  </span>
+                </div>
+                {exam.hasAttempt ? (
+                  <div style={{ padding: "6px 12px", borderRadius: 8, background: T.greenLight, color: T.green, fontWeight: 700, fontSize: 12, textAlign: "center" }}>
+                    ✓ Өгсөн
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => router.push(`/dashboard/exam/${exam._id}`)}
+                    style={{
+                      width: "100%", padding: "8px", borderRadius: 8, border: "none",
+                      background: "#4F46E5", color: "#fff", fontWeight: 700, fontSize: 12,
+                      cursor: "pointer", fontFamily: "Plus Jakarta Sans, sans-serif",
+                    }}
+                  >
+                    Эхлэх →
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
