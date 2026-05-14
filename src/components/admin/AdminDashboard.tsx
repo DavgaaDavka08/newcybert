@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { T } from '@/styles/tokens';
-import { Ic, Btn, Badge, Label } from '@/components/ui';
+import { Ic, Badge } from '@/components/ui';
 import { LiveGameControl } from './LiveGameControl';
 import { ConnectedStudents } from './ConnectedStudents';
 import { LiveLeaderboard } from './LiveLeaderboard';

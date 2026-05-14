@@ -11,7 +11,7 @@ interface Question { id: string; question: string; options: Option[]; }
 interface Exam { _id: string; title: string; duration: number; questions: Question[]; }
 
 export default function TakeExamPage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
   const params = useParams();
   const examId = params.id as string;
@@ -63,8 +63,8 @@ export default function TakeExamPage() {
           throw new Error(aData.error ?? "Attempt эхлүүлэхэд алдаа");
         }
         setAttemptId(aData._id);
-      } catch (e: any) {
-        setError(e.message);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Алдаа гарлаа");
       } finally {
         setLoading(false);
       }

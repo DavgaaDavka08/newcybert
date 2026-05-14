@@ -3,6 +3,7 @@ import type { NavItem } from '@/types';
 export const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Нүүр хуудас', icon: 'home',   path: '/dashboard' },
   { id: 'game',      label: 'Давталт',      icon: 'game',   path: '/dashboard/game' },
+  { id: 'ees',       label: 'ЕЭШ сорил',    icon: 'exam',   path: '/dashboard/ees' },
   { id: 'exam',      label: 'Шалгалт',      icon: 'task',   path: '/dashboard/exam' },
   { id: 'videos',    label: 'Видео хичээл', icon: 'video',  path: '/dashboard/videos' },
   { id: 'premium',   label: 'Premium',      icon: 'award',  path: '/dashboard/premium' },

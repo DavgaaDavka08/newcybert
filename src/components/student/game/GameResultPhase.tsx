@@ -9,13 +9,17 @@ interface Props {
   onBackMap: () => void; onRetry: () => void;
 }
 
-function StarDisplay({ stars, color }: { stars: number; color: string }) {
+function StarDisplay({ stars }: { stars: number }) {
   const [shown, setShown] = useState(0);
   useEffect(() => {
     const t1 = setTimeout(() => setShown(1), 300);
     const t2 = stars >= 2 ? setTimeout(() => setShown(2), 600) : null;
     const t3 = stars >= 3 ? setTimeout(() => setShown(3), 900) : null;
-    return () => { clearTimeout(t1); t2 && clearTimeout(t2); t3 && clearTimeout(t3); };
+    return () => {
+      clearTimeout(t1);
+      if (t2 !== null) clearTimeout(t2);
+      if (t3 !== null) clearTimeout(t3);
+    };
   }, [stars]);
   const SIZE = [52, 68, 52];
   return (
@@ -50,7 +54,7 @@ export function GameResultPhase({ score, total, mistakes, xpEarned, coinsEarned,
       <div style={{ borderRadius: 24, border: '1.5px solid #E2E8F0', background: '#fff', boxShadow: '0 8px 32px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
         <div style={{ background: `linear-gradient(135deg, ${topicColor}22, ${topicColor}08)`, padding: '32px 28px 24px', textAlign: 'center', borderBottom: '1px solid #F1F5F9' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: topicColor, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 16 }}>{topicName} · Level {level}</div>
-          <StarDisplay stars={stars} color={topicColor} />
+          <StarDisplay stars={stars} />
           <div style={{ fontWeight: 900, fontSize: 24, color: msg.color, marginBottom: 4 }}>{msg.title}</div>
           <div style={{ fontSize: 13, color: '#64748B' }}>{msg.sub}</div>
         </div>

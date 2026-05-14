@@ -17,7 +17,7 @@ interface Result {
 }
 
 export default function ExamResultPage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;

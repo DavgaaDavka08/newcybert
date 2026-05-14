@@ -19,7 +19,7 @@ export async function GET() {
     premiumUsers,
     todayActive,
     payments,
-    totalCoinSpent,
+    _totalCoinSpent,
   ] = await Promise.all([
     User.countDocuments(),
     User.countDocuments({ isPremium: true }),

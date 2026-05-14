@@ -43,7 +43,7 @@ export default function PremiumPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [_purchaseOk, setPurchaseOk] = useState<string | null>(null);
 
   async function handlePurchase(planId: string) {
     setLoading(planId);
@@ -55,7 +55,7 @@ export default function PremiumPage() {
       });
       const data = await res.json();
       if (data.qrImage || data.invoice) {
-        setSuccess(planId);
+        setPurchaseOk(planId);
       }
     } catch {}
     setLoading(null);

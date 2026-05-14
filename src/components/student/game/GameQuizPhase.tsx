@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React from 'react';
 import type { GameQuestion } from '@/lib/game-data';
 
 function HeartIcon({ filled }: { filled: boolean }) {

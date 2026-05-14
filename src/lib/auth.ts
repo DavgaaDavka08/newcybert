@@ -1,7 +1,7 @@
 // src/lib/auth.ts
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 export async function getSession() {
   return await getServerSession(authOptions);

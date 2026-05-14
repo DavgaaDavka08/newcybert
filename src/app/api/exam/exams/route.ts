@@ -5,7 +5,7 @@ import { AttemptModel } from '@/models/AttemptModel';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     await connectDB();
 

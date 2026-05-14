@@ -1,7 +1,7 @@
 // src/app/(auth)/login/page.tsx
 "use client";
 import { useState, useEffect, Suspense } from "react";
-import { signIn, useSession } from "next-auth/react";
+import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const PROVINCES = [
@@ -190,7 +190,6 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
    REGISTER FORM
 ════════════════════════════════════════════ */
 function RegisterTab({ onSwitch }: { onSwitch: () => void }) {
-  const router = useRouter();
   const [form, setForm] = useState({
     firstName: "", lastName: "", email: "", password: "",
     phone: "", province: "", school: "", role: "student",
@@ -340,8 +339,6 @@ function RegisterTab({ onSwitch }: { onSwitch: () => void }) {
    MAIN CONTENT (uses useSearchParams)
 ════════════════════════════════════════════ */
 function AuthContent() {
-  const { data: session } = useSession();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<"login" | "register">("login");
 

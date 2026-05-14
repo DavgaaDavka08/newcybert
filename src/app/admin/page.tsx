@@ -42,7 +42,7 @@ const DEFAULT_QFORM = {
   categoryId: "", level: 1, question: "", options: ["", "", "", ""],
   correctIndex: 0, explanation: "", difficulty: "medium", xpReward: 10, coinReward: 5,
 };
-const DEFAULT_CATFORM = { name: "", icon: "⚡", color: "#4F46E5", totalLevels: 5, order: 0 };
+const DEFAULT_CATFORM = { name: "", icon: "", color: "#4F46E5", totalLevels: 5, order: 0 };
 
 /* ─── Live game local mock ─────────────────────────────────── */
 const MOCK_Q = {
@@ -53,12 +53,13 @@ const MOCK_Q = {
 };
 const MOCK_PLAYERS = [
   { name: "Батбаяр Э.", initials: "БЭ", score: 1840, streak: 4 },
-  { name: "Номин С.",   initials: "НС", score: 1760, streak: 5 },
+  { name: "Номин С.", initials: "НС", score: 1760, streak: 5 },
   { name: "Саруул Д.", initials: "СД", score: 1640, streak: 3 },
   { name: "Энхжин Б.", initials: "ЭБ", score: 1520, streak: 0 },
   { name: "Мөнхбат Т.", initials: "МТ", score: 1380, streak: 2 },
   { name: "Дөлгөөн О.", initials: "ДО", score: 1200, streak: 1 },
 ];
+
 const CHART_DATA = [45, 72, 38, 91, 64, 83, 57];
 
 /* ─── Helpers ─────────────────────────────────────────────── */
@@ -98,7 +99,7 @@ export default function AdminPage() {
   const [examAttempts, setExamAttempts] = useState<AttemptRow[]>([]);
 
   /* Live game state */
-  const [livePhase, setLivePhase] = useState<"setup"|"active">("active");
+  const [livePhase, _setLivePhase] = useState<"setup" | "active">("active");
   const [liveTopic, setLiveTopic] = useState("");
   const [liveTimer, setLiveTimer] = useState(30);
   const [liveCountdown, setLiveCountdown] = useState(18);
@@ -114,7 +115,13 @@ export default function AdminPage() {
   useEffect(() => {
     if (livePhase !== "active" || liveRevealed) return;
     const t = setInterval(() => {
-      setLiveCountdown(c => { if (c <= 1) { setLiveRevealed(true); return 0; } return c - 1; });
+      setLiveCountdown(c => {
+        if (c <= 1) {
+          setLiveRevealed(true);
+          return 0;
+        }
+        return c - 1;
+      });
     }, 1000);
     return () => clearInterval(t);
   }, [livePhase, liveRevealed]);
@@ -146,6 +153,7 @@ export default function AdminPage() {
     if (tab === "users") { loadUsers(); }
     if (tab === "questions") { loadQuestions(); loadCategories(); }
     if (tab === "categories") loadCategories();
+    if (tab === "live") loadCategories();
     if (tab === "exams") loadExams();
   }, [tab, loadStats, loadUsers, loadQuestions, loadCategories, loadExams]);
 
@@ -213,14 +221,14 @@ export default function AdminPage() {
     return true;
   });
 
-  const NAV: { id: Tab; icon: string; label: string; badge?: string }[] = [
-    { id: "overview",   icon: "📊", label: "Тойм" },
-    { id: "live",       icon: "🎮", label: "Шууд тоглолт", badge: "LIVE" },
-    { id: "users",      icon: "👥", label: "Хэрэглэгчид" },
-    { id: "questions",  icon: "❓", label: "Асуултууд" },
-    { id: "categories", icon: "📚", label: "Сэдвүүд" },
-    { id: "payments",   icon: "💳", label: "Төлбөр" },
-    { id: "exams",      icon: "📝", label: "Шалгалт" },
+  const NAV: { id: Tab; label: string; badge?: string }[] = [
+    { id: "overview",   label: "Ерөнхий тойм" },
+    { id: "live",       label: "Шууд тоглоом", badge: "LIVE" },
+    { id: "users",      label: "Хэрэглэгчид" },
+    { id: "questions",  label: "Асуултын сан" },
+    { id: "categories", label: "Ангилал" },
+    { id: "payments",   label: "Орлого, төлбөр" },
+    { id: "exams",      label: "Шалгалтууд" },
   ];
 
   return (
@@ -243,7 +251,7 @@ export default function AdminPage() {
         .shell{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
         .sidebar{position:sticky;top:0;height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 12px}
         .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 16px}
-        .brand-logo{width:32px;height:32px;border-radius:8px;background:var(--indigo);display:grid;place-items:center;color:#fff;font-size:16px;flex:none}
+        .brand-logo{height:34px;width:auto;max-width:44px;flex:none;object-fit:contain;display:block}
         .nav-section{font-size:10px;font-weight:500;letter-spacing:.1em;color:var(--muted-2);text-transform:uppercase;padding:16px 12px 6px}
         .nav-item{display:flex;align-items:center;gap:10px;padding:8px 12px;margin:1px 0;border-radius:6px;cursor:pointer;color:var(--text-2);font-weight:500;font-size:14px;background:transparent;width:100%;text-align:left;transition:background .1s,color .1s}
         .nav-item:hover{background:var(--surface-alt)}
@@ -320,17 +328,18 @@ export default function AdminPage() {
         {/* ── SIDEBAR ── */}
         <aside className="sidebar">
           <div className="brand">
-            <div className="brand-logo">⚡</div>
+            <img className="brand-logo" src="/cyberphysic-logo.png" alt="CyberPhysics"
+              onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+            />
             <div>
               <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text)", letterSpacing: "-.01em" }}>CyberPhysics</div>
-              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".08em", color: "var(--indigo)", textTransform: "uppercase", marginTop: 1 }}>Admin</div>
+              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".08em", color: "var(--indigo)", textTransform: "uppercase", marginTop: 1 }}>Админ</div>
             </div>
           </div>
 
-          <div className="nav-section">Удирдлага</div>
+          <div className="nav-section">Удирдлагын цэс</div>
           {NAV.map(n => (
             <button key={n.id} className={`nav-item${tab === n.id ? " active" : ""}`} onClick={() => setTab(n.id)}>
-              <span style={{ fontSize: 16 }}>{n.icon}</span>
               <span style={{ flex: 1 }}>{n.label}</span>
               {n.badge && (
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".06em", background: "#DCFCE7", color: "#15803D", padding: "2px 5px", borderRadius: 4 }}>
@@ -348,7 +357,7 @@ export default function AdminPage() {
               <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>{session?.user?.name ?? "Admin"}</div>
               <div style={{ fontSize: 11, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session?.user?.email}</div>
             </div>
-            <button className="icon-btn" onClick={() => signOut({ callbackUrl: "/login" })} title="Гарах">⎋</button>
+            <button className="icon-btn" onClick={() => signOut({ callbackUrl: "/login" })} title="Гарах" style={{ fontSize: 11, fontWeight: 600, width: "auto", padding: "0 8px" }}>Гарах</button>
           </div>
         </aside>
 
@@ -360,11 +369,11 @@ export default function AdminPage() {
             <div>
               <div className="topbar">
                 <div>
-                  <h1>Тойм</h1>
-                  <div className="sub">CyberPhysics платформын өнөөдрийн байдал</div>
+                  <h1>Ерөнхий тойм</h1>
+                  <div className="sub">Платформын тоо баримт, орлого, хэрэглэгчдийн тойм мэдээлэл</div>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button className="btn sm" onClick={loadStats}>↻ Шинэчлэх</button>
+                  <button className="btn sm" onClick={loadStats}>Шинэчлэх</button>
                 </div>
               </div>
 
@@ -372,15 +381,14 @@ export default function AdminPage() {
                 <>
                   <div className="stat-grid">
                     {[
-                      { icon: "👥", label: "Нийт хэрэглэгч",    value: stats.totalUsers.toLocaleString(),                       trend: `+${stats.newUsersLast7} энэ 7 хоногт`,     trendColor: "green" },
-                      { icon: "⭐", label: "Premium хэрэглэгч",  value: stats.premiumUsers.toLocaleString(),                     trend: `${Math.round(stats.premiumUsers/Math.max(stats.totalUsers,1)*100)}% нийтийн` },
-                      { icon: "📡", label: "Өнөөдөр идэвхтэй",   value: stats.todayActive.toLocaleString(),                      trend: "Өнөөдрийн идэвхтэй" },
-                      { icon: "💰", label: "Нийт орлого",         value: `${(stats.totalRevenue/1000000).toFixed(2)}M₮`,         trend: "Нийт цуглуулсан",                           trendColor: "green" },
+                      { label: "Нийт бүртгэлтэй хэрэглэгч", value: stats.totalUsers.toLocaleString(),                       trend: `+${stats.newUsersLast7} сүүлийн 7 хоногт`,     trendColor: "green" },
+                      { label: "Premium эрхтэй хэрэглэгч", value: stats.premiumUsers.toLocaleString(),                     trend: `${Math.round(stats.premiumUsers/Math.max(stats.totalUsers,1)*100)}% нийтээс` },
+                      { label: "Өнөөдөр идэвхтэй",          value: stats.todayActive.toLocaleString(),                      trend: "Өдрийн идэвх" },
+                      { label: "Нийт орлого (тооцоо)",      value: `${(stats.totalRevenue/1000000).toFixed(2)}M₮`,         trend: "Бүх цагийн дүн",                           trendColor: "green" },
                     ].map((s, i) => (
                       <div key={i} className="stat">
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                        <div style={{ marginBottom: 4 }}>
                           <span className="stat-label">{s.label}</span>
-                          <span style={{ fontSize: 20 }}>{s.icon}</span>
                         </div>
                         <div className="stat-value">{s.value}</div>
                         <div className={`stat-trend ${s.trendColor ?? ""}`}>{s.trend}</div>
@@ -461,7 +469,7 @@ export default function AdminPage() {
                         <div><h3>Сүүлийн төлбөрүүд</h3><div className="sub">QPay болон Khan Bank</div></div>
                       </div>
                       <div className="card-body" style={{ padding: 0 }}>
-                        {(stats.recentPayments ?? []).slice(0,5).map((p: any, i: number, arr: any[]) => (
+                        {(stats.recentPayments ?? []).slice(0,5).map((p: PayRow, i: number, arr: PayRow[]) => (
                           <div key={p._id ?? i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", borderBottom: i < arr.length-1 ? "1px solid var(--border-soft)" : 0 }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>
@@ -484,7 +492,6 @@ export default function AdminPage() {
                 </>
               ) : (
                 <div style={{ textAlign: "center", padding: "80px 0", color: "var(--muted)" }}>
-                  <div style={{ fontSize: 32, marginBottom: 12 }}>📊</div>
                   Ачаалж байна...
                 </div>
               )}
@@ -496,15 +503,14 @@ export default function AdminPage() {
             <div>
               <div className="topbar">
                 <div>
-                  <h1>Шууд тоглолт</h1>
-                  <div className="sub">Сурагчидтай шууд PIN-д нэгдсэн тоглолт удирдах</div>
+                  <h1>Шууд тоглоом</h1>
+                  <div className="sub">Сурагчдыг PIN-ээр холбож, шууд асуулт-хариултын тоглоомыг удирдах</div>
                 </div>
                 <span className="badge green dot">Идэвхтэй сесс</span>
               </div>
 
               <div className="row" style={{ gridTemplateColumns: "1.5fr 1fr", alignItems: "start" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  {/* Session card */}
                   <div className="card">
                     <div className="card-head">
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -521,7 +527,7 @@ export default function AdminPage() {
                             {LIVE_PIN}
                           </div>
                           <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                            <button className="btn sm" onClick={() => navigator.clipboard?.writeText(LIVE_PIN)}>📋 Хуулах</button>
+                            <button type="button" className="btn sm" onClick={() => navigator.clipboard?.writeText(LIVE_PIN)}>PIN хуулах</button>
                           </div>
                           <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 10 }}>
                             Сурагчид{" "}
@@ -531,9 +537,9 @@ export default function AdminPage() {
                         </div>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,auto)", gap: 16, columnGap: 28 }}>
                           {[
-                            { label: "Асуулт",    value: `${liveQIdx}/10` },
-                            { label: "Сурагчид",  value: MOCK_PLAYERS.length },
-                            { label: "Хариулсан", value: `${liveRevealed ? MOCK_PLAYERS.length : Math.floor(MOCK_PLAYERS.length*.78)}/${MOCK_PLAYERS.length}` },
+                            { label: "Асуулт", value: `${liveQIdx}/10` },
+                            { label: "Сурагчид", value: MOCK_PLAYERS.length },
+                            { label: "Хариулсан", value: `${liveRevealed ? MOCK_PLAYERS.length : Math.floor(MOCK_PLAYERS.length * 0.78)}/${MOCK_PLAYERS.length}` },
                           ].map((m, i) => (
                             <div key={i}>
                               <div className="label" style={{ marginBottom: 2 }}>{m.label}</div>
@@ -544,16 +550,15 @@ export default function AdminPage() {
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 8, padding: "12px 16px", borderTop: "1px solid var(--border)", background: "var(--surface-alt)" }}>
-                      <button className="btn">⏸ Зогсоох</button>
-                      <button className="btn danger">⏹ Дуусгах</button>
+                      <button type="button" className="btn">Түр зогсоох</button>
+                      <button type="button" className="btn danger">Дуусгах</button>
                       <div style={{ flex: 1 }} />
-                      <button className="btn primary" onClick={() => { setLiveQIdx(i => Math.min(i+1,10)); setLiveCountdown(liveTimer); setLiveRevealed(false); }}>
+                      <button type="button" className="btn primary" onClick={() => { setLiveQIdx(i => Math.min(i + 1, 10)); setLiveCountdown(liveTimer); setLiveRevealed(false); }}>
                         Дараагийн асуулт →
                       </button>
                     </div>
                   </div>
 
-                  {/* Active question */}
                   <div className="card">
                     <div className="card-head">
                       <h3>Идэвхтэй асуулт</h3>
@@ -575,7 +580,7 @@ export default function AdminPage() {
                               <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10 }}>
                                 <div style={{ width: 24, height: 24, borderRadius: 4, background: reveal ? "var(--green)" : "var(--border-soft)", color: reveal ? "#fff" : "var(--text-2)", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 600, flex: "none" }}>{"ABCD"[i]}</div>
                                 <div style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "var(--text)" }}>{opt}</div>
-                                {reveal && <span style={{ color: "var(--green)" }}>✓</span>}
+                                {reveal && <span style={{ color: "var(--green)", fontSize: 12, fontWeight: 600 }}>Зөв</span>}
                                 <div style={{ fontSize: 13, fontWeight: 600, color: reveal ? "var(--green)" : "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{pct}%</div>
                               </div>
                             </div>
@@ -584,13 +589,12 @@ export default function AdminPage() {
                       </div>
                       {liveRevealed && (
                         <div style={{ marginTop: 12, padding: 10, borderRadius: 6, background: "var(--green-bg)", border: "1px solid var(--green-border)", fontSize: 13, color: "var(--green-text)", display: "flex", alignItems: "center", gap: 8 }}>
-                          ✓ Зөв хариулт: <strong>A · V = IR</strong> · {MOCK_Q.votes[MOCK_Q.correct]}% сурагч зөв хариуллаа
+                          Зөв хариулт: <strong>A · V = IR</strong> · {MOCK_Q.votes[MOCK_Q.correct]}% сурагч зөв хариуллаа
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {/* New session */}
                   <div className="card">
                     <div className="card-head"><h3>Шинэ тоглолт үүсгэх</h3></div>
                     <div className="card-body" style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
@@ -604,15 +608,14 @@ export default function AdminPage() {
                       <div style={{ width: 140 }}>
                         <label className="label">Хугацаа</label>
                         <select className="select" value={liveTimer} onChange={e => setLiveTimer(+e.target.value)}>
-                          {[15,20,30,45,60].map(t => <option key={t} value={t}>{t} секунд</option>)}
+                          {[15, 20, 30, 45, 60].map(t => <option key={t} value={t}>{t} секунд</option>)}
                         </select>
                       </div>
-                      <button className="btn primary">▶ Шинэ PIN үүсгэх</button>
+                      <button type="button" className="btn primary">Шинэ PIN үүсгэх</button>
                     </div>
                   </div>
                 </div>
 
-                {/* Leaderboard */}
                 <div className="card">
                   <div className="card-head">
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -628,14 +631,14 @@ export default function AdminPage() {
                         {MOCK_PLAYERS.map((p, i) => (
                           <tr key={i}>
                             <td style={{ color: "var(--muted)", fontVariantNumeric: "tabular-nums", fontWeight: i < 3 ? 600 : 400 }}>
-                              {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i+1}
+                              {i + 1}
                             </td>
                             <td>
                               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                 <div className="avatar" style={{ width: 28, height: 28, fontSize: 11 }}>{p.initials}</div>
                                 <div>
                                   <div style={{ fontWeight: 500, color: "var(--text)" }}>{p.name}</div>
-                                  {p.streak > 0 && <div style={{ fontSize: 11, color: "var(--amber)" }}>🔥 {p.streak}d streak</div>}
+                                  {p.streak > 0 && <div style={{ fontSize: 11, color: "var(--amber)" }}>Дараалсан {p.streak} өдөр</div>}
                                 </div>
                               </div>
                             </td>
@@ -654,12 +657,11 @@ export default function AdminPage() {
           {tab === "users" && (
             <div>
               <div className="topbar">
-                <div><h1>Хэрэглэгчид</h1><div className="sub">Нийт {users.length} хэрэглэгч бүртгэлтэй</div></div>
+                <div><h1>Хэрэглэгчид</h1><div className="sub">Системд бүртгэлтэй нийт {users.length} хэрэглэгч</div></div>
               </div>
               <div className="tab-actions">
                 <div className="search-box" style={{ width: 240 }}>
-                  🔍
-                  <input placeholder="Нэр, и-мэйл хайх..." value={search} onChange={e => setSearch(e.target.value)} />
+                  <input placeholder="Нэр, и-мэйлээр хайх..." value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
                 <select className="select" value={userRoleFilter} onChange={e => setUserRoleFilter(e.target.value)} style={{ width: 140 }}>
                   <option value="all">Бүгд</option>
@@ -668,7 +670,7 @@ export default function AdminPage() {
                   <option value="admin">Admin</option>
                 </select>
                 <div className="spacer" />
-                <button className="btn primary" onClick={loadUsers}>↻ Шинэчлэх</button>
+                <button className="btn primary" onClick={loadUsers}>Шинэчлэх</button>
               </div>
               <div className="table-wrap">
                 <table className="table">
@@ -714,7 +716,7 @@ export default function AdminPage() {
                         <td style={{ color: "var(--muted)", fontSize: 12, fontVariantNumeric: "tabular-nums" }}>{fmtDate(u.createdAt)}</td>
                         <td style={{ textAlign: "right" }}>
                           <div className="actions" style={{ justifyContent: "flex-end" }}>
-                            <button className="icon-btn">✏️</button>
+                            <button type="button" className="btn sm">Засах</button>
                           </div>
                         </td>
                       </tr>
@@ -732,24 +734,24 @@ export default function AdminPage() {
           {tab === "questions" && (
             <div>
               <div className="topbar">
-                <div><h1>Асуултууд</h1><div className="sub">Нийт {questions.length} асуулт</div></div>
+                <div><h1>Асуултын сан</h1><div className="sub">Нийт {questions.length} асуулт хадгалагдсан</div></div>
               </div>
               <div className="tab-actions">
                 <select className="select" value={qCatFilter} onChange={e => setQCatFilter(e.target.value)} style={{ width: 160 }}>
-                  <option value="all">Бүх сэдэв</option>
+                  <option value="all">Бүх ангилал</option>
                   {categories.map(c => <option key={c._id}>{c.name}</option>)}
                 </select>
                 <select className="select" value={qDiffFilter} onChange={e => setQDiffFilter(e.target.value)} style={{ width: 120 }}>
-                  <option value="all">Бүх хүнд</option>
+                  <option value="all">Бүх түвшин</option>
                   <option value="easy">Хялбар</option>
                   <option value="medium">Дунд</option>
                   <option value="hard">Хэцүү</option>
                 </select>
                 <div className="search-box" style={{ width: 220 }}>
-                  🔍<input placeholder="Асуулт хайх..." value={search} onChange={e => setSearch(e.target.value)} />
+                  <input placeholder="Асуултын текстээр хайх..." value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
                 <div className="spacer" />
-                <button className="btn primary" onClick={() => setQModal(true)}>＋ Асуулт нэмэх</button>
+                <button className="btn primary" onClick={() => setQModal(true)}>+ Асуулт нэмэх</button>
               </div>
               <div className="table-wrap">
                 <table className="table">
@@ -779,8 +781,8 @@ export default function AdminPage() {
                         <td style={{ color: "var(--indigo)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>+{q.xpReward}</td>
                         <td style={{ textAlign: "right" }}>
                           <div className="actions" style={{ justifyContent: "flex-end" }}>
-                            <button className="icon-btn">✏️</button>
-                            <button className="icon-btn" style={{ color: "var(--red)" }}>🗑</button>
+                            <button type="button" className="btn sm">Засах</button>
+                            <button type="button" className="btn sm danger">Устгах</button>
                           </div>
                         </td>
                       </tr>
@@ -798,27 +800,27 @@ export default function AdminPage() {
           {tab === "categories" && (
             <div>
               <div className="topbar">
-                <div><h1>Сэдвүүд</h1><div className="sub">{categories.length} сэдэв нийт</div></div>
+                <div><h1>Ангилал</h1><div className="sub">{categories.length} ангилал бүртгэлтэй</div></div>
               </div>
               <div className="tab-actions">
                 <div className="spacer" />
-                <button className="btn primary" onClick={() => setCatModal(true)}>＋ Сэдэв нэмэх</button>
+                <button className="btn primary" onClick={() => setCatModal(true)}>+ Ангилал нэмэх</button>
               </div>
               <div className="row c3">
                 {categories.map(c => (
                   <div key={c._id} className="card">
                     <div style={{ padding: 16 }}>
                       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 8, background: c.color + "22", color: c.color, display: "grid", placeItems: "center", fontSize: 20 }}>
-                          {c.icon}
+                        <div style={{ width: 36, height: 36, borderRadius: 8, background: c.color + "22", color: c.color, display: "grid", placeItems: "center", fontSize: 14, fontWeight: 700 }}>
+                          {c.icon?.trim() ? c.icon : (c.name?.[0]?.toUpperCase() ?? "—")}
                         </div>
                         <span className={`badge ${c.isActive ? "green dot" : "gray"}`}>{c.isActive ? "Идэвхтэй" : "Идэвхгүй"}</span>
                       </div>
                       <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>{c.name}</div>
                       <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 14 }}>{c.totalLevels} level · Дараалал {c.order}</div>
                       <div style={{ display: "flex", gap: 6 }}>
-                        <button className="btn sm" style={{ flex: 1 }}>✏️ Засах</button>
-                        <button className="btn sm" style={{ flex: 1 }}>📋 Асуултууд</button>
+                        <button type="button" className="btn sm" style={{ flex: 1 }}>Засах</button>
+                        <button type="button" className="btn sm" style={{ flex: 1 }}>Асуултууд</button>
                       </div>
                     </div>
                   </div>
@@ -826,8 +828,8 @@ export default function AdminPage() {
                 <button onClick={() => setCatModal(true)} style={{ background: "transparent", border: "1px dashed var(--border)", borderRadius: 8, padding: 16, color: "var(--muted)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, minHeight: 180, transition: "all .1s" }}
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--indigo)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--indigo)"; (e.currentTarget as HTMLButtonElement).style.background = "var(--indigo-50)"; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--muted)"; (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}>
-                  <span style={{ fontSize: 22 }}>＋</span>
-                  <span style={{ fontSize: 13, fontWeight: 500 }}>Шинэ сэдэв нэмэх</span>
+                  <span style={{ fontSize: 22 }}>+</span>
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>Шинэ ангилал нэмэх</span>
                 </button>
               </div>
             </div>
@@ -837,29 +839,30 @@ export default function AdminPage() {
           {tab === "payments" && (
             <div>
               <div className="topbar">
-                <div><h1>Төлбөр</h1><div className="sub">QPay болон Khan Bank гүйлгээнүүд</div></div>
+                <div><h1>Орлого ба төлбөр</h1><div className="sub">QPay, Khan Bank-ийн гүйлгээний жагсаалт</div></div>
               </div>
               <div className="stat-grid" style={{ marginBottom: 20 }}>
-                {[
-                  { icon: "💰", label: "Нийт орлого",       value: "8.42M₮",  trend: "Бүх цаг хугацаа" },
-                  { icon: "📈", label: "Энэ сарын орлого",   value: "2.15M₮",  trend: "+18.4% өмнөх сар", trendColor: "green" },
-                  { icon: "📱", label: "QPay орлого",         value: "4.92M₮",  trend: "58% эзлэх" },
-                  { icon: "🏦", label: "Khan Bank",           value: "3.50M₮",  trend: "42% эзлэх" },
-                ].map((s, i) => (
+                {(
+                  [
+                    { label: "Нийт орлого", value: "8.42M₮", trend: "Бүх цагийн дүн" },
+                    { label: "Энэ сарын орлого", value: "2.15M₮", trend: "+18.4% өмнөх сартай харьцуулав", trendColor: "green" },
+                    { label: "QPay-ээр орсон", value: "4.92M₮", trend: "Нийт орлогын 58%" },
+                    { label: "Khan Bank-аар орсон", value: "3.50M₮", trend: "Нийт орлогын 42%" },
+                  ] satisfies ReadonlyArray<{ label: string; value: string; trend: string; trendColor?: string }>
+                ).map((s, i) => (
                   <div key={i} className="stat">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                    <div style={{ marginBottom: 4 }}>
                       <span className="stat-label">{s.label}</span>
-                      <span style={{ fontSize: 20 }}>{s.icon}</span>
                     </div>
                     <div className="stat-value">{s.value}</div>
-                    <div className={`stat-trend ${(s as any).trendColor ?? ""}`}>{s.trend}</div>
+                    <div className={`stat-trend ${s.trendColor ?? ""}`}>{s.trend}</div>
                   </div>
                 ))}
               </div>
               <div className="tab-actions">
                 <span style={{ fontSize: 13, color: "var(--muted)" }}>Саяхны гүйлгээнүүд</span>
                 <div className="spacer" />
-                <button className="btn">⬇ Excel экспорт</button>
+                <button className="btn">Excel экспорт</button>
               </div>
               <div className="table-wrap">
                 <table className="table">
@@ -874,7 +877,7 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(stats?.recentPayments ?? []).map((p: any, i: number) => (
+                    {(stats?.recentPayments ?? []).map((p: PayRow, i: number) => (
                       <tr key={p._id ?? i}>
                         <td>
                           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -910,12 +913,12 @@ export default function AdminPage() {
             <div>
               <div className="topbar">
                 <div>
-                  <h1>Шалгалтын удирдлага</h1>
-                  <div className="sub">Шалгалт үүсгэх, сурагчдын үр дүнг хянах</div>
+                  <h1>Шалгалтууд</h1>
+                  <div className="sub">Шалгалт үүсгэж, сурагчдын оролдлогыг хянах</div>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button className="btn" onClick={loadExams}>↻ Шинэчлэх</button>
-                  <button className="btn primary" onClick={() => { setExamForm(DEFAULT_EXAM_FORM); setExamModal(true); }}>＋ Шалгалт нэмэх</button>
+                  <button className="btn" onClick={loadExams}>Шинэчлэх</button>
+                  <button className="btn primary" onClick={() => { setExamForm(DEFAULT_EXAM_FORM); setExamModal(true); }}>+ Шалгалт нэмэх</button>
                 </div>
               </div>
 
@@ -924,9 +927,8 @@ export default function AdminPage() {
                 <div>
                   {exams.length === 0 ? (
                     <div style={{ textAlign: "center", padding: "60px 0", color: "var(--muted)", background: "var(--surface)", borderRadius: 8, border: "1px solid var(--border)" }}>
-                      <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
-                      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Шалгалт байхгүй байна</div>
-                      <button className="btn primary" onClick={() => setExamModal(true)} style={{ marginTop: 12 }}>＋ Анхны шалгалтаа нэмэх</button>
+                      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Одоогоор шалгалт үүсээгүй байна</div>
+                      <button className="btn primary" onClick={() => setExamModal(true)} style={{ marginTop: 12 }}>+ Анхны шалгалтаа нэмэх</button>
                     </div>
                   ) : (
                     <div className="table-wrap">
@@ -944,10 +946,7 @@ export default function AdminPage() {
                           {exams.map(exam => (
                             <tr key={exam._id} style={{ cursor: "pointer" }} onClick={() => { setSelectedExam(exam); loadAttempts(exam._id); }}>
                               <td>
-                                <div style={{ fontWeight: 600, color: "var(--text)", display: "flex", alignItems: "center", gap: 8 }}>
-                                  <span style={{ fontSize: 16 }}>📝</span>
-                                  {exam.title}
-                                </div>
+                                <div style={{ fontWeight: 600, color: "var(--text)" }}>{exam.title}</div>
                                 {exam.description && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{exam.description}</div>}
                               </td>
                               <td style={{ color: "var(--indigo)", fontWeight: 600 }}>{exam.questions?.length ?? 0}</td>
@@ -955,7 +954,7 @@ export default function AdminPage() {
                               <td style={{ fontSize: 12, color: "var(--muted)" }}>{fmtDate(exam.createdAt)}</td>
                               <td style={{ textAlign: "right" }}>
                                 <div className="actions" style={{ justifyContent: "flex-end" }} onClick={e => e.stopPropagation()}>
-                                  <button className="icon-btn" style={{ color: "var(--red)" }} onClick={() => deleteExam(exam._id)}>🗑</button>
+                                  <button type="button" className="btn sm danger" onClick={() => deleteExam(exam._id)}>Устгах</button>
                                 </div>
                               </td>
                             </tr>
@@ -973,17 +972,16 @@ export default function AdminPage() {
                     <div className="card" style={{ marginBottom: 12 }}>
                       <div className="card-head">
                         <div>
-                          <h3>📊 {selectedExam.title}</h3>
+                          <h3>{selectedExam.title}</h3>
                           <div className="sub">{examAttempts.length} оролдлого</div>
                         </div>
-                        <button className="icon-btn" onClick={() => { setSelectedExam(null); setExamAttempts([]); }}>✕</button>
+                        <button type="button" className="icon-btn" onClick={() => { setSelectedExam(null); setExamAttempts([]); }} title="Хаах">×</button>
                       </div>
                     </div>
 
                     {examAttempts.length === 0 ? (
                       <div style={{ textAlign: "center", padding: "40px", color: "var(--muted)", background: "var(--surface)", borderRadius: 8, border: "1px solid var(--border)" }}>
-                        <div style={{ fontSize: 28, marginBottom: 8 }}>👤</div>
-                        Сурагчид одоогоор шалгалт өгөөгүй байна
+                        Одоогоор энэ шалгалтыг өгсөн сурагч алга
                       </div>
                     ) : (
                       <div className="table-wrap">
@@ -997,7 +995,7 @@ export default function AdminPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {examAttempts.map((a, i) => {
+                            {examAttempts.map((a) => {
                               const pct = a.percentage ?? (a.totalQuestions > 0 ? Math.round((a.score / a.totalQuestions) * 100) : 0);
                               return (
                                 <tr key={a._id}>
@@ -1047,7 +1045,7 @@ export default function AdminPage() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-head">
               <h2>Асуулт нэмэх</h2>
-              <button className="icon-btn" onClick={() => setQModal(false)}>✕</button>
+              <button type="button" className="icon-btn" onClick={() => setQModal(false)} title="Хаах">×</button>
             </div>
             <div className="modal-body">
               <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 140px", gap: 12, marginBottom: 14 }}>
@@ -1113,8 +1111,8 @@ export default function AdminPage() {
         <div className="modal-overlay" onClick={() => setCatModal(false)}>
           <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
             <div className="modal-head">
-              <h2>Сэдэв нэмэх</h2>
-              <button className="icon-btn" onClick={() => setCatModal(false)}>✕</button>
+              <h2>Ангилал нэмэх</h2>
+              <button type="button" className="icon-btn" onClick={() => setCatModal(false)} title="Хаах">×</button>
             </div>
             <div className="modal-body">
               <div className="field">
@@ -1122,8 +1120,8 @@ export default function AdminPage() {
                 <input className="input" placeholder="Жишээ: Оптик" value={catForm.name} onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))} />
               </div>
               <div className="field">
-                <label className="label">Icon (emoji)</label>
-                <input className="input" placeholder="⚡" value={catForm.icon} onChange={e => setCatForm(f => ({ ...f, icon: e.target.value }))} />
+                <label className="label">Жижиг тэмдэг (нэг тэмдэгт)</label>
+                <input className="input" placeholder="Жишээ нь: Ц" value={catForm.icon} onChange={e => setCatForm(f => ({ ...f, icon: e.target.value }))} />
               </div>
               <div className="field">
                 <label className="label">Өнгө (hex)</label>
@@ -1153,8 +1151,8 @@ export default function AdminPage() {
         <div className="modal-overlay" onClick={() => setExamModal(false)}>
           <div className="modal" style={{ maxWidth: 680 }} onClick={e => e.stopPropagation()}>
             <div className="modal-head">
-              <h2>📝 Шинэ шалгалт үүсгэх</h2>
-              <button className="icon-btn" onClick={() => setExamModal(false)}>✕</button>
+              <h2>Шинэ шалгалт үүсгэх</h2>
+              <button type="button" className="icon-btn" onClick={() => setExamModal(false)} title="Хаах">×</button>
             </div>
             <div className="modal-body">
               {/* Basic info */}
@@ -1176,7 +1174,7 @@ export default function AdminPage() {
               {/* Questions */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                 <div style={{ fontWeight: 600, color: "var(--text)" }}>Асуултууд ({examForm.questions.length})</div>
-                <button className="btn sm primary" onClick={addExamQuestion}>＋ Асуулт нэмэх</button>
+                <button className="btn sm primary" onClick={addExamQuestion}>+ Асуулт нэмэх</button>
               </div>
 
               <div style={{ maxHeight: 400, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
@@ -1185,7 +1183,7 @@ export default function AdminPage() {
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                       <span style={{ fontWeight: 600, fontSize: 13, color: "var(--text)" }}>Асуулт {qi + 1}</span>
                       {examForm.questions.length > 1 && (
-                        <button className="icon-btn" style={{ color: "var(--red)" }} onClick={() => removeExamQuestion(q.id)}>🗑</button>
+                        <button type="button" className="btn sm danger" onClick={() => removeExamQuestion(q.id)}>Хасах</button>
                       )}
                     </div>
                     <div className="field" style={{ marginBottom: 10 }}>
@@ -1200,14 +1198,14 @@ export default function AdminPage() {
                         </label>
                       ))}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 6 }}>☝ Зөв хариулт: <b>{q.correctAnswer}</b></div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 6 }}>Зөв хариултыг сонгоно уу: <b>{q.correctAnswer}</b></div>
                   </div>
                 ))}
               </div>
             </div>
             <div className="modal-foot">
               <button className="btn" onClick={() => setExamModal(false)}>Болих</button>
-              <button className="btn primary" disabled={submitting} onClick={saveExam}>{submitting ? "Хадгалж байна..." : "✅ Шалгалт хадгалах"}</button>
+              <button className="btn primary" disabled={submitting} onClick={saveExam}>{submitting ? "Хадгалж байна..." : "Шалгалт хадгалах"}</button>
             </div>
           </div>
         </div>
