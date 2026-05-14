@@ -6,6 +6,20 @@ import bcrypt from "bcryptjs";
 import { connectDB } from "./mongodb";
 import { User } from "@/models/User";
 
+/** Google OAuth profile fields used when auto-creating a user */
+interface GoogleNameProfile {
+  given_name?: string;
+  family_name?: string;
+}
+
+/** Mongoose user document fields used by streak logic */
+interface UserDocForStreak {
+  lastLoginDate?: Date;
+  streak?: number;
+  coins?: number;
+  save(): Promise<unknown>;
+}
+
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
@@ -94,11 +108,13 @@ export const authOptions: NextAuthOptions = {
         const email = user.email!.toLowerCase();
 
         let dbUser = await User.findOne({ email });
+        const gp = profile as GoogleNameProfile | undefined;
+
         if (!dbUser) {
           // Auto-create from Google
           dbUser = await User.create({
-            firstName: (profile as any)?.given_name ?? user.name?.split(" ")[0] ?? "Google",
-            lastName: (profile as any)?.family_name ?? user.name?.split(" ")[1] ?? "User",
+            firstName: gp?.given_name ?? user.name?.split(" ")[0] ?? "Google",
+            lastName: gp?.family_name ?? user.name?.split(" ")[1] ?? "User",
             email,
             googleId: account.providerAccountId,
             avatar: user.image,
@@ -113,13 +129,13 @@ export const authOptions: NextAuthOptions = {
         await updateStreak(dbUser);
 
         user.id = dbUser._id.toString();
-        (user as any).role = dbUser.role;
-        (user as any).isPremium = dbUser.isPremium;
-        (user as any).xp = dbUser.xp;
-        (user as any).level = dbUser.level;
-        (user as any).coins = dbUser.coins;
-        (user as any).lives = dbUser.lives;
-        (user as any).streak = dbUser.streak;
+        user.role = dbUser.role;
+        user.isPremium = dbUser.isPremium;
+        user.xp = dbUser.xp;
+        user.level = dbUser.level;
+        user.coins = dbUser.coins;
+        user.lives = dbUser.lives;
+        user.streak = dbUser.streak;
       }
       return true;
     },
@@ -127,13 +143,13 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
-        token.role = (user as any).role;
-        token.isPremium = (user as any).isPremium;
-        token.xp = (user as any).xp;
-        token.level = (user as any).level;
-        token.coins = (user as any).coins;
-        token.lives = (user as any).lives;
-        token.streak = (user as any).streak;
+        token.role = user.role;
+        token.isPremium = user.isPremium;
+        token.xp = user.xp;
+        token.level = user.level;
+        token.coins = user.coins;
+        token.lives = user.lives;
+        token.streak = user.streak;
       }
       // Allow updating session
       if (trigger === "update" && session) {
@@ -159,7 +175,7 @@ export const authOptions: NextAuthOptions = {
 };
 
 // ── Streak helper ────────────────────────────────────────────────────────────
-async function updateStreak(user: any) {
+async function updateStreak(user: UserDocForStreak) {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const lastLogin = user.lastLoginDate

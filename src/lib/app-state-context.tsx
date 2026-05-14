@@ -27,14 +27,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   // Sync from session on login
   useEffect(() => {
     if (status === 'authenticated' && session?.user && !initialized) {
-      const u = session.user as any;
+      const u = session.user;
       setAppStateRaw({
-        xp:     Number(u.xp     ?? 0),
-        level:  Number(u.level  ?? 1),
-        coins:  Number(u.coins  ?? 100),
-        lives:  Number(u.lives  ?? 5),
+        xp:     Number(u.xp ?? 0),
+        level:  Number(u.level ?? 1),
+        coins:  Number(u.coins ?? 100),
+        lives:  Number(u.lives ?? 5),
         streak: Number(u.streak ?? 0),
-        name:   u.name ?? 'Сурагч',
+        name:   u.name ?? "Сурагч",
       });
       setInitialized(true);
     }

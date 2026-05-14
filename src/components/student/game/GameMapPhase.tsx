@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { Ic } from '@/components/ui';
 import {
   getTopics, getStars, getSettings, LEVELS_PER_TOPIC,
@@ -211,7 +212,25 @@ function SubjectSection({ topic, topicIdx, topicStars, currentNodeIdx, topicStat
               {isCurr && isActiveTopic && nodeStatus === 'current' && (
                 <div style={{ position: 'absolute', right: offset === 'off-r' || offset === 'off-r2' ? 'auto' : -150, left: offset === 'off-r' || offset === 'off-r2' ? -150 : 'auto', top: -24, zIndex: 4, pointerEvents: 'none', animation: 'cp-bob 4.2s ease-in-out infinite' }}>
                   <div style={{ position: 'absolute', inset: -20, background: `radial-gradient(circle,${topic.color}66 0%,transparent 65%)`, filter: 'blur(8px)', animation: 'cp-glow 3s ease-in-out infinite' }} />
-                  <img src="/cyberphysic-logo.png" alt="" onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} style={{ width: 110, height: 110, objectFit: 'contain', display: 'block', clipPath: 'inset(42% 0 0 52%)', transform: 'scale(2.1) translate(-10px, 10px)', transformOrigin: 'top right', filter: `drop-shadow(0 8px 24px ${topic.color}88)` }} />
+                  <Image
+                    src="/cyberphysic-logo.png"
+                    alt=""
+                    width={110}
+                    height={110}
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
+                    }}
+                    style={{
+                      width: 110,
+                      height: 110,
+                      objectFit: "contain",
+                      display: "block",
+                      clipPath: "inset(42% 0 0 52%)",
+                      transform: "scale(2.1) translate(-10px, 10px)",
+                      transformOrigin: "top right",
+                      filter: `drop-shadow(0 8px 24px ${topic.color}88)`,
+                    }}
+                  />
                 </div>
               )}
               <LessonNode index={i} type={meta.type} nodeStatus={nodeStatus} starCount={nodeSt} topicColor={topic.color} topicState={topicState} xpReward={xpReward} onClick={() => !isLock && onSelectLevel(i + 1)} />
