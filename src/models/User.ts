@@ -10,6 +10,8 @@ const UserSchema = new Schema(
     phone:        { type: String },
     province:     { type: String },
     school:       { type: String },
+    /** Дунд сургуулийн анги (6–12), сурагчид */
+    grade:        { type: Number, min: 6, max: 12 },
     role:         { type: String, enum: ["student", "teacher", "admin"], default: "student" },
     googleId:     { type: String, sparse: true },
     avatar:       { type: String },

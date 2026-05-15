@@ -69,6 +69,8 @@ export interface IUser {
   phone?: string;
   province?: string;
   school?: string;
+  /** Дунд сургуулийн анги (6–12) */
+  grade?: number;
   role: UserRole;
   isVerified: boolean;
   isPremium: boolean;

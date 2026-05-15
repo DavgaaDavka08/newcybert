@@ -20,6 +20,10 @@ interface UserDocForStreak {
   save(): Promise<unknown>;
 }
 
+const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+const googleConfigured = Boolean(googleClientId && googleClientSecret);
+
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
@@ -30,11 +34,14 @@ export const authOptions: NextAuthOptions = {
   },
 
   providers: [
-    // ── Google OAuth ──────────────────────────────────
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
+    ...(googleConfigured
+      ? [
+          GoogleProvider({
+            clientId: googleClientId!,
+            clientSecret: googleClientSecret!,
+          }),
+        ]
+      : []),
 
     // ── Credentials (email + password) ───────────────
     CredentialsProvider({
@@ -67,6 +74,7 @@ export const authOptions: NextAuthOptions = {
             coins: 9999,
             lives: 99,
             streak: 0,
+            grade: undefined,
           };
         }
 
@@ -88,6 +96,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: `${user.firstName} ${user.lastName}`,
           role: user.role,
+          grade: typeof user.grade === "number" ? user.grade : undefined,
           isPremium: user.isPremium,
           xp: user.xp,
           level: user.level,
@@ -130,6 +139,7 @@ export const authOptions: NextAuthOptions = {
 
         user.id = dbUser._id.toString();
         user.role = dbUser.role;
+        user.grade = typeof dbUser.grade === "number" ? dbUser.grade : undefined;
         user.isPremium = dbUser.isPremium;
         user.xp = dbUser.xp;
         user.level = dbUser.level;
@@ -144,6 +154,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.grade = user.grade;
         token.isPremium = user.isPremium;
         token.xp = user.xp;
         token.level = user.level;
@@ -162,6 +173,7 @@ export const authOptions: NextAuthOptions = {
       if (token && session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
+        session.user.grade = token.grade as number | undefined;
         session.user.isPremium = token.isPremium as boolean;
         session.user.xp = token.xp as number;
         session.user.level = token.level as number;

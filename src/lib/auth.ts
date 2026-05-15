@@ -38,12 +38,3 @@ export function apiError(message: string, status = 400) {
 export function validatePhone(phone: string): boolean {
   return /^[89]\d{7}$/.test(phone.replace(/\s/g, ""));
 }
-
-// Provinces list
-export const PROVINCES = [
-  "Улаанбаатар", "Архангай", "Баян-Өлгий", "Баянхонгор",
-  "Булган", "Говь-Алтай", "Говьсүмбэр", "Дархан-Уул",
-  "Дорноговь", "Дорнод", "Дундговь", "Завхан", "Орхон",
-  "Өвөрхангай", "Өмнөговь", "Сүхбаатар", "Сэлэнгэ",
-  "Төв", "Увс", "Ховд", "Хөвсгөл", "Хэнтий",
-];

@@ -3,12 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-
-const PROVINCES = [
-  "Улаанбаатар","Архангай","Баян-Өлгий","Баянхонгор","Булган","Говь-Алтай",
-  "Говьсүмбэр","Дархан-Уул","Дорноговь","Дорнод","Дундговь","Завхан","Орхон",
-  "Өвөрхангай","Өмнөговь","Сүхбаатар","Сэлэнгэ","Төв","Увс","Ховд","Хөвсгөл","Хэнтий",
-];
+import { PROVINCES, SCHOOL_GRADES } from "@/lib/mn-constants";
 
 /* ─── Decorative shapes on the right bg ─── */
 type Shape = { type: string; x: number; y: number; size: number; color: string; rot?: number };
@@ -192,7 +187,7 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
 function RegisterTab({ onSwitch }: { onSwitch: () => void }) {
   const [form, setForm] = useState({
     firstName: "", lastName: "", email: "", password: "",
-    phone: "", province: "", school: "", role: "student",
+    phone: "", province: "", school: "", grade: "", role: "student",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
@@ -206,7 +201,10 @@ function RegisterTab({ onSwitch }: { onSwitch: () => void }) {
     setError(""); setSuccess(""); setLoading(true);
     const res  = await fetch("/api/auth/register", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        grade: form.grade === "" ? undefined : Number(form.grade),
+      }),
     });
     const data = await res.json();
     setLoading(false);
@@ -284,31 +282,27 @@ function RegisterTab({ onSwitch }: { onSwitch: () => void }) {
           </div>
         </div>
 
-        <div style={{ marginBottom: 12 }}>
+        <div style={{ marginBottom: 10 }}>
           <label style={lbl}>СУРГУУЛЬ</label>
           <input value={form.school} onChange={e => upd("school", e.target.value)}
             placeholder="Сургуулийн нэр" style={inp} />
         </div>
 
-        <div style={{ marginBottom: 18 }}>
-          <label style={lbl}>ДҮР СОНГОХ</label>
-          <div style={{ display: "flex", gap: 8 }}>
-            {[
-              { v: "student", label: "Сурагч", sub: "Асуулт бодно, XP цуглуулна" },
-              { v: "teacher", label: "Багш",   sub: "Анги удирдана, тайлан харна" },
-            ].map(opt => (
-              <button key={opt.v} type="button" onClick={() => upd("role", opt.v)} style={{
-                flex: 1, padding: "10px 8px", borderRadius: 10, cursor: "pointer", textAlign: "left",
-                border: `1.5px solid ${form.role === opt.v ? "#4361EE" : "rgba(255,255,255,0.1)"}`,
-                background: form.role === opt.v ? "rgba(67,97,238,0.12)" : "rgba(255,255,255,0.03)",
-                color: form.role === opt.v ? "#A5B4FC" : "#94A3B8",
-                fontFamily: "inherit", transition: "all .2s",
-              }}>
-                <div style={{ fontWeight: 800, fontSize: 13 }}>{opt.label}</div>
-                <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2, lineHeight: 1.3 }}>{opt.sub}</div>
-              </button>
+        <div style={{ marginBottom: 12 }}>
+          <label style={lbl}>АНГИ</label>
+          <select
+            value={form.grade}
+            onChange={e => upd("grade", e.target.value)}
+            required
+            style={{ ...inp, cursor: "pointer" }}
+          >
+            <option value="">-- Сонгох --</option>
+            {SCHOOL_GRADES.map((g) => (
+              <option key={g} value={g}>
+                {g}-р анги
+              </option>
             ))}
-          </div>
+          </select>
         </div>
 
         <button type="submit" disabled={loading} style={{

@@ -4,14 +4,19 @@ import bcrypt from "bcryptjs";
 import { connectDB } from "@/lib/mongodb";
 import { User } from "@/models/User";
 import { sendWelcomeEmail } from "@/lib/email";
-import { PROVINCES } from "@/lib/auth";
+import { PROVINCES, isValidSchoolGrade } from "@/lib/mn-constants";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { firstName, lastName, email, password, phone, province, school, role } = body;
+    const { firstName, lastName, email, password, phone, province, school, role, grade } = body;
 
-    // Validation
+    const gradeNum =
+      grade === undefined || grade === null || grade === ""
+        ? NaN
+        : typeof grade === "number"
+          ? grade
+          : parseInt(String(grade), 10);
     if (!firstName || !lastName || !email || !password) {
       return NextResponse.json({ error: "Бүх заавал талбарыг бөглөнө үү" }, { status: 400 });
     }
@@ -25,6 +30,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Аймаг/нийслэл буруу байна" }, { status: 400 });
     }
 
+    const effectiveRole = role === "teacher" ? "teacher" : "student";
+    if (effectiveRole === "student" && !isValidSchoolGrade(gradeNum)) {
+      return NextResponse.json({ error: "6–12 хүртэл анги сонгоно уу" }, { status: 400 });
+    }
+
     await connectDB();
 
     const existing = await User.findOne({ email: email.toLowerCase().trim() });
@@ -36,7 +46,7 @@ export async function POST(req: NextRequest) {
 
     // Generate teacher code if teacher role
     let teacherCode: string | undefined;
-    if (role === "teacher") {
+    if (effectiveRole === "teacher") {
       teacherCode = `TCP-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     }
 
@@ -48,7 +58,8 @@ export async function POST(req: NextRequest) {
       phone,
       province,
       school,
-      role: role === "teacher" ? "teacher" : "student",
+      ...(effectiveRole === "student" ? { grade: gradeNum } : {}),
+      role: effectiveRole,
       teacherCode,
       isVerified: true, // Email verification disabled for simplicity
       coins: 100, // Welcome bonus
