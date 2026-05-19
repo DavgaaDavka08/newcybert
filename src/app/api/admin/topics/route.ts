@@ -9,7 +9,7 @@ export async function GET() {
     await connectDB();
     const topics = await TopicModel.find({ isActive: true }).sort({ order: 1 }).lean();
     return NextResponse.json({ topics });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       order: count,
     });
     return NextResponse.json({ topic });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

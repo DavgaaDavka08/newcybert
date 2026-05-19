@@ -6,7 +6,7 @@ import {
   getTopics, getStars, getSettings, LEVELS_PER_TOPIC,
   getLessonSequence,
   getTopicsV2, getStarsV2,
-  type LessonType, type GameTopic, type GameTopicWithSubtopics,
+  type LessonType, type GameTopic, type GameTopicWithSubtopics, type GameSubtopic,
 } from '@/lib/game-data';
 import type { AppState } from '@/types';
 

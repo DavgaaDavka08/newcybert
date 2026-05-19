@@ -1,10 +1,8 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
 import { GameMapPhase } from './game/GameMapPhase';
 import { GameQuizPhase } from './game/GameQuizPhase';
 import { GameResultPhase } from './game/GameResultPhase';
-import { GamePathAdminPanel } from './game/GamePathAdminPanel';
 import {
   getTopics, getQuestions, getSettings, getLivesState, setLivesState,
   setNodeStars, calcStars, hydrateGamePathFromApi, hydrateTopicsV2, getLessonSequence,
@@ -87,9 +85,7 @@ function NoLivesOverlay({ refillAt, coins, refillCoins, livesCount, onRefillCoin
 }
 
 export function GameScreen({ onNav: _onNav, state, setState }: Props) {
-  const { data: session } = useSession();
   const { refreshStats } = useAppState();
-  const isAdmin = session?.user?.role === 'admin';
   const [topicIdx, setTopicIdx]     = useState(0);
   const [phase, setPhase]           = useState<'map' | 'quiz' | 'result'>('map');
   const [selectedLv, setSelectedLv] = useState<{ topic: GameTopic; level: number; subtopicId?: string } | null>(null);
@@ -255,13 +251,6 @@ export function GameScreen({ onNav: _onNav, state, setState }: Props) {
 
   if (phase === 'map') return (
     <>
-      {isAdmin && (
-        <GamePathAdminPanel
-          onSaved={() => {
-            void hydrateGamePathFromApi().finally(() => setMapReload(r => r + 1));
-          }}
-        />
-      )}
       <GameMapPhase state={{ ...state, lives }} topicIdx={topicIdx} onTopicIdx={setTopicIdx} reloadSignal={mapReload}
         onSelectLevel={(topicName, level) => {
           // V2: subtopicId is passed as a string
