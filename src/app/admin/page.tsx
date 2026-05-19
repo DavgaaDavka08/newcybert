@@ -3,16 +3,8 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 
-/* ─── Types ─────────────────────────────────────────────── */
-type Tab = "overview" | "live" | "users" | "questions" | "categories" | "payments" | "exams";
-
-interface ExamOption { id: string; text: string; }
-interface ExamQuestion { id: string; question: string; options: ExamOption[]; correctAnswer: string; }
-interface ExamItem { _id: string; title: string; description?: string; duration: number; questions: ExamQuestion[]; createdAt: string; }
-interface AttemptRow { _id: string; studentId?: { firstName?: string; lastName?: string; email?: string }; score: number; totalQuestions: number; percentage?: number; finishedAt?: string; }
-
-const DEFAULT_EXAM_FORM = { title: "", description: "", duration: 60, questions: [{ id: "1", question: "", options: [{ id: "A", text: "" },{ id: "B", text: "" },{ id: "C", text: "" },{ id: "D", text: "" }], correctAnswer: "A" }] };
-function uid() { return Math.random().toString(36).slice(2); }
+// ── Types ─────────────────────────────────────────────────────
+type Tab = "overview" | "live" | "users" | "questions" | "categories" | "exams";
 
 interface Stats {
   totalUsers: number; premiumUsers: number; todayActive: number;
@@ -26,7 +18,7 @@ interface User {
 }
 interface Question {
   _id: string; question: string; difficulty: string; level: number;
-  xpReward: number; categoryId: { name: string; icon: string };
+  xpReward: number; categoryId: { _id?: string; name: string; icon: string };
 }
 interface Category {
   _id: string; name: string; icon: string; color: string;
@@ -36,154 +28,127 @@ interface PayRow {
   _id: string; userId: { firstName?: string; lastName?: string; email?: string } | string;
   amount: number; type: string; status: string; method: string; createdAt: string;
 }
+interface ExamOption { id: string; text: string; }
+interface ExamQuestion { id: string; question: string; options: ExamOption[]; correctAnswer: string; }
+interface ExamItem { _id: string; title: string; description?: string; duration: number; questions: ExamQuestion[]; createdAt: string; }
+interface AttemptRow { _id: string; studentId?: { firstName?: string; lastName?: string; email?: string }; score: number; totalQuestions: number; percentage?: number; finishedAt?: string; }
+interface LbEntry { name: string; initials: string; score: number; streak: number; }
 
-/* ─── Q Form ─────────────────────────────────────────────── */
+// ── Defaults ──────────────────────────────────────────────────
 const DEFAULT_QFORM = {
   categoryId: "", level: 1, question: "", options: ["", "", "", ""],
   correctIndex: 0, explanation: "", difficulty: "medium", xpReward: 10, coinReward: 5,
 };
 const DEFAULT_CATFORM = { name: "", icon: "", color: "#4F46E5", totalLevels: 5, order: 0 };
-
-/* ─── Live game local mock ─────────────────────────────────── */
-const MOCK_Q = {
-  text: "Ом-ын хуулийн томьёо аль нь вэ?",
-  options: ["V = IR", "F = ma", "P = IV", "E = mc²"],
-  correct: 0,
-  votes: [72, 12, 10, 6],
+const DEFAULT_EXAM_FORM = {
+  title: "", description: "", duration: 60,
+  questions: [{ id: "1", question: "", options: [{ id: "A", text: "" }, { id: "B", text: "" }, { id: "C", text: "" }, { id: "D", text: "" }], correctAnswer: "A" }],
 };
 
-const CHART_DATA = [45, 72, 38, 91, 64, 83, 57];
-
-/* ─── Helpers ─────────────────────────────────────────────── */
-function initials(u: User) {
-  return `${u.firstName?.[0] ?? ""}${u.lastName?.[0] ?? ""}`.toUpperCase() || "?";
-}
+function uid() { return Math.random().toString(36).slice(2); }
 function fmtDate(s: string) {
   return new Date(s).toLocaleDateString("mn-MN", { year: "numeric", month: "short", day: "numeric" });
 }
-
-function initialsFromDisplayName(name: string) {
+function initials2(a?: string, b?: string) {
+  return `${a?.[0] ?? ""}${b?.[0] ?? ""}`.toUpperCase() || "?";
+}
+function initialsFromName(name: string) {
   const p = name.trim().split(/\s+/).filter(Boolean);
-  if (p.length >= 2) return `${p[0][0] ?? ""}${p[1][0] ?? ""}`.toUpperCase() || "?";
-  const w = p[0] || "?";
-  return w.slice(0, 2).toUpperCase();
+  if (p.length >= 2) return `${p[0][0] ?? ""}${p[1][0] ?? ""}`.toUpperCase();
+  return (p[0] ?? "?").slice(0, 2).toUpperCase();
 }
 
-/* ═══════════════════════════════════════════════════════════
-   MAIN COMPONENT
-═══════════════════════════════════════════════════════════ */
+// ── Main Component ─────────────────────────────────────────────
 export default function AdminPage() {
   const { data: session, status } = useSession();
-  const router  = useRouter();
-  const [tab, setTab]   = useState<Tab>("overview");
-  const [stats, setStats]   = useState<Stats | null>(null);
-  const [users, setUsers]   = useState<User[]>([]);
+  const router = useRouter();
+  const [tab, setTab] = useState<Tab>("overview");
+
+  // Data
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [exams, setExams] = useState<ExamItem[]>([]);
+  const [lbPlayers, setLbPlayers] = useState<LbEntry[]>([]);
+  const [examAttempts, setExamAttempts] = useState<AttemptRow[]>([]);
+  const [selectedExam, setSelectedExam] = useState<ExamItem | null>(null);
+
+  // UI state
   const [search, setSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("all");
   const [qCatFilter, setQCatFilter] = useState("all");
   const [qDiffFilter, setQDiffFilter] = useState("all");
+  const [loading, setLoading] = useState(false);
+
+  // Modals
   const [qModal, setQModal] = useState(false);
   const [catModal, setCatModal] = useState(false);
+  const [examModal, setExamModal] = useState(false);
   const [qForm, setQForm] = useState(DEFAULT_QFORM);
   const [catForm, setCatForm] = useState(DEFAULT_CATFORM);
+  const [examForm, setExamForm] = useState(DEFAULT_EXAM_FORM);
   const [editingQ, setEditingQ] = useState<Question | null>(null);
   const [editingCat, setEditingCat] = useState<Category | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  /* Exam state */
-  const [exams, setExams] = useState<ExamItem[]>([]);
-  const [examForm, setExamForm] = useState(DEFAULT_EXAM_FORM);
-  const [examModal, setExamModal] = useState(false);
-  const [selectedExam, setSelectedExam] = useState<ExamItem | null>(null);
-  const [examAttempts, setExamAttempts] = useState<AttemptRow[]>([]);
-
-  /* Live game state */
-  const [livePhase, _setLivePhase] = useState<"setup" | "active">("active");
-  const [liveTopic, setLiveTopic] = useState("");
-  const [liveTimer, setLiveTimer] = useState(30);
-  const [liveCountdown, setLiveCountdown] = useState(18);
-  const [liveRevealed, setLiveRevealed] = useState(false);
-  const [liveQIdx, setLiveQIdx] = useState(4);
-  const LIVE_PIN = "847291";
-  const [liveLbPlayers, setLiveLbPlayers] = useState<
-    { name: string; initials: string; score: number; streak: number }[]
-  >([]);
-
+  // Auth guard
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
     if (status === "authenticated" && session?.user?.role !== "admin") router.replace("/dashboard");
   }, [status, session, router]);
 
-  useEffect(() => {
-    if (tab !== "live") return;
-    let cancelled = false;
-    fetch("/api/leaderboard")
-      .then(r => (r.ok ? r.json() : { entries: [] }))
-      .then(d => {
-        const entries = Array.isArray(d.entries) ? d.entries : [];
-        const rows = entries.slice(0, 12).map((e: { name: string; xp?: number; streak?: number }) => ({
-          name: e.name || "Сурагч",
-          initials: initialsFromDisplayName(e.name || ""),
-          score: e.xp ?? 0,
-          streak: e.streak ?? 0,
-        }));
-        if (!cancelled) setLiveLbPlayers(rows);
-      })
-      .catch(() => {
-        if (!cancelled) setLiveLbPlayers([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [tab]);
-
-  useEffect(() => {
-    if (livePhase !== "active" || liveRevealed) return;
-    const t = setInterval(() => {
-      setLiveCountdown(c => {
-        if (c <= 1) {
-          setLiveRevealed(true);
-          return 0;
-        }
-        return c - 1;
-      });
-    }, 1000);
-    return () => clearInterval(t);
-  }, [livePhase, liveRevealed]);
-
+  // Data loaders
   const loadStats = useCallback(async () => {
     const r = await fetch("/api/admin/stats");
     if (r.ok) setStats(await r.json());
   }, []);
   const loadUsers = useCallback(async () => {
+    setLoading(true);
     const r = await fetch("/api/admin/users");
     if (r.ok) { const d = await r.json(); setUsers(d.users ?? []); }
+    setLoading(false);
   }, []);
   const loadQuestions = useCallback(async () => {
+    setLoading(true);
     const r = await fetch("/api/admin/questions");
     if (r.ok) { const d = await r.json(); setQuestions(d.questions ?? []); }
+    setLoading(false);
   }, []);
   const loadCategories = useCallback(async () => {
     const r = await fetch("/api/admin/categories");
     if (r.ok) { const d = await r.json(); setCategories(d.categories ?? []); }
   }, []);
-
   const loadExams = useCallback(async () => {
+    setLoading(true);
     const r = await fetch("/api/exam/exams");
     if (r.ok) { const d = await r.json(); setExams(Array.isArray(d) ? d : []); }
+    setLoading(false);
+  }, []);
+  const loadLeaderboard = useCallback(async () => {
+    const r = await fetch("/api/leaderboard");
+    if (!r.ok) return;
+    const d = await r.json();
+    const entries = Array.isArray(d.entries) ? d.entries : [];
+    setLbPlayers(entries.slice(0, 15).map((e: { name: string; xp?: number; streak?: number }) => ({
+      name: e.name || "Сурагч",
+      initials: initialsFromName(e.name || "S"),
+      score: e.xp ?? 0,
+      streak: e.streak ?? 0,
+    })));
   }, []);
 
   useEffect(() => {
     if (tab === "overview") loadStats();
-    if (tab === "users") { loadUsers(); }
+    if (tab === "users") loadUsers();
     if (tab === "questions") { loadQuestions(); loadCategories(); }
     if (tab === "categories") loadCategories();
-    if (tab === "live") loadCategories();
     if (tab === "exams") loadExams();
-  }, [tab, loadStats, loadUsers, loadQuestions, loadCategories, loadExams]);
+    if (tab === "live") loadLeaderboard();
+    setSearch("");
+  }, [tab, loadStats, loadUsers, loadQuestions, loadCategories, loadExams, loadLeaderboard]);
 
+  // Question CRUD
   async function saveQuestion() {
     setSubmitting(true);
     if (editingQ) {
@@ -194,10 +159,25 @@ export default function AdminPage() {
     setSubmitting(false); setQModal(false); setQForm(DEFAULT_QFORM); setEditingQ(null); loadQuestions();
   }
   async function deleteQuestion(id: string) {
-    if (!confirm("Асуултыг устгах уу?")) return;
+    if (!confirm("Энэ асуултыг устгах уу?")) return;
     await fetch(`/api/admin/questions?id=${id}`, { method: "DELETE" });
     loadQuestions();
   }
+  function openEditQ(q: Question) {
+    setEditingQ(q);
+    setQForm({
+      categoryId: typeof q.categoryId === "object" ? (q.categoryId as any)._id ?? "" : q.categoryId ?? "",
+      level: q.level, question: q.question,
+      options: (q as any).options ?? ["", "", "", ""],
+      correctIndex: (q as any).correctIndex ?? 0,
+      explanation: (q as any).explanation ?? "",
+      difficulty: q.difficulty, xpReward: q.xpReward,
+      coinReward: (q as any).coinReward ?? 5,
+    });
+    setQModal(true);
+  }
+
+  // Category CRUD
   async function saveCategory() {
     setSubmitting(true);
     if (editingCat) {
@@ -208,10 +188,17 @@ export default function AdminPage() {
     setSubmitting(false); setCatModal(false); setCatForm(DEFAULT_CATFORM); setEditingCat(null); loadCategories();
   }
   async function deleteCategory(id: string) {
-    if (!confirm("Ангиллыг устгах уу?")) return;
+    if (!confirm("Энэ ангиллыг устгах уу?")) return;
     await fetch(`/api/admin/categories?id=${id}`, { method: "DELETE" });
     loadCategories();
   }
+  function openEditCat(c: Category) {
+    setEditingCat(c);
+    setCatForm({ name: c.name, icon: c.icon ?? "", color: c.color ?? "#4F46E5", totalLevels: c.totalLevels, order: c.order });
+    setCatModal(true);
+  }
+
+  // Exam CRUD
   async function saveExam() {
     setSubmitting(true);
     const r = await fetch("/api/exam/exams", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(examForm) });
@@ -229,8 +216,15 @@ export default function AdminPage() {
     if (r.ok) setExamAttempts(await r.json());
   }
 
+  // User actions
+  async function togglePremium(id: string, current: boolean) {
+    await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: id, isPremium: !current }) });
+    loadUsers();
+  }
+
+  // Exam form helpers
   function addExamQuestion() {
-    setExamForm(f => ({ ...f, questions: [...f.questions, { id: uid(), question: "", options: [{ id: "A", text: "" },{ id: "B", text: "" },{ id: "C", text: "" },{ id: "D", text: "" }], correctAnswer: "A" }] }));
+    setExamForm(f => ({ ...f, questions: [...f.questions, { id: uid(), question: "", options: [{ id: "A", text: "" }, { id: "B", text: "" }, { id: "C", text: "" }, { id: "D", text: "" }], correctAnswer: "A" }] }));
   }
   function removeExamQuestion(qid: string) {
     setExamForm(f => ({ ...f, questions: f.questions.filter(q => q.id !== qid) }));
@@ -242,22 +236,11 @@ export default function AdminPage() {
     setExamForm(f => ({ ...f, questions: f.questions.map(q => q.id === qid ? { ...q, options: q.options.map(o => o.id === oid ? { ...o, text } : o) } : q) }));
   }
 
-  async function togglePremium(id: string, current: boolean) {
-    await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: id, isPremium: !current }) });
-    loadUsers();
-  }
-
-  if (status === "loading") return (
-    <div style={{ minHeight: "100vh", background: "#F7F8FA", display: "flex", alignItems: "center", justifyContent: "center", color: "#6B7280", fontFamily: "Inter, system-ui, sans-serif" }}>
-      Ачаалж байна...
-    </div>
-  );
-
+  // Filtered data
   const filteredUsers = users.filter(u => {
     if (userRoleFilter !== "all" && u.role !== userRoleFilter) return false;
     if (!search) return true;
-    const q = search.toLowerCase();
-    return `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(q);
+    return `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(search.toLowerCase());
   });
   const filteredQs = questions.filter(q => {
     if (qCatFilter !== "all" && q.categoryId?.name !== qCatFilter) return false;
@@ -266,533 +249,368 @@ export default function AdminPage() {
     return true;
   });
 
-  const NAV: { id: Tab; label: string; badge?: string }[] = [
-    { id: "overview",   label: "Ерөнхий тойм" },
-    { id: "live",       label: "Шууд тоглоом", badge: "LIVE" },
-    { id: "users",      label: "Хэрэглэгчид" },
-    { id: "questions",  label: "Асуултын сан" },
-    { id: "categories", label: "Ангилал" },
-    { id: "payments",   label: "Орлого, төлбөр" },
-    { id: "exams",      label: "Шалгалтууд" },
+  const NAV: { id: Tab; label: string; icon: string }[] = [
+    { id: "overview",   label: "Тойм",         icon: "⊞" },
+    { id: "live",       label: "Тэргүүлэгчид", icon: "🏆" },
+    { id: "users",      label: "Хэрэглэгчид",  icon: "👥" },
+    { id: "questions",  label: "Асуултын сан", icon: "❓" },
+    { id: "categories", label: "Ангилал",       icon: "📂" },
+    { id: "exams",      label: "Шалгалтууд",   icon: "📝" },
   ];
+
+  if (status === "loading") return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Inter, sans-serif", color: "#64748B" }}>
+      Ачаалж байна…
+    </div>
+  );
 
   return (
     <>
       <style>{`
-        :root {
-          --bg:#F7F8FA;--surface:#fff;--surface-alt:#F9FAFB;
-          --border:#E5E7EB;--border-soft:#F3F4F6;
-          --text:#111827;--text-2:#374151;--muted:#6B7280;--muted-2:#9CA3AF;
-          --indigo:#4F46E5;--indigo-50:#EEF2FF;--indigo-100:#E0E7FF;
-          --green:#16A34A;--green-bg:#ECFDF5;--green-text:#065F46;--green-border:#A7F3D0;
-          --red:#DC2626;--red-bg:#FEF2F2;--red-text:#991B1B;
-          --amber:#D97706;--amber-bg:#FFFBEB;--amber-text:#92400E;
-          --purple-bg:#F5F3FF;--purple-text:#6D28D9;
-        }
-        *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
-        button{font-family:inherit;cursor:pointer;border:0}
-        input,select,textarea{font-family:inherit}
-        .shell{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
-        .sidebar{position:sticky;top:0;height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 12px}
-        .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 16px}
-        .brand-logo{height:34px;width:auto;max-width:44px;flex:none;object-fit:contain;display:block}
-        .nav-section{font-size:10px;font-weight:500;letter-spacing:.1em;color:var(--muted-2);text-transform:uppercase;padding:16px 12px 6px}
-        .nav-item{display:flex;align-items:center;gap:10px;padding:8px 12px;margin:1px 0;border-radius:6px;cursor:pointer;color:var(--text-2);font-weight:500;font-size:14px;background:transparent;width:100%;text-align:left;transition:background .1s,color .1s}
-        .nav-item:hover{background:var(--surface-alt)}
-        .nav-item.active{background:var(--indigo-50);color:var(--indigo)}
-        .main{min-width:0;padding:24px}
-        .topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:24px}
-        .topbar h1{font-size:22px;font-weight:600;color:var(--text);letter-spacing:-.01em}
-        .topbar .sub{font-size:13px;color:var(--muted);margin-top:2px}
-        .card{background:var(--surface);border:1px solid var(--border);border-radius:8px}
-        .card-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
-        .card-head h3{font-size:14px;font-weight:600;color:var(--text)}
-        .card-head .sub{font-size:12px;color:var(--muted);margin-top:2px}
-        .card-body{padding:16px}
-        .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
-        .stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px}
-        .stat-label{font-size:12px;color:var(--muted);font-weight:500}
-        .stat-value{font-size:24px;font-weight:600;color:var(--text);margin:10px 0 4px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-        .stat-trend{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px}
-        .stat-trend.green{color:var(--green)}.stat-trend.red{color:var(--red)}
-        .row{display:grid;gap:16px}.row.c2{grid-template-columns:1.5fr 1fr}.row.c3{grid-template-columns:repeat(3,1fr)}
-        .badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;padding:2px 8px;border-radius:4px;background:var(--surface-alt);color:var(--text-2);border:1px solid transparent}
-        .badge.indigo{background:var(--indigo-50);color:#3730A3}.badge.purple{background:var(--purple-bg);color:var(--purple-text)}
-        .badge.green{background:var(--green-bg);color:var(--green-text)}.badge.red{background:var(--red-bg);color:var(--red-text)}
-        .badge.amber{background:var(--amber-bg);color:var(--amber-text)}.badge.gray{background:#F3F4F6;color:#374151}
-        .badge.dot::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
-        .btn{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;font-size:13px;font-weight:500;background:var(--surface);color:var(--text-2);border:1px solid var(--border);border-radius:6px;transition:background .1s,border-color .1s}
-        .btn:hover{background:var(--surface-alt)}.btn.primary{background:var(--indigo);color:#fff;border-color:var(--indigo)}.btn.primary:hover{background:#4338CA;border-color:#4338CA}
-        .btn.danger{color:var(--red)}.btn.danger:hover{background:var(--red-bg);border-color:var(--red)}
-        .btn.sm{height:32px;padding:0 10px;font-size:12px}.btn:disabled{opacity:.5;cursor:not-allowed}
-        .search-box{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--muted);font-size:13px}
-        .search-box input{border:0;background:transparent;outline:none;flex:1;color:var(--text);font-size:13px}
-        .tab-actions{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap}
-        .tab-actions .spacer{flex:1}
-        .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}
-        .table{width:100%;border-collapse:collapse}
-        .table th{font-size:11px;font-weight:500;letter-spacing:.04em;color:var(--muted);text-transform:uppercase;padding:10px 14px;text-align:left;background:var(--surface-alt);border-bottom:1px solid var(--border)}
-        .table td{padding:12px 14px;font-size:13px;color:var(--text-2);border-bottom:1px solid var(--border-soft);vertical-align:middle}
-        .table tbody tr:last-child td{border-bottom:0}
-        .table tbody tr:hover td{background:#FAFBFC}
-        .table .actions{display:flex;gap:4px;opacity:0;transition:opacity .1s}.table tr:hover .actions{opacity:1}
-        .pager{display:flex;align-items:center;padding:12px 16px;border-top:1px solid var(--border)}
-        .pager-info{font-size:13px;color:var(--muted)}.pager .spacer{flex:1}
-        .pager-btns{display:flex;gap:4px}
-        .pager-btn{min-width:32px;height:32px;padding:0 8px;border:1px solid var(--border);background:var(--surface);border-radius:6px;font-size:13px;color:var(--text-2);display:inline-flex;align-items:center;justify-content:center}
-        .pager-btn:hover{background:var(--surface-alt)}.pager-btn.active{background:var(--indigo);color:#fff;border-color:var(--indigo)}.pager-btn:disabled{opacity:.4;cursor:not-allowed}
-        .input,.select,.textarea{width:100%;height:36px;padding:0 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none;transition:border-color .1s,box-shadow .1s}
-        .textarea{height:auto;padding:10px;resize:vertical;line-height:1.5;font-size:14px}
-        .input:focus,.select:focus,.textarea:focus{border-color:var(--indigo);box-shadow:0 0 0 3px rgba(79,70,229,.12)}
-        .label{display:block;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
-        .field{margin-bottom:14px}
-        .modal-overlay{position:fixed;inset:0;background:rgba(17,24,39,.4);display:grid;place-items:center;z-index:100;padding:24px;animation:fadeIn .12s ease}
-        .modal{background:var(--surface);border-radius:12px;width:100%;max-width:540px;max-height:85vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.15);animation:pop .14s ease}
-        .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border)}
-        .modal-head h2{font-size:18px;font-weight:600;color:var(--text)}
-        .modal-body{padding:20px 24px}
-        .modal-foot{display:flex;gap:8px;padding:14px 24px;border-top:1px solid var(--border);justify-content:flex-end}
-        .icon-btn{width:28px;height:28px;border-radius:6px;background:transparent;color:var(--muted);display:grid;place-items:center;transition:background .1s,color .1s;font-size:16px}
-        .icon-btn:hover{background:var(--surface-alt);color:var(--text)}
-        .seg{display:inline-flex;padding:2px;gap:2px;background:var(--surface-alt);border:1px solid var(--border);border-radius:6px}
-        .seg-btn{padding:5px 12px;font-size:12px;font-weight:500;border-radius:4px;color:var(--text-2);background:transparent}
-        .seg-btn.active{background:var(--surface);color:var(--indigo);box-shadow:0 1px 2px rgba(0,0,0,.06)}
-        .avatar{width:32px;height:32px;border-radius:50%;background:var(--indigo-50);display:grid;place-items:center;color:var(--indigo);font-size:12px;font-weight:600;flex:none}
-        .user-card{margin-top:auto;padding:12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
-        .link{font-size:13px;color:var(--indigo);font-weight:500;background:transparent}
-        .link:hover{text-decoration:underline}
-        .scrollbar::-webkit-scrollbar{width:6px;height:6px}
-        .scrollbar::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:8px}
-        .scrollbar::-webkit-scrollbar-track{background:transparent}
-        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-        @keyframes pop{from{transform:scale(.97);opacity:0}to{transform:scale(1);opacity:1}}
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: "Inter", system-ui, -apple-system, sans-serif; background: #F1F5F9; color: #0F172A; font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+        button { font-family: inherit; cursor: pointer; border: 0; }
+        input, select, textarea { font-family: inherit; }
+
+        /* Layout */
+        .shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+        .sidebar { position: sticky; top: 0; height: 100vh; background: #fff; border-right: 1px solid #E2E8F0; display: flex; flex-direction: column; }
+        .main { min-width: 0; padding: 28px 32px; overflow-y: auto; max-height: 100vh; }
+
+        /* Sidebar */
+        .brand { padding: 20px 16px 16px; border-bottom: 1px solid #F1F5F9; }
+        .brand-title { font-size: 15px; font-weight: 700; color: #0F172A; letter-spacing: -.01em; }
+        .brand-sub { font-size: 10px; font-weight: 600; color: #6366F1; text-transform: uppercase; letter-spacing: .08em; margin-top: 1px; }
+        .nav { padding: 10px 8px; flex: 1; }
+        .nav-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border-radius: 7px; background: transparent; color: #64748B; font-size: 13.5px; font-weight: 500; text-align: left; transition: all .12s; margin-bottom: 2px; }
+        .nav-item:hover { background: #F8FAFC; color: #0F172A; }
+        .nav-item.active { background: #EEF2FF; color: #4F46E5; font-weight: 600; }
+        .nav-icon { font-size: 15px; width: 20px; text-align: center; }
+        .user-area { padding: 12px 14px; border-top: 1px solid #F1F5F9; display: flex; align-items: center; gap: 10px; }
+        .avatar { width: 32px; height: 32px; border-radius: 50%; background: #EEF2FF; color: #4F46E5; font-size: 12px; font-weight: 700; display: grid; place-items: center; flex-shrink: 0; }
+        .signout-btn { font-size: 12px; color: #94A3B8; background: transparent; padding: 4px 8px; border-radius: 5px; border: 1px solid #E2E8F0; transition: all .1s; }
+        .signout-btn:hover { color: #DC2626; border-color: #FCA5A5; background: #FEF2F2; }
+
+        /* Page header */
+        .page-header { margin-bottom: 24px; }
+        .page-title { font-size: 20px; font-weight: 700; color: #0F172A; letter-spacing: -.02em; }
+        .page-sub { font-size: 13px; color: #64748B; margin-top: 3px; }
+
+        /* Cards */
+        .card { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; }
+        .card-head { padding: 14px 18px; border-bottom: 1px solid #F1F5F9; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .card-head h3 { font-size: 14px; font-weight: 600; color: #0F172A; }
+        .card-head .sub { font-size: 12px; color: #94A3B8; margin-top: 1px; }
+        .card-body { padding: 16px 18px; }
+
+        /* Stat grid */
+        .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+        .stat-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; padding: 16px 18px; }
+        .stat-label { font-size: 12px; font-weight: 500; color: #64748B; }
+        .stat-value { font-size: 26px; font-weight: 700; color: #0F172A; margin: 8px 0 4px; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+        .stat-trend { font-size: 12px; color: #94A3B8; }
+        .stat-trend.up { color: #16A34A; }
+
+        /* Toolbar */
+        .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .spacer { flex: 1; }
+
+        /* Buttons */
+        .btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; font-size: 13px; font-weight: 500; background: #fff; color: #374151; border: 1px solid #E2E8F0; border-radius: 7px; transition: all .1s; white-space: nowrap; }
+        .btn:hover { background: #F8FAFC; border-color: #CBD5E1; }
+        .btn.primary { background: #4F46E5; color: #fff; border-color: #4F46E5; }
+        .btn.primary:hover { background: #4338CA; border-color: #4338CA; }
+        .btn.danger { color: #DC2626; }
+        .btn.danger:hover { background: #FEF2F2; border-color: #FCA5A5; }
+        .btn.sm { height: 30px; padding: 0 10px; font-size: 12px; }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+        /* Inputs */
+        .input, .select, .textarea { width: 100%; height: 36px; padding: 0 10px; background: #fff; border: 1px solid #E2E8F0; border-radius: 7px; color: #0F172A; font-size: 13px; outline: none; transition: border-color .1s, box-shadow .1s; }
+        .textarea { height: auto; padding: 10px; resize: vertical; line-height: 1.5; }
+        .input:focus, .select:focus, .textarea:focus { border-color: #6366F1; box-shadow: 0 0 0 3px rgba(99,102,241,.1); }
+        .label { display: block; font-size: 11px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 5px; }
+        .field { margin-bottom: 14px; }
+        .search-wrap { display: flex; align-items: center; height: 34px; padding: 0 10px; gap: 8px; border: 1px solid #E2E8F0; border-radius: 7px; background: #fff; }
+        .search-wrap input { border: 0; outline: none; flex: 1; font-size: 13px; color: #0F172A; background: transparent; }
+
+        /* Tables */
+        .table-wrap { border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden; background: #fff; }
+        .table { width: 100%; border-collapse: collapse; }
+        .table th { font-size: 11px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: .05em; padding: 10px 16px; text-align: left; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; }
+        .table td { padding: 12px 16px; font-size: 13px; color: #374151; border-bottom: 1px solid #F8FAFC; vertical-align: middle; }
+        .table tbody tr:last-child td { border-bottom: 0; }
+        .table tbody tr:hover td { background: #FAFBFF; }
+        .row-actions { display: flex; gap: 4px; opacity: 0; transition: opacity .1s; }
+        .table tr:hover .row-actions { opacity: 1; }
+        .pager { padding: 10px 16px; border-top: 1px solid #F1F5F9; font-size: 12px; color: #94A3B8; }
+
+        /* Badges */
+        .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 5px; }
+        .badge.green { background: #ECFDF5; color: #065F46; }
+        .badge.red { background: #FEF2F2; color: #991B1B; }
+        .badge.amber { background: #FFFBEB; color: #92400E; }
+        .badge.blue { background: #EFF6FF; color: #1D4ED8; }
+        .badge.gray { background: #F1F5F9; color: #475569; }
+        .badge.purple { background: #F5F3FF; color: #6D28D9; }
+        .badge.dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+        /* Modals */
+        .overlay { position: fixed; inset: 0; background: rgba(15,23,42,.4); display: grid; place-items: center; z-index: 100; padding: 20px; animation: fadeIn .1s ease; }
+        .modal { background: #fff; border-radius: 12px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.15); animation: pop .12s ease; }
+        .modal.wide { max-width: 680px; }
+        .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #F1F5F9; }
+        .modal-head h2 { font-size: 16px; font-weight: 700; color: #0F172A; }
+        .modal-body { padding: 18px 20px; }
+        .modal-foot { display: flex; gap: 8px; padding: 14px 20px; border-top: 1px solid #F1F5F9; justify-content: flex-end; }
+        .close-btn { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 6px; background: transparent; color: #94A3B8; font-size: 18px; transition: all .1s; }
+        .close-btn:hover { background: #F1F5F9; color: #374151; }
+
+        /* Empty state */
+        .empty { padding: 48px 20px; text-align: center; color: #94A3B8; }
+        .empty-icon { font-size: 32px; margin-bottom: 10px; }
+        .empty-title { font-size: 14px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+        .empty-sub { font-size: 13px; }
+
+        /* Loading */
+        .loading-row td { text-align: center; padding: 32px; color: #94A3B8; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes pop { from { transform: scale(.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
       `}</style>
 
       <div className="shell">
-        {/* ── SIDEBAR ── */}
+        {/* ── SIDEBAR ─────────────────────────────────── */}
         <aside className="sidebar">
           <div className="brand">
-            <img className="brand-logo" src="/cyberphysic-logo.png" alt="CyberPhysics"
-              onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-            />
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text)", letterSpacing: "-.01em" }}>CyberPhysics</div>
-              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".08em", color: "var(--indigo)", textTransform: "uppercase", marginTop: 1 }}>Админ</div>
-            </div>
+            <div className="brand-title">CyberPhysics</div>
+            <div className="brand-sub">Удирдлагын самбар</div>
           </div>
 
-          <div className="nav-section">Удирдлагын цэс</div>
-          {NAV.map(n => (
-            <button key={n.id} className={`nav-item${tab === n.id ? " active" : ""}`} onClick={() => setTab(n.id)}>
-              <span style={{ flex: 1 }}>{n.label}</span>
-              {n.badge && (
-                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".06em", background: "#DCFCE7", color: "#15803D", padding: "2px 5px", borderRadius: 4 }}>
-                  {n.badge}
-                </span>
-              )}
-            </button>
-          ))}
+          <nav className="nav">
+            {NAV.map(n => (
+              <button key={n.id} className={`nav-item${tab === n.id ? " active" : ""}`} onClick={() => setTab(n.id)}>
+                <span className="nav-icon">{n.icon}</span>
+                {n.label}
+              </button>
+            ))}
+          </nav>
 
-          <div className="user-card">
-            <div className="avatar" style={{ fontSize: 11 }}>
-              {session?.user?.name?.[0]?.toUpperCase() ?? "A"}
-            </div>
+          <div className="user-area">
+            <div className="avatar">{session?.user?.name?.[0]?.toUpperCase() ?? "A"}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>{session?.user?.name ?? "Admin"}</div>
-              <div style={{ fontSize: 11, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session?.user?.email}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session?.user?.name ?? "Admin"}</div>
+              <div style={{ fontSize: 11, color: "#94A3B8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session?.user?.email}</div>
             </div>
-            <button className="icon-btn" onClick={() => signOut({ callbackUrl: "/login" })} title="Гарах" style={{ fontSize: 11, fontWeight: 600, width: "auto", padding: "0 8px" }}>Гарах</button>
+            <button className="signout-btn" onClick={() => signOut({ callbackUrl: "/login" })}>Гарах</button>
           </div>
         </aside>
 
-        {/* ── MAIN ── */}
-        <main className="main scrollbar" style={{ overflowY: "auto" }}>
+        {/* ── MAIN ─────────────────────────────────────── */}
+        <main className="main">
 
-          {/* ══ OVERVIEW ══════════════════════════════════ */}
+          {/* ═══ OVERVIEW ═══════════════════════════════ */}
           {tab === "overview" && (
             <div>
-              <div className="topbar">
-                <div>
-                  <h1>Ерөнхий тойм</h1>
-                  <div className="sub">Платформын тоо баримт, орлого, хэрэглэгчдийн тойм мэдээлэл</div>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button className="btn sm" onClick={loadStats}>Шинэчлэх</button>
-                </div>
+              <div className="page-header">
+                <h1 className="page-title">Ерөнхий тойм</h1>
+                <p className="page-sub">{new Date().toLocaleDateString("mn-MN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
               </div>
 
-              {stats ? (
+              {!stats ? (
+                <div style={{ textAlign: "center", padding: "60px 0", color: "#94A3B8" }}>Ачаалж байна…</div>
+              ) : (
                 <>
                   <div className="stat-grid">
-                    {[
-                      { label: "Нийт бүртгэлтэй хэрэглэгч", value: stats.totalUsers.toLocaleString(),                       trend: `+${stats.newUsersLast7} сүүлийн 7 хоногт`,     trendColor: "green" },
-                      { label: "Premium эрхтэй хэрэглэгч", value: stats.premiumUsers.toLocaleString(),                     trend: `${Math.round(stats.premiumUsers/Math.max(stats.totalUsers,1)*100)}% нийтээс` },
-                      { label: "Өнөөдөр идэвхтэй",          value: stats.todayActive.toLocaleString(),                      trend: "Өдрийн идэвх" },
-                      { label: "Нийт орлого (тооцоо)",      value: `${(stats.totalRevenue/1000000).toFixed(2)}M₮`,         trend: "Бүх цагийн дүн",                           trendColor: "green" },
-                    ].map((s, i) => (
-                      <div key={i} className="stat">
-                        <div style={{ marginBottom: 4 }}>
-                          <span className="stat-label">{s.label}</span>
-                        </div>
-                        <div className="stat-value">{s.value}</div>
-                        <div className={`stat-trend ${s.trendColor ?? ""}`}>{s.trend}</div>
-                      </div>
-                    ))}
+                    <div className="stat-card">
+                      <div className="stat-label">Нийт хэрэглэгч</div>
+                      <div className="stat-value">{stats.totalUsers.toLocaleString()}</div>
+                      <div className="stat-trend up">+{stats.newUsersLast7} энэ 7 хоногт</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-label">Premium хэрэглэгч</div>
+                      <div className="stat-value">{stats.premiumUsers.toLocaleString()}</div>
+                      <div className="stat-trend">{Math.round(stats.premiumUsers / Math.max(stats.totalUsers, 1) * 100)}% нийтээс</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-label">Өнөөдөр идэвхтэй</div>
+                      <div className="stat-value">{stats.todayActive.toLocaleString()}</div>
+                      <div className="stat-trend">Өдрийн идэвх</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-label">Нийт орлого</div>
+                      <div className="stat-value">{(stats.totalRevenue / 1_000_000).toFixed(2)}M₮</div>
+                      <div className="stat-trend">Бүх цагийн дүн</div>
+                    </div>
                   </div>
 
-                  <div className="row c2" style={{ marginBottom: 16 }}>
-                    {/* Line chart */}
+                  {/* Recent payments */}
+                  {(stats.recentPayments?.length ?? 0) > 0 && (
                     <div className="card">
                       <div className="card-head">
                         <div>
-                          <h3>Шинэ хэрэглэгч — сүүлийн 7 хоног</h3>
-                          <div className="sub">Өдөр бүрийн шинэ бүртгэлийн тоо</div>
-                        </div>
-                        <div className="seg">
-                          <button className="seg-btn active">7 хоног</button>
-                          <button className="seg-btn">30 хоног</button>
+                          <h3>Сүүлийн төлбөрүүд</h3>
+                          <div className="sub">QPay болон Khan Bank гүйлгээ</div>
                         </div>
                       </div>
-                      <div className="card-body">
-                        <LineChart data={CHART_DATA} labels={["Да","Мя","Лх","Пү","Ба","Бя","Ня"]} />
+                      <div className="table-wrap" style={{ border: "none", borderRadius: 0 }}>
+                        <table className="table">
+                          <thead><tr><th>Хэрэглэгч</th><th>Арга</th><th>Огноо</th><th style={{ textAlign: "right" }}>Дүн</th><th>Статус</th></tr></thead>
+                          <tbody>
+                            {stats.recentPayments.slice(0, 8).map((p, i) => (
+                              <tr key={p._id ?? i}>
+                                <td style={{ fontWeight: 500 }}>
+                                  {typeof p.userId === "object" ? `${p.userId?.firstName ?? ""} ${p.userId?.lastName ?? ""}`.trim() || p.userId?.email || "—" : "Хэрэглэгч"}
+                                </td>
+                                <td><span className={`badge ${p.method === "qpay" ? "blue" : "amber"}`}>{p.method?.toUpperCase()}</span></td>
+                                <td style={{ color: "#94A3B8", fontSize: 12 }}>{fmtDate(p.createdAt)}</td>
+                                <td style={{ textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{(p.amount ?? 0).toLocaleString()}₮</td>
+                                <td>
+                                  <span className={`badge ${p.status === "success" ? "green" : p.status === "pending" ? "amber" : "red"}`}>
+                                    {p.status === "success" ? "Амжилттай" : p.status === "pending" ? "Хүлээгдэж" : "Алдаа"}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
-                    {/* System status */}
-                    <div className="card">
-                      <div className="card-head">
-                        <h3>Системийн төлөв</h3>
-                        <span className="badge green dot">Хэвийн</span>
-                      </div>
-                      <div className="card-body" style={{ padding: 0 }}>
-                        {[
-                          { label: "MongoDB Atlas",   value: "Холбогдсон" },
-                          { label: "API хариу",        value: "~140ms"      },
-                          { label: "Google OAuth",     value: "Идэвхтэй"   },
-                          { label: "Gmail SMTP",       value: "Идэвхтэй"   },
-                          { label: "QPay",             value: "Идэвхтэй"   },
-                        ].map((it, i, arr) => (
-                          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: i < arr.length-1 ? "1px solid var(--border-soft)" : 0, fontSize: 13 }}>
-                            <span style={{ color: "var(--text-2)" }}>{it.label}</span>
-                            <span style={{ color: "var(--green)", display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 500, fontSize: 12 }}>
-                              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--green)", display: "inline-block" }} />
-                              {it.value}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="row c2">
-                    {/* By province */}
-                    <div className="card">
-                      <div className="card-head">
-                        <div><h3>Аймгаар харах</h3><div className="sub">Сурагчдын тоо</div></div>
-                        <span className="badge">Нийт</span>
-                      </div>
-                      <div className="card-body">
-                        {(stats.byProvince ?? []).slice(0,6).map((p, i) => {
-                          const max = stats.byProvince[0]?.count ?? 1;
-                          return (
-                            <div key={i} style={{ marginBottom: i < 5 ? 12 : 0 }}>
-                              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                                <span style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>{p._id || "Тодорхойгүй"}</span>
-                                <span style={{ fontSize: 12, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{p.count}</span>
-                              </div>
-                              <div style={{ height: 6, background: "var(--border-soft)", borderRadius: 3 }}>
-                                <div style={{ width: `${(p.count/max)*100}%`, height: "100%", background: "var(--indigo)", borderRadius: 3 }} />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    {/* Recent payments */}
-                    <div className="card">
-                      <div className="card-head">
-                        <div><h3>Сүүлийн төлбөрүүд</h3><div className="sub">QPay болон Khan Bank</div></div>
-                      </div>
-                      <div className="card-body" style={{ padding: 0 }}>
-                        {(stats.recentPayments ?? []).slice(0,5).map((p: PayRow, i: number, arr: PayRow[]) => (
-                          <div key={p._id ?? i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", borderBottom: i < arr.length-1 ? "1px solid var(--border-soft)" : 0 }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>
-                                {typeof p.userId === "object" ? `${p.userId?.firstName ?? ""} ${p.userId?.lastName ?? ""}`.trim() || p.userId?.email : "Хэрэглэгч"}
-                              </div>
-                              <div style={{ fontSize: 12, color: "var(--muted-2)" }}>{fmtDate(p.createdAt)}</div>
-                            </div>
-                            <span className={`badge ${p.method === "qpay" ? "indigo" : "amber"}`}>{p.method?.toUpperCase()}</span>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", minWidth: 76, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                              {(p.amount ?? 0).toLocaleString()}₮
-                            </div>
-                          </div>
-                        ))}
-                        <div style={{ padding: "10px 16px", display: "flex", justifyContent: "flex-end", borderTop: "1px solid var(--border-soft)" }}>
-                          <button className="link" onClick={() => setTab("payments")}>Бүгдийг харах →</button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </>
-              ) : (
-                <div style={{ textAlign: "center", padding: "80px 0", color: "var(--muted)" }}>
-                  Ачаалж байна...
-                </div>
               )}
             </div>
           )}
 
-          {/* ══ LIVE GAME ══════════════════════════════════ */}
+          {/* ═══ LEADERBOARD ════════════════════════════ */}
           {tab === "live" && (
             <div>
-              <div className="topbar">
+              <div className="page-header" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                 <div>
-                  <h1>Шууд тоглоом</h1>
-                  <div className="sub">Сурагчдыг PIN-ээр холбож, шууд асуулт-хариултын тоглоомыг удирдах</div>
+                  <h1 className="page-title">Тэргүүлэгчид</h1>
+                  <p className="page-sub">XP-ээр эрэмбэлэгдсэн шилдэг сурагчид</p>
                 </div>
-                <span className="badge green dot">Идэвхтэй сесс</span>
+                <button className="btn" onClick={loadLeaderboard}>Шинэчлэх</button>
               </div>
 
-              <div className="row" style={{ gridTemplateColumns: "1.5fr 1fr", alignItems: "start" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <div className="card">
-                    <div className="card-head">
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <h3>Идэвхтэй сесс</h3>
-                        <span className="badge green dot">Идэвхтэй</span>
-                      </div>
-                      <span className="badge indigo">Цахилгаан · Lvl 1</span>
-                    </div>
-                    <div className="card-body">
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 24, alignItems: "center" }}>
-                        <div>
-                          <div className="label" style={{ marginBottom: 4 }}>JOIN PIN</div>
-                          <div style={{ fontFamily: "'JetBrains Mono',ui-monospace,monospace", fontSize: 44, fontWeight: 600, letterSpacing: "0.08em", color: "var(--text)", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
-                            {LIVE_PIN}
+              <div className="table-wrap">
+                <table className="table">
+                  <thead><tr><th style={{ width: 50 }}>#</th><th>Сурагч</th><th style={{ width: 120 }}>XP</th><th style={{ width: 120 }}>Streak</th></tr></thead>
+                  <tbody>
+                    {lbPlayers.length === 0 ? (
+                      <tr><td colSpan={4} style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Мэдээлэл байхгүй байна</td></tr>
+                    ) : lbPlayers.map((p, i) => (
+                      <tr key={`${p.name}-${i}`}>
+                        <td style={{ fontWeight: i < 3 ? 700 : 400, color: i === 0 ? "#F59E0B" : i === 1 ? "#94A3B8" : i === 2 ? "#B45309" : "#94A3B8", fontVariantNumeric: "tabular-nums" }}>
+                          {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div className="avatar">{p.initials}</div>
+                            <div style={{ fontWeight: 500 }}>{p.name}</div>
                           </div>
-                          <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                            <button type="button" className="btn sm" onClick={() => navigator.clipboard?.writeText(LIVE_PIN)}>PIN хуулах</button>
-                          </div>
-                          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 10 }}>
-                            Сурагчид{" "}
-                            <span style={{ color: "var(--indigo)", fontWeight: 500 }}>cyberphysics.mn/join</span>
-                            {" "}хаягаар орж PIN оруулна
-                          </div>
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,auto)", gap: 16, columnGap: 28 }}>
-                          {[
-                            { label: "Асуулт", value: `${liveQIdx}/10` },
-                            { label: "Сурагчид", value: String(liveLbPlayers.length) },
-                            {
-                              label: "Хариулсан",
-                              value: `${liveRevealed ? liveLbPlayers.length : Math.floor(liveLbPlayers.length * 0.78)}/${Math.max(1, liveLbPlayers.length)}`,
-                            },
-                          ].map((m, i) => (
-                            <div key={i}>
-                              <div className="label" style={{ marginBottom: 2 }}>{m.label}</div>
-                              <div style={{ fontSize: 22, fontWeight: 600, color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>{m.value}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 8, padding: "12px 16px", borderTop: "1px solid var(--border)", background: "var(--surface-alt)" }}>
-                      <button type="button" className="btn">Түр зогсоох</button>
-                      <button type="button" className="btn danger">Дуусгах</button>
-                      <div style={{ flex: 1 }} />
-                      <button type="button" className="btn primary" onClick={() => { setLiveQIdx(i => Math.min(i + 1, 10)); setLiveCountdown(liveTimer); setLiveRevealed(false); }}>
-                        Дараагийн асуулт →
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="card">
-                    <div className="card-head">
-                      <h3>Идэвхтэй асуулт</h3>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ fontSize: 12, color: "var(--muted)" }}>Хугацаа</span>
-                        <CountdownRing value={liveCountdown} max={liveTimer} />
-                      </div>
-                    </div>
-                    <div className="card-body">
-                      <div style={{ fontSize: 17, fontWeight: 500, color: "var(--text)", marginBottom: 16, lineHeight: 1.4 }}>{MOCK_Q.text}</div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                        {MOCK_Q.options.map((opt, i) => {
-                          const isCorrect = i === MOCK_Q.correct;
-                          const pct = MOCK_Q.votes[i];
-                          const reveal = liveRevealed && isCorrect;
-                          return (
-                            <div key={i} style={{ position: "relative", padding: "12px 14px", border: `1px solid ${reveal ? "var(--green)" : "var(--border)"}`, background: reveal ? "var(--green-bg)" : "var(--surface)", borderRadius: 6, overflow: "hidden" }}>
-                              <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${pct}%`, background: reveal ? "rgba(22,163,74,.10)" : "rgba(79,70,229,.06)", transition: "width .6s ease" }} />
-                              <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10 }}>
-                                <div style={{ width: 24, height: 24, borderRadius: 4, background: reveal ? "var(--green)" : "var(--border-soft)", color: reveal ? "#fff" : "var(--text-2)", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 600, flex: "none" }}>{"ABCD"[i]}</div>
-                                <div style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "var(--text)" }}>{opt}</div>
-                                {reveal && <span style={{ color: "var(--green)", fontSize: 12, fontWeight: 600 }}>Зөв</span>}
-                                <div style={{ fontSize: 13, fontWeight: 600, color: reveal ? "var(--green)" : "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{pct}%</div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {liveRevealed && (
-                        <div style={{ marginTop: 12, padding: 10, borderRadius: 6, background: "var(--green-bg)", border: "1px solid var(--green-border)", fontSize: 13, color: "var(--green-text)", display: "flex", alignItems: "center", gap: 8 }}>
-                          Зөв хариулт: <strong>A · V = IR</strong> · {MOCK_Q.votes[MOCK_Q.correct]}% сурагч зөв хариуллаа
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="card">
-                    <div className="card-head"><h3>Шинэ тоглолт үүсгэх</h3></div>
-                    <div className="card-body" style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-                      <div style={{ flex: 1 }}>
-                        <label className="label">Сэдэв</label>
-                        <select className="select" value={liveTopic} onChange={e => setLiveTopic(e.target.value)}>
-                          <option value="">— Сонгох —</option>
-                          {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                        </select>
-                      </div>
-                      <div style={{ width: 140 }}>
-                        <label className="label">Хугацаа</label>
-                        <select className="select" value={liveTimer} onChange={e => setLiveTimer(+e.target.value)}>
-                          {[15, 20, 30, 45, 60].map(t => <option key={t} value={t}>{t} секунд</option>)}
-                        </select>
-                      </div>
-                      <button type="button" className="btn primary">Шинэ PIN үүсгэх</button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="card">
-                  <div className="card-head">
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <h3>Тэргүүлэгчид</h3>
-                      <span className="badge green dot">Шууд</span>
-                    </div>
-                    <span style={{ fontSize: 12, color: "var(--muted)" }}>{liveLbPlayers.length} (XP жагсаалт)</span>
-                  </div>
-                  <div className="scrollbar" style={{ maxHeight: 520, overflowY: "auto" }}>
-                    <table className="table">
-                      <thead><tr><th style={{ width: 40 }}>#</th><th>Сурагч</th><th style={{ textAlign: "right", paddingRight: 16 }}>Оноо</th></tr></thead>
-                      <tbody>
-                        {liveLbPlayers.length === 0 ? (
-                          <tr>
-                            <td colSpan={3} style={{ padding: 24, textAlign: "center", color: "var(--muted)" }}>
-                              Сурагчийн өгөгдөл алга
-                            </td>
-                          </tr>
-                        ) : (
-                        liveLbPlayers.map((p, i) => (
-                          <tr key={`${p.name}-${i}`}>
-                            <td style={{ color: "var(--muted)", fontVariantNumeric: "tabular-nums", fontWeight: i < 3 ? 600 : 400 }}>
-                              {i + 1}
-                            </td>
-                            <td>
-                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <div className="avatar" style={{ width: 28, height: 28, fontSize: 11 }}>{p.initials}</div>
-                                <div>
-                                  <div style={{ fontWeight: 500, color: "var(--text)" }}>{p.name}</div>
-                                  {p.streak > 0 && <div style={{ fontSize: 11, color: "var(--amber)" }}>Дараалсан {p.streak} өдөр</div>}
-                                </div>
-                              </div>
-                            </td>
-                            <td style={{ textAlign: "right", fontWeight: 600, color: "var(--text)", fontVariantNumeric: "tabular-nums", paddingRight: 16 }}>{p.score.toLocaleString()}</td>
-                          </tr>
-                        ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                        </td>
+                        <td style={{ fontWeight: 600, color: "#4F46E5", fontVariantNumeric: "tabular-nums" }}>{p.score.toLocaleString()} XP</td>
+                        <td style={{ color: p.streak > 7 ? "#F59E0B" : "#64748B" }}>
+                          {p.streak > 0 ? `🔥 ${p.streak} өдөр` : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="pager">{lbPlayers.length} сурагч</div>
               </div>
             </div>
           )}
 
-          {/* ══ USERS ══════════════════════════════════════ */}
+          {/* ═══ USERS ══════════════════════════════════ */}
           {tab === "users" && (
             <div>
-              <div className="topbar">
-                <div><h1>Хэрэглэгчид</h1><div className="sub">Системд бүртгэлтэй нийт {users.length} хэрэглэгч</div></div>
+              <div className="page-header">
+                <h1 className="page-title">Хэрэглэгчид</h1>
+                <p className="page-sub">Системд бүртгэлтэй {users.length} хэрэглэгч</p>
               </div>
-              <div className="tab-actions">
-                <div className="search-box" style={{ width: 240 }}>
-                  <input placeholder="Нэр, и-мэйлээр хайх..." value={search} onChange={e => setSearch(e.target.value)} />
+
+              <div className="toolbar">
+                <div className="search-wrap" style={{ width: 240 }}>
+                  <span style={{ color: "#94A3B8", fontSize: 14 }}>⌕</span>
+                  <input placeholder="Нэр, и-мэйлээр хайх…" value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
                 <select className="select" value={userRoleFilter} onChange={e => setUserRoleFilter(e.target.value)} style={{ width: 140 }}>
-                  <option value="all">Бүгд</option>
+                  <option value="all">Бүх дүр</option>
                   <option value="student">Сурагч</option>
                   <option value="teacher">Багш</option>
                   <option value="admin">Admin</option>
                 </select>
                 <div className="spacer" />
-                <button className="btn primary" onClick={loadUsers}>Шинэчлэх</button>
+                <button className="btn" onClick={loadUsers}>Шинэчлэх</button>
               </div>
+
               <div className="table-wrap">
                 <table className="table">
                   <thead>
                     <tr>
                       <th>Хэрэглэгч</th>
                       <th style={{ width: 90 }}>Дүр</th>
-                      <th style={{ width: 80 }}>XP</th>
-                      <th style={{ width: 80 }}>Streak</th>
-                      <th style={{ width: 100 }}>Premium</th>
+                      <th style={{ width: 90 }}>XP</th>
+                      <th style={{ width: 90 }}>Streak</th>
+                      <th style={{ width: 110 }}>Premium</th>
                       <th style={{ width: 120 }}>Нэмэгдсэн</th>
-                      <th style={{ width: 80, textAlign: "right" }}>Үйлдэл</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredUsers.map(u => (
+                    {loading ? (
+                      <tr className="loading-row"><td colSpan={6}>Ачаалж байна…</td></tr>
+                    ) : filteredUsers.length === 0 ? (
+                      <tr><td colSpan={6} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>Хэрэглэгч олдсонгүй</td></tr>
+                    ) : filteredUsers.map(u => (
                       <tr key={u._id}>
                         <td>
                           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <div className="avatar">{initials(u)}</div>
+                            <div className="avatar">{initials2(u.firstName, u.lastName)}</div>
                             <div>
-                              <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>{u.lastName} {u.firstName}</div>
-                              <div style={{ fontSize: 12, color: "var(--muted-2)" }}>{u.email}</div>
+                              <div style={{ fontWeight: 500 }}>{u.lastName} {u.firstName}</div>
+                              <div style={{ fontSize: 12, color: "#94A3B8" }}>{u.email}</div>
                             </div>
                           </div>
                         </td>
                         <td>
-                          <span className={`badge ${u.role === "admin" ? "purple" : u.role === "teacher" ? "indigo" : "gray"}`}>
+                          <span className={`badge ${u.role === "admin" ? "purple" : u.role === "teacher" ? "blue" : "gray"}`}>
                             {u.role === "admin" ? "Admin" : u.role === "teacher" ? "Багш" : "Сурагч"}
                           </span>
                         </td>
-                        <td style={{ color: "var(--indigo)", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                        <td style={{ fontWeight: 600, color: "#4F46E5", fontVariantNumeric: "tabular-nums" }}>
                           {u.role === "student" ? (u.xp ?? 0).toLocaleString() : "—"}
                         </td>
-                        <td style={{ color: (u.streak ?? 0) > 7 ? "var(--amber)" : (u.streak ?? 0) > 0 ? "var(--text-2)" : "var(--muted-2)", fontVariantNumeric: "tabular-nums" }}>
+                        <td style={{ color: (u.streak ?? 0) > 7 ? "#F59E0B" : "#64748B" }}>
                           {(u.streak ?? 0) > 0 ? `${u.streak}d` : "—"}
                         </td>
                         <td>
-                          <button onClick={() => togglePremium(u._id, u.isPremium)} className="badge" style={{ cursor: "pointer", background: u.isPremium ? "var(--green-bg)" : "var(--surface)", color: u.isPremium ? "var(--green-text)" : "var(--muted)", border: `1px solid ${u.isPremium ? "var(--green-border)" : "var(--border)"}` }}>
-                            {u.isPremium ? "Premium" : "Энгийн"}
+                          <button onClick={() => togglePremium(u._id, u.isPremium)}
+                            className={`badge ${u.isPremium ? "green" : "gray"}`}
+                            style={{ cursor: "pointer", border: "none" }}>
+                            {u.isPremium ? "✓ Premium" : "Энгийн"}
                           </button>
                         </td>
-                        <td style={{ color: "var(--muted)", fontSize: 12, fontVariantNumeric: "tabular-nums" }}>{fmtDate(u.createdAt)}</td>
-                        <td style={{ textAlign: "right" }}>
-                          <div className="actions" style={{ justifyContent: "flex-end" }}>
-                            <button type="button" className="btn sm">Засах</button>
-                          </div>
-                        </td>
+                        <td style={{ color: "#94A3B8", fontSize: 12, fontVariantNumeric: "tabular-nums" }}>{fmtDate(u.createdAt)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                <div className="pager">
-                  <span className="pager-info">Нийт {filteredUsers.length} хэрэглэгч</span>
-                </div>
+                <div className="pager">{filteredUsers.length} / {users.length} хэрэглэгч</div>
               </div>
             </div>
           )}
 
-          {/* ══ QUESTIONS ══════════════════════════════════ */}
+          {/* ═══ QUESTIONS ══════════════════════════════ */}
           {tab === "questions" && (
             <div>
-              <div className="topbar">
-                <div><h1>Асуултын сан</h1><div className="sub">Нийт {questions.length} асуулт хадгалагдсан</div></div>
+              <div className="page-header">
+                <h1 className="page-title">Асуултын сан</h1>
+                <p className="page-sub">Нийт {questions.length} асуулт хадгалагдсан</p>
               </div>
-              <div className="tab-actions">
+
+              <div className="toolbar">
                 <select className="select" value={qCatFilter} onChange={e => setQCatFilter(e.target.value)} style={{ width: 160 }}>
                   <option value="all">Бүх ангилал</option>
                   {categories.map(c => <option key={c._id}>{c.name}</option>)}
@@ -803,182 +621,110 @@ export default function AdminPage() {
                   <option value="medium">Дунд</option>
                   <option value="hard">Хэцүү</option>
                 </select>
-                <div className="search-box" style={{ width: 220 }}>
-                  <input placeholder="Асуултын текстээр хайх..." value={search} onChange={e => setSearch(e.target.value)} />
+                <div className="search-wrap" style={{ width: 220 }}>
+                  <span style={{ color: "#94A3B8", fontSize: 14 }}>⌕</span>
+                  <input placeholder="Асуулт хайх…" value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
                 <div className="spacer" />
-                <button className="btn primary" onClick={() => setQModal(true)}>+ Асуулт нэмэх</button>
+                <button className="btn primary" onClick={() => { setEditingQ(null); setQForm(DEFAULT_QFORM); setQModal(true); }}>+ Асуулт нэмэх</button>
               </div>
+
               <div className="table-wrap">
                 <table className="table">
                   <thead>
                     <tr>
                       <th>Асуулт</th>
-                      <th style={{ width: 140 }}>Сэдэв</th>
+                      <th style={{ width: 140 }}>Ангилал</th>
                       <th style={{ width: 60 }}>Lvl</th>
                       <th style={{ width: 90 }}>Хүнд</th>
                       <th style={{ width: 60 }}>XP</th>
-                      <th style={{ width: 80, textAlign: "right" }}>Үйлдэл</th>
+                      <th style={{ width: 90, textAlign: "right" }}>Үйлдэл</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredQs.map(q => (
+                    {loading ? (
+                      <tr className="loading-row"><td colSpan={6}>Ачаалж байна…</td></tr>
+                    ) : filteredQs.length === 0 ? (
+                      <tr><td colSpan={6} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>Асуулт олдсонгүй</td></tr>
+                    ) : filteredQs.map(q => (
                       <tr key={q._id}>
                         <td style={{ maxWidth: 360 }}>
-                          <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.question}</div>
+                          <div style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.question}</div>
                         </td>
-                        <td style={{ fontSize: 13, color: "var(--text-2)" }}>{q.categoryId?.name ?? "—"}</td>
-                        <td style={{ color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{q.level}</td>
+                        <td style={{ color: "#64748B" }}>{q.categoryId?.name ?? "—"}</td>
+                        <td style={{ color: "#94A3B8", fontVariantNumeric: "tabular-nums" }}>{q.level}</td>
                         <td>
                           <span className={`badge ${q.difficulty === "easy" ? "green" : q.difficulty === "hard" ? "red" : "amber"}`}>
                             {q.difficulty === "easy" ? "Хялбар" : q.difficulty === "hard" ? "Хэцүү" : "Дунд"}
                           </span>
                         </td>
-                        <td style={{ color: "var(--indigo)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>+{q.xpReward}</td>
+                        <td style={{ color: "#4F46E5", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>+{q.xpReward}</td>
                         <td style={{ textAlign: "right" }}>
-                          <div className="actions" style={{ justifyContent: "flex-end" }}>
-                            <button type="button" className="btn sm" onClick={() => {
-                              setEditingQ(q);
-                              setQForm({ categoryId: typeof q.categoryId === "object" ? (q.categoryId as any)._id ?? "" : q.categoryId ?? "", level: q.level, question: q.question, options: (q as any).options ?? ["","","",""], correctIndex: (q as any).correctIndex ?? 0, explanation: (q as any).explanation ?? "", difficulty: q.difficulty, xpReward: q.xpReward, coinReward: (q as any).coinReward ?? 5 });
-                              setQModal(true);
-                            }}>Засах</button>
-                            <button type="button" className="btn sm danger" onClick={() => deleteQuestion(q._id)}>Устгах</button>
+                          <div className="row-actions" style={{ justifyContent: "flex-end" }}>
+                            <button className="btn sm" onClick={() => openEditQ(q)}>Засах</button>
+                            <button className="btn sm danger" onClick={() => deleteQuestion(q._id)}>Устгах</button>
                           </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                <div className="pager">
-                  <span className="pager-info">{filteredQs.length} / {questions.length} асуулт</span>
-                </div>
+                <div className="pager">{filteredQs.length} / {questions.length} асуулт</div>
               </div>
             </div>
           )}
 
-          {/* ══ CATEGORIES ══════════════════════════════════ */}
+          {/* ═══ CATEGORIES ═════════════════════════════ */}
           {tab === "categories" && (
             <div>
-              <div className="topbar">
-                <div><h1>Ангилал</h1><div className="sub">{categories.length} ангилал бүртгэлтэй</div></div>
+              <div className="page-header" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+                <div>
+                  <h1 className="page-title">Ангилал</h1>
+                  <p className="page-sub">{categories.length} ангилал бүртгэлтэй</p>
+                </div>
+                <button className="btn primary" onClick={() => { setEditingCat(null); setCatForm(DEFAULT_CATFORM); setCatModal(true); }}>+ Ангилал нэмэх</button>
               </div>
-              <div className="tab-actions">
-                <div className="spacer" />
-                <button className="btn primary" onClick={() => setCatModal(true)}>+ Ангилал нэмэх</button>
-              </div>
-              <div className="row c3">
-                {categories.map(c => (
-                  <div key={c._id} className="card">
-                    <div style={{ padding: 16 }}>
-                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 8, background: c.color + "22", color: c.color, display: "grid", placeItems: "center", fontSize: 14, fontWeight: 700 }}>
-                          {c.icon?.trim() ? c.icon : (c.name?.[0]?.toUpperCase() ?? "—")}
+
+              {categories.length === 0 ? (
+                <div className="card">
+                  <div className="empty">
+                    <div className="empty-icon">📂</div>
+                    <div className="empty-title">Ангилал байхгүй байна</div>
+                    <div className="empty-sub">Дээрх товчоор анхны ангилалаа нэмнэ үү</div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
+                  {categories.map(c => (
+                    <div key={c._id} className="card">
+                      <div style={{ padding: "16px 18px" }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
+                          <div style={{ width: 40, height: 40, borderRadius: 10, background: `${c.color}18`, color: c.color, display: "grid", placeItems: "center", fontSize: 18, fontWeight: 700, flexShrink: 0 }}>
+                            {c.icon?.trim() || c.name?.[0]?.toUpperCase() || "?"}
+                          </div>
+                          <span className={`badge ${c.isActive ? "green dot" : "gray"}`}>{c.isActive ? "Идэвхтэй" : "Идэвхгүй"}</span>
                         </div>
-                        <span className={`badge ${c.isActive ? "green dot" : "gray"}`}>{c.isActive ? "Идэвхтэй" : "Идэвхгүй"}</span>
-                      </div>
-                      <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>{c.name}</div>
-                      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 14 }}>{c.totalLevels} level · Дараалал {c.order}</div>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button type="button" className="btn sm" style={{ flex: 1 }} onClick={() => {
-                          setEditingCat(c);
-                          setCatForm({ name: c.name, icon: c.icon ?? "", color: c.color ?? "#4F46E5", totalLevels: c.totalLevels, order: c.order });
-                          setCatModal(true);
-                        }}>Засах</button>
-                        <button type="button" className="btn sm danger" style={{ flex: 1 }} onClick={() => deleteCategory(c._id)}>Устгах</button>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: "#0F172A", marginBottom: 3 }}>{c.name}</div>
+                        <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 14 }}>{c.totalLevels} level · Дараалал {c.order}</div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button className="btn sm" style={{ flex: 1 }} onClick={() => openEditCat(c)}>Засах</button>
+                          <button className="btn sm danger" onClick={() => deleteCategory(c._id)}>Устгах</button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-                <button onClick={() => setCatModal(true)} style={{ background: "transparent", border: "1px dashed var(--border)", borderRadius: 8, padding: 16, color: "var(--muted)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, minHeight: 180, transition: "all .1s" }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--indigo)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--indigo)"; (e.currentTarget as HTMLButtonElement).style.background = "var(--indigo-50)"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--muted)"; (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}>
-                  <span style={{ fontSize: 22 }}>+</span>
-                  <span style={{ fontSize: 13, fontWeight: 500 }}>Шинэ ангилал нэмэх</span>
-                </button>
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
-          {/* ══ PAYMENTS ══════════════════════════════════ */}
-          {tab === "payments" && (
-            <div>
-              <div className="topbar">
-                <div><h1>Орлого ба төлбөр</h1><div className="sub">QPay, Khan Bank-ийн гүйлгээний жагсаалт</div></div>
-              </div>
-              <div className="stat-grid" style={{ marginBottom: 20 }}>
-                {(
-                  [
-                    { label: "Нийт орлого", value: "8.42M₮", trend: "Бүх цагийн дүн" },
-                    { label: "Энэ сарын орлого", value: "2.15M₮", trend: "+18.4% өмнөх сартай харьцуулав", trendColor: "green" },
-                    { label: "QPay-ээр орсон", value: "4.92M₮", trend: "Нийт орлогын 58%" },
-                    { label: "Khan Bank-аар орсон", value: "3.50M₮", trend: "Нийт орлогын 42%" },
-                  ] satisfies ReadonlyArray<{ label: string; value: string; trend: string; trendColor?: string }>
-                ).map((s, i) => (
-                  <div key={i} className="stat">
-                    <div style={{ marginBottom: 4 }}>
-                      <span className="stat-label">{s.label}</span>
-                    </div>
-                    <div className="stat-value">{s.value}</div>
-                    <div className={`stat-trend ${s.trendColor ?? ""}`}>{s.trend}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="tab-actions">
-                <span style={{ fontSize: 13, color: "var(--muted)" }}>Саяхны гүйлгээнүүд</span>
-                <div className="spacer" />
-                <button className="btn">Excel экспорт</button>
-              </div>
-              <div className="table-wrap">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Хэрэглэгч</th>
-                      <th>Бүтээгдэхүүн</th>
-                      <th style={{ width: 110 }}>Арга</th>
-                      <th style={{ width: 130 }}>Огноо</th>
-                      <th style={{ width: 110, textAlign: "right" }}>Дүн</th>
-                      <th style={{ width: 110 }}>Статус</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(stats?.recentPayments ?? []).map((p: PayRow, i: number) => (
-                      <tr key={p._id ?? i}>
-                        <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <div className="avatar" style={{ width: 28, height: 28, fontSize: 11 }}>
-                              {typeof p.userId === "object" ? `${p.userId?.firstName?.[0] ?? ""}${p.userId?.lastName?.[0] ?? ""}` : "U"}
-                            </div>
-                            <span style={{ fontWeight: 500, color: "var(--text)" }}>
-                              {typeof p.userId === "object" ? `${p.userId?.firstName ?? ""} ${p.userId?.lastName ?? ""}`.trim() || "—" : "Хэрэглэгч"}
-                            </span>
-                          </div>
-                        </td>
-                        <td style={{ color: "var(--text-2)" }}>{p.type}</td>
-                        <td><span className={`badge ${p.method === "qpay" ? "indigo" : "amber"}`}>{p.method?.toUpperCase()}</span></td>
-                        <td style={{ color: "var(--muted)", fontSize: 12 }}>{fmtDate(p.createdAt)}</td>
-                        <td style={{ textAlign: "right", fontWeight: 600, color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>{(p.amount ?? 0).toLocaleString()}₮</td>
-                        <td>
-                          <span className={`badge ${p.status === "success" ? "green" : p.status === "pending" ? "amber" : p.status === "failed" ? "red" : "gray"}`}>
-                            {p.status === "success" ? "Амжилттай" : p.status === "pending" ? "Хүлээгдэж" : p.status === "failed" ? "Алдаа" : "Цуцлагдсан"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="pager">
-                  <span className="pager-info">{(stats?.recentPayments ?? []).length} гүйлгээ</span>
-                </div>
-              </div>
-            </div>
-          )}
-          {/* ══ EXAMS ══════════════════════════════════════ */}
+          {/* ═══ EXAMS ══════════════════════════════════ */}
           {tab === "exams" && (
             <div>
-              <div className="topbar">
+              <div className="page-header" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                 <div>
-                  <h1>Шалгалтууд</h1>
-                  <div className="sub">Шалгалт үүсгэж, сурагчдын оролдлогыг хянах</div>
+                  <h1 className="page-title">Шалгалтууд</h1>
+                  <p className="page-sub">Шалгалт үүсгэж, сурагчдын оролдлогыг хянах</p>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button className="btn" onClick={loadExams}>Шинэчлэх</button>
@@ -987,111 +733,90 @@ export default function AdminPage() {
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: selectedExam ? "1fr 1fr" : "1fr", gap: 20 }}>
-                {/* Exam list */}
-                <div>
+                <div className="table-wrap">
                   {exams.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: "60px 0", color: "var(--muted)", background: "var(--surface)", borderRadius: 8, border: "1px solid var(--border)" }}>
-                      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Одоогоор шалгалт үүсээгүй байна</div>
-                      <button className="btn primary" onClick={() => setExamModal(true)} style={{ marginTop: 12 }}>+ Анхны шалгалтаа нэмэх</button>
+                    <div className="empty">
+                      <div className="empty-icon">📝</div>
+                      <div className="empty-title">Шалгалт байхгүй байна</div>
+                      <div className="empty-sub" style={{ marginBottom: 14 }}>Дээрх товчоор анхны шалгалтаа нэмнэ үү</div>
                     </div>
                   ) : (
-                    <div className="table-wrap">
-                      <table className="table">
-                        <thead>
-                          <tr>
-                            <th>Шалгалт</th>
-                            <th style={{ width: 80 }}>Асуулт</th>
-                            <th style={{ width: 80 }}>Хугацаа</th>
-                            <th style={{ width: 90 }}>Нэмэгдсэн</th>
-                            <th style={{ width: 100, textAlign: "right" }}>Үйлдэл</th>
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Шалгалт</th>
+                          <th style={{ width: 80 }}>Асуулт</th>
+                          <th style={{ width: 80 }}>Хугацаа</th>
+                          <th style={{ width: 100 }}>Нэмэгдсэн</th>
+                          <th style={{ width: 80, textAlign: "right" }}>Үйлдэл</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {exams.map(exam => (
+                          <tr key={exam._id} style={{ cursor: "pointer" }} onClick={() => { setSelectedExam(exam); loadAttempts(exam._id); }}>
+                            <td>
+                              <div style={{ fontWeight: 600 }}>{exam.title}</div>
+                              {exam.description && <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>{exam.description}</div>}
+                            </td>
+                            <td style={{ color: "#4F46E5", fontWeight: 600 }}>{exam.questions?.length ?? 0}</td>
+                            <td style={{ color: "#64748B" }}>{exam.duration}мин</td>
+                            <td style={{ fontSize: 12, color: "#94A3B8" }}>{fmtDate(exam.createdAt)}</td>
+                            <td style={{ textAlign: "right" }}>
+                              <div className="row-actions" style={{ justifyContent: "flex-end" }} onClick={e => e.stopPropagation()}>
+                                <button className="btn sm danger" onClick={() => deleteExam(exam._id)}>Устгах</button>
+                              </div>
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {exams.map(exam => (
-                            <tr key={exam._id} style={{ cursor: "pointer" }} onClick={() => { setSelectedExam(exam); loadAttempts(exam._id); }}>
-                              <td>
-                                <div style={{ fontWeight: 600, color: "var(--text)" }}>{exam.title}</div>
-                                {exam.description && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{exam.description}</div>}
-                              </td>
-                              <td style={{ color: "var(--indigo)", fontWeight: 600 }}>{exam.questions?.length ?? 0}</td>
-                              <td style={{ color: "var(--text-2)" }}>{exam.duration}мин</td>
-                              <td style={{ fontSize: 12, color: "var(--muted)" }}>{fmtDate(exam.createdAt)}</td>
-                              <td style={{ textAlign: "right" }}>
-                                <div className="actions" style={{ justifyContent: "flex-end" }} onClick={e => e.stopPropagation()}>
-                                  <button type="button" className="btn sm danger" onClick={() => deleteExam(exam._id)}>Устгах</button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      <div className="pager"><span className="pager-info">{exams.length} шалгалт</span></div>
-                    </div>
+                        ))}
+                      </tbody>
+                      <tfoot><tr><td colSpan={5} className="pager">{exams.length} шалгалт</td></tr></tfoot>
+                    </table>
                   )}
                 </div>
 
-                {/* Attempts for selected exam */}
                 {selectedExam && (
                   <div>
-                    <div className="card" style={{ marginBottom: 12 }}>
+                    <div className="card" style={{ marginBottom: 14 }}>
                       <div className="card-head">
                         <div>
                           <h3>{selectedExam.title}</h3>
                           <div className="sub">{examAttempts.length} оролдлого</div>
                         </div>
-                        <button type="button" className="icon-btn" onClick={() => { setSelectedExam(null); setExamAttempts([]); }} title="Хаах">×</button>
+                        <button className="close-btn" onClick={() => { setSelectedExam(null); setExamAttempts([]); }}>×</button>
                       </div>
                     </div>
-
                     {examAttempts.length === 0 ? (
-                      <div style={{ textAlign: "center", padding: "40px", color: "var(--muted)", background: "var(--surface)", borderRadius: 8, border: "1px solid var(--border)" }}>
-                        Одоогоор энэ шалгалтыг өгсөн сурагч алга
-                      </div>
+                      <div className="card"><div className="empty"><div className="empty-sub">Одоогоор оролдлого байхгүй</div></div></div>
                     ) : (
                       <div className="table-wrap">
                         <table className="table">
-                          <thead>
-                            <tr>
-                              <th>Сурагч</th>
-                              <th style={{ width: 80 }}>Оноо</th>
-                              <th style={{ width: 70 }}>Хувь</th>
-                              <th style={{ width: 90 }}>Огноо</th>
-                            </tr>
-                          </thead>
+                          <thead><tr><th>Сурагч</th><th style={{ width: 80 }}>Оноо</th><th style={{ width: 70 }}>%</th><th style={{ width: 90 }}>Огноо</th></tr></thead>
                           <tbody>
-                            {examAttempts.map((a) => {
+                            {examAttempts.map(a => {
                               const pct = a.percentage ?? (a.totalQuestions > 0 ? Math.round((a.score / a.totalQuestions) * 100) : 0);
                               return (
                                 <tr key={a._id}>
                                   <td>
                                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                       <div className="avatar" style={{ width: 28, height: 28, fontSize: 11 }}>
-                                        {a.studentId?.firstName?.[0] ?? "?"}{a.studentId?.lastName?.[0] ?? ""}
+                                        {initials2(a.studentId?.firstName, a.studentId?.lastName)}
                                       </div>
                                       <div>
-                                        <div style={{ fontWeight: 500, color: "var(--text)" }}>{a.studentId?.firstName ?? ""} {a.studentId?.lastName ?? ""}</div>
-                                        <div style={{ fontSize: 11, color: "var(--muted-2)" }}>{a.studentId?.email ?? ""}</div>
+                                        <div style={{ fontWeight: 500 }}>{a.studentId?.firstName ?? ""} {a.studentId?.lastName ?? ""}</div>
+                                        <div style={{ fontSize: 11, color: "#94A3B8" }}>{a.studentId?.email ?? ""}</div>
                                       </div>
                                     </div>
                                   </td>
-                                  <td style={{ fontWeight: 600, color: "var(--indigo)", fontVariantNumeric: "tabular-nums" }}>
-                                    {a.score}/{a.totalQuestions}
-                                  </td>
-                                  <td>
-                                    <span className={`badge ${pct >= 75 ? "green" : pct >= 50 ? "amber" : "red"}`}>{pct}%</span>
-                                  </td>
-                                  <td style={{ fontSize: 12, color: "var(--muted)" }}>{a.finishedAt ? fmtDate(a.finishedAt) : "—"}</td>
+                                  <td style={{ fontWeight: 600, color: "#4F46E5", fontVariantNumeric: "tabular-nums" }}>{a.score}/{a.totalQuestions}</td>
+                                  <td><span className={`badge ${pct >= 75 ? "green" : pct >= 50 ? "amber" : "red"}`}>{pct}%</span></td>
+                                  <td style={{ fontSize: 12, color: "#94A3B8" }}>{a.finishedAt ? fmtDate(a.finishedAt) : "—"}</td>
                                 </tr>
                               );
                             })}
                           </tbody>
                         </table>
                         <div className="pager">
-                          <span className="pager-info">{examAttempts.length} оролдлого</span>
-                          <div style={{ flex: 1 }} />
-                          <span style={{ fontSize: 12, color: "var(--muted)" }}>
-                            Дундаж: {examAttempts.length > 0 ? Math.round(examAttempts.reduce((s, a) => s + (a.percentage ?? 0), 0) / examAttempts.length) : 0}%
-                          </span>
+                          Дундаж: {Math.round(examAttempts.reduce((s, a) => s + (a.percentage ?? 0), 0) / examAttempts.length)}%
                         </div>
                       </div>
                     )}
@@ -1103,18 +828,18 @@ export default function AdminPage() {
         </main>
       </div>
 
-      {/* ══ QUESTION MODAL ════════════════════════════════ */}
+      {/* ── QUESTION MODAL ─────────────────────────────── */}
       {qModal && (
-        <div className="modal-overlay" onClick={() => { setQModal(false); setEditingQ(null); setQForm(DEFAULT_QFORM); }}>
+        <div className="overlay" onClick={() => { setQModal(false); setEditingQ(null); setQForm(DEFAULT_QFORM); }}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-head">
-              <h2>{editingQ ? "Асуулт засах" : "Асуулт нэмэх"}</h2>
-              <button type="button" className="icon-btn" onClick={() => { setQModal(false); setEditingQ(null); setQForm(DEFAULT_QFORM); }} title="Хаах">×</button>
+              <h2>{editingQ ? "Асуулт засах" : "Шинэ асуулт нэмэх"}</h2>
+              <button className="close-btn" onClick={() => { setQModal(false); setEditingQ(null); setQForm(DEFAULT_QFORM); }}>×</button>
             </div>
             <div className="modal-body">
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 140px", gap: 12, marginBottom: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 90px 130px", gap: 10, marginBottom: 14 }}>
                 <div className="field" style={{ margin: 0 }}>
-                  <label className="label">Сэдэв</label>
+                  <label className="label">Ангилал</label>
                   <select className="select" value={qForm.categoryId} onChange={e => setQForm(f => ({ ...f, categoryId: e.target.value }))}>
                     <option value="">— Сонгох —</option>
                     {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
@@ -1125,7 +850,7 @@ export default function AdminPage() {
                   <input type="number" className="input" value={qForm.level} min={1} onChange={e => setQForm(f => ({ ...f, level: +e.target.value }))} />
                 </div>
                 <div className="field" style={{ margin: 0 }}>
-                  <label className="label">Хүнд</label>
+                  <label className="label">Хүндвэрлэл</label>
                   <select className="select" value={qForm.difficulty} onChange={e => setQForm(f => ({ ...f, difficulty: e.target.value }))}>
                     <option value="easy">Хялбар</option>
                     <option value="medium">Дунд</option>
@@ -1135,65 +860,70 @@ export default function AdminPage() {
               </div>
               <div className="field">
                 <label className="label">Асуулт</label>
-                <textarea className="textarea" rows={3} placeholder="Жишээ: Ом-ын хуулийн томьёо?" value={qForm.question} onChange={e => setQForm(f => ({ ...f, question: e.target.value }))} />
+                <textarea className="textarea" rows={3} placeholder="Асуултаа оруулна уу" value={qForm.question} onChange={e => setQForm(f => ({ ...f, question: e.target.value }))} />
               </div>
               <div className="field">
-                <label className="label">Хариултууд</label>
-                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Зөв хариултыг сонгоно уу</div>
+                <label className="label">Хариултууд — зөв хариулт сонгоно уу</label>
                 {qForm.options.map((o, i) => (
-                  <label key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                    <input type="radio" name="correct" checked={qForm.correctIndex === i} onChange={() => setQForm(f => ({ ...f, correctIndex: i }))} style={{ accentColor: "var(--indigo)", width: 16, height: 16, flex: "none" }} />
-                    <input className="input" placeholder={`Хариулт ${"ABCD"[i]}`} value={o} onChange={e => setQForm(f => ({ ...f, options: f.options.map((v, k) => k === i ? e.target.value : v) }))} style={{ borderColor: qForm.correctIndex === i ? "var(--indigo)" : "var(--border)" }} />
+                  <label key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <input type="radio" name="correct" checked={qForm.correctIndex === i} onChange={() => setQForm(f => ({ ...f, correctIndex: i }))} style={{ accentColor: "#4F46E5", width: 15, height: 15, flexShrink: 0 }} />
+                    <span style={{ width: 22, height: 22, borderRadius: 5, background: qForm.correctIndex === i ? "#4F46E5" : "#F1F5F9", color: qForm.correctIndex === i ? "#fff" : "#64748B", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{"ABCD"[i]}</span>
+                    <input className="input" placeholder={`Хариулт ${"ABCD"[i]}`} value={o} onChange={e => setQForm(f => ({ ...f, options: f.options.map((v, k) => k === i ? e.target.value : v) }))} style={{ borderColor: qForm.correctIndex === i ? "#6366F1" : "#E2E8F0" }} />
                   </label>
                 ))}
               </div>
-              <div className="field">
-                <label className="label">Тайлбар</label>
-                <textarea className="textarea" rows={2} placeholder="Зөв хариултын тайлбар..." value={qForm.explanation} onChange={e => setQForm(f => ({ ...f, explanation: e.target.value }))} />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "100px 100px", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 90px 90px", gap: 10 }}>
                 <div className="field" style={{ margin: 0 }}>
-                  <label className="label">XP шагнал</label>
+                  <label className="label">Тайлбар</label>
+                  <input className="input" placeholder="Зөв хариултын тайлбар" value={qForm.explanation} onChange={e => setQForm(f => ({ ...f, explanation: e.target.value }))} />
+                </div>
+                <div className="field" style={{ margin: 0 }}>
+                  <label className="label">XP</label>
                   <input type="number" className="input" value={qForm.xpReward} onChange={e => setQForm(f => ({ ...f, xpReward: +e.target.value }))} />
                 </div>
                 <div className="field" style={{ margin: 0 }}>
-                  <label className="label">Coin шагнал</label>
+                  <label className="label">Coin</label>
                   <input type="number" className="input" value={qForm.coinReward} onChange={e => setQForm(f => ({ ...f, coinReward: +e.target.value }))} />
                 </div>
               </div>
             </div>
             <div className="modal-foot">
               <button className="btn" onClick={() => { setQModal(false); setEditingQ(null); setQForm(DEFAULT_QFORM); }}>Болих</button>
-              <button className="btn primary" disabled={submitting} onClick={saveQuestion}>{submitting ? "Хадгалж байна..." : editingQ ? "Хадгалах" : "Нэмэх"}</button>
+              <button className="btn primary" disabled={submitting} onClick={saveQuestion}>{submitting ? "Хадгалж байна…" : editingQ ? "Хадгалах" : "Нэмэх"}</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ══ CATEGORY MODAL ════════════════════════════════ */}
+      {/* ── CATEGORY MODAL ─────────────────────────────── */}
       {catModal && (
-        <div className="modal-overlay" onClick={() => { setCatModal(false); setEditingCat(null); setCatForm(DEFAULT_CATFORM); }}>
-          <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+        <div className="overlay" onClick={() => { setCatModal(false); setEditingCat(null); setCatForm(DEFAULT_CATFORM); }}>
+          <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
             <div className="modal-head">
-              <h2>{editingCat ? "Ангилал засах" : "Ангилал нэмэх"}</h2>
-              <button type="button" className="icon-btn" onClick={() => { setCatModal(false); setEditingCat(null); setCatForm(DEFAULT_CATFORM); }} title="Хаах">×</button>
+              <h2>{editingCat ? "Ангилал засах" : "Шинэ ангилал нэмэх"}</h2>
+              <button className="close-btn" onClick={() => { setCatModal(false); setEditingCat(null); setCatForm(DEFAULT_CATFORM); }}>×</button>
             </div>
             <div className="modal-body">
               <div className="field">
                 <label className="label">Нэр</label>
-                <input className="input" placeholder="Жишээ: Оптик" value={catForm.name} onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))} />
+                <input className="input" placeholder="Жишээ: Цахилгаан" value={catForm.name} onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))} />
               </div>
-              <div className="field">
-                <label className="label">Жижиг тэмдэг (нэг тэмдэгт)</label>
-                <input className="input" placeholder="Жишээ нь: Ц" value={catForm.icon} onChange={e => setCatForm(f => ({ ...f, icon: e.target.value }))} />
-              </div>
-              <div className="field">
-                <label className="label">Өнгө (hex)</label>
-                <input className="input" value={catForm.color} onChange={e => setCatForm(f => ({ ...f, color: e.target.value }))} />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <div className="field" style={{ margin: 0 }}>
-                  <label className="label">Нийт level тоо</label>
+                  <label className="label">Дүрс тэмдэг</label>
+                  <input className="input" placeholder="Жишээ: ⚡" value={catForm.icon} onChange={e => setCatForm(f => ({ ...f, icon: e.target.value }))} />
+                </div>
+                <div className="field" style={{ margin: 0 }}>
+                  <label className="label">Өнгө (hex)</label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input type="color" value={catForm.color} onChange={e => setCatForm(f => ({ ...f, color: e.target.value }))} style={{ width: 36, height: 36, padding: 2, border: "1px solid #E2E8F0", borderRadius: 7, cursor: "pointer" }} />
+                    <input className="input" value={catForm.color} onChange={e => setCatForm(f => ({ ...f, color: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
+                <div className="field" style={{ margin: 0 }}>
+                  <label className="label">Нийт level</label>
                   <input type="number" className="input" value={catForm.totalLevels} min={1} onChange={e => setCatForm(f => ({ ...f, totalLevels: +e.target.value }))} />
                 </div>
                 <div className="field" style={{ margin: 0 }}>
@@ -1204,23 +934,22 @@ export default function AdminPage() {
             </div>
             <div className="modal-foot">
               <button className="btn" onClick={() => { setCatModal(false); setEditingCat(null); setCatForm(DEFAULT_CATFORM); }}>Болих</button>
-              <button className="btn primary" disabled={submitting} onClick={saveCategory}>{submitting ? "Хадгалж байна..." : editingCat ? "Хадгалах" : "Нэмэх"}</button>
+              <button className="btn primary" disabled={submitting || !catForm.name.trim()} onClick={saveCategory}>{submitting ? "Хадгалж байна…" : editingCat ? "Хадгалах" : "Нэмэх"}</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ══ EXAM CREATION MODAL ═══════════════════════════ */}
+      {/* ── EXAM MODAL ──────────────────────────────────── */}
       {examModal && (
-        <div className="modal-overlay" onClick={() => setExamModal(false)}>
-          <div className="modal" style={{ maxWidth: 680 }} onClick={e => e.stopPropagation()}>
+        <div className="overlay" onClick={() => setExamModal(false)}>
+          <div className="modal wide" onClick={e => e.stopPropagation()}>
             <div className="modal-head">
               <h2>Шинэ шалгалт үүсгэх</h2>
-              <button type="button" className="icon-btn" onClick={() => setExamModal(false)} title="Хаах">×</button>
+              <button className="close-btn" onClick={() => setExamModal(false)}>×</button>
             </div>
             <div className="modal-body">
-              {/* Basic info */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 12, marginBottom: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 10, marginBottom: 14 }}>
                 <div className="field" style={{ margin: 0 }}>
                   <label className="label">Шалгалтын нэр</label>
                   <input className="input" placeholder="Жишээ: Цахилгааны I шалгалт" value={examForm.title} onChange={e => setExamForm(f => ({ ...f, title: e.target.value }))} />
@@ -1234,20 +963,17 @@ export default function AdminPage() {
                 <label className="label">Тайлбар</label>
                 <textarea className="textarea" rows={2} placeholder="Шалгалтын тухай товч тайлбар" value={examForm.description} onChange={e => setExamForm(f => ({ ...f, description: e.target.value }))} />
               </div>
-
-              {/* Questions */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <div style={{ fontWeight: 600, color: "var(--text)" }}>Асуултууд ({examForm.questions.length})</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <span style={{ fontWeight: 600, fontSize: 13, color: "#0F172A" }}>Асуултууд ({examForm.questions.length})</span>
                 <button className="btn sm primary" onClick={addExamQuestion}>+ Асуулт нэмэх</button>
               </div>
-
-              <div style={{ maxHeight: 400, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ maxHeight: 360, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
                 {examForm.questions.map((q, qi) => (
-                  <div key={q.id} style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 14, background: "var(--surface-alt)" }}>
+                  <div key={q.id} style={{ border: "1px solid #E2E8F0", borderRadius: 8, padding: 14, background: "#F8FAFC" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                      <span style={{ fontWeight: 600, fontSize: 13, color: "var(--text)" }}>Асуулт {qi + 1}</span>
+                      <span style={{ fontWeight: 600, fontSize: 13, color: "#0F172A" }}>Асуулт {qi + 1}</span>
                       {examForm.questions.length > 1 && (
-                        <button type="button" className="btn sm danger" onClick={() => removeExamQuestion(q.id)}>Хасах</button>
+                        <button className="btn sm danger" onClick={() => removeExamQuestion(q.id)}>Хасах</button>
                       )}
                     </div>
                     <div className="field" style={{ marginBottom: 10 }}>
@@ -1256,70 +982,23 @@ export default function AdminPage() {
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                       {q.options.map(opt => (
                         <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <input type="radio" name={`correct-${q.id}`} checked={q.correctAnswer === opt.id} onChange={() => updateExamQ(q.id, "correctAnswer", opt.id)} style={{ accentColor: "var(--indigo)", width: 15, height: 15, flex: "none" }} />
-                          <span style={{ display: "flex", width: 24, height: 24, borderRadius: 4, background: "var(--border-soft)", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flex: "none" }}>{opt.id}</span>
-                          <input className="input" placeholder={`Хариулт ${opt.id}`} value={opt.text} onChange={e => updateExamOpt(q.id, opt.id, e.target.value)} style={{ borderColor: q.correctAnswer === opt.id ? "var(--indigo)" : "var(--border)" }} />
+                          <input type="radio" name={`correct-${q.id}`} checked={q.correctAnswer === opt.id} onChange={() => updateExamQ(q.id, "correctAnswer", opt.id)} style={{ accentColor: "#4F46E5", width: 14, height: 14, flexShrink: 0 }} />
+                          <span style={{ width: 22, height: 22, borderRadius: 5, background: q.correctAnswer === opt.id ? "#4F46E5" : "#E2E8F0", color: q.correctAnswer === opt.id ? "#fff" : "#64748B", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{opt.id}</span>
+                          <input className="input" placeholder={`Хариулт ${opt.id}`} value={opt.text} onChange={e => updateExamOpt(q.id, opt.id, e.target.value)} style={{ borderColor: q.correctAnswer === opt.id ? "#6366F1" : "#E2E8F0" }} />
                         </label>
                       ))}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 6 }}>Зөв хариултыг сонгоно уу: <b>{q.correctAnswer}</b></div>
                   </div>
                 ))}
               </div>
             </div>
             <div className="modal-foot">
               <button className="btn" onClick={() => setExamModal(false)}>Болих</button>
-              <button className="btn primary" disabled={submitting} onClick={saveExam}>{submitting ? "Хадгалж байна..." : "Шалгалт хадгалах"}</button>
+              <button className="btn primary" disabled={submitting || !examForm.title.trim()} onClick={saveExam}>{submitting ? "Хадгалж байна…" : "Шалгалт хадгалах"}</button>
             </div>
           </div>
         </div>
       )}
     </>
-  );
-}
-
-/* ─── Sub-components ─────────────────────────────────────── */
-function LineChart({ data, labels }: { data: number[]; labels: string[] }) {
-  const w = 560, h = 160, padL = 36, padR = 14, padT = 14, padB = 26;
-  const innerW = w - padL - padR, innerH = h - padT - padB;
-  const max = Math.max(...data, 10), min = 0;
-  const xs = data.map((_, i) => padL + (i / (data.length - 1)) * innerW);
-  const ys = data.map(v => padT + (1 - (v - min) / (max - min)) * innerH);
-  const path = xs.map((x, i) => `${i === 0 ? "M" : "L"} ${x} ${ys[i]}`).join(" ");
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", height: h, display: "block" }}>
-      {[0, Math.round(max/2), max].map(v => {
-        const y = padT + (1 - (v - min) / (max - min)) * innerH;
-        return (
-          <g key={v}>
-            <line x1={padL} x2={w - padR} y1={y} y2={y} stroke="#F3F4F6" strokeWidth="1" />
-            <text x={padL - 8} y={y + 3} fill="#9CA3AF" fontSize="11" textAnchor="end">{v}</text>
-          </g>
-        );
-      })}
-      <path d={path} fill="none" stroke="#4F46E5" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-      {xs.map((x, i) => <circle key={i} cx={x} cy={ys[i]} r="4" fill="#fff" stroke="#4F46E5" strokeWidth="2" />)}
-      {labels.map((lab, i) => <text key={i} x={xs[i]} y={h - 6} fill="#9CA3AF" fontSize="12" textAnchor="middle">{lab}</text>)}
-    </svg>
-  );
-}
-
-function CountdownRing({ value, max }: { value: number; max: number }) {
-  const r = 19, circ = 2 * Math.PI * r;
-  const stroke = value < 6 ? "#DC2626" : value < 12 ? "#D97706" : "#4F46E5";
-  return (
-    <div style={{ position: "relative", width: 44, height: 44 }}>
-      <svg viewBox="0 0 44 44" style={{ width: "100%", height: "100%", transform: "rotate(-90deg)" }}>
-        <circle cx="22" cy="22" r={r} fill="none" stroke="#F3F4F6" strokeWidth="3" />
-        <circle cx="22" cy="22" r={r} fill="none" stroke={stroke} strokeWidth="3" strokeLinecap="round"
-          strokeDasharray={circ}
-          strokeDashoffset={circ * (1 - value / max)}
-          style={{ transition: "stroke-dashoffset 1s linear, stroke .3s" }}
-        />
-      </svg>
-      <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", fontSize: 14, fontWeight: 600, color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
-        {value}
-      </div>
-    </div>
   );
 }
