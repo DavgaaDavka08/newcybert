@@ -1,18 +1,20 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import { T } from '@/styles/tokens';
 import { Ic, Avatar, Label } from '@/components/ui';
 import { NAV_ITEMS } from '@/lib/routes';
-import { getRank } from '@/lib/mock-data';
+import { getRank } from '@/lib/ranks';
 import { useAppState } from '@/lib/app-state-context';
+import { ProfileModal } from '@/components/layout/ProfileModal';
 
 export function Sidebar() {
   const pathname        = usePathname();
   const router          = useRouter();
   const { appState }    = useAppState();
   const { data: session } = useSession();
+  const [profileOpen, setProfileOpen] = useState(false);
   const rank            = getRank(appState.xp);
   const userName        = session?.user?.name ?? appState.name;
 
@@ -76,7 +78,35 @@ export function Sidebar() {
 
       {/* User footer */}
       <div style={{ padding: '10px 10px 14px', borderTop: `1px solid ${T.border}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: '#F8FAFC', borderRadius: 12, border: `1px solid ${T.border}`, marginBottom: 8 }}>
+        <button
+          type="button"
+          onClick={() => setProfileOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={profileOpen}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '8px 10px',
+            background: '#F8FAFC',
+            borderRadius: 12,
+            border: `1px solid ${T.border}`,
+            marginBottom: 8,
+            cursor: 'pointer',
+            textAlign: 'left',
+            fontFamily: 'Plus Jakarta Sans, sans-serif',
+            transition: 'box-shadow 0.15s, border-color 0.15s',
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 0 0 2px ${T.blue}22`;
+            (e.currentTarget as HTMLButtonElement).style.borderColor = T.blueMuted;
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none';
+            (e.currentTarget as HTMLButtonElement).style.borderColor = T.border;
+          }}
+        >
           <Avatar name={userName} size={32} color={T.blue} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -84,7 +114,8 @@ export function Sidebar() {
             </div>
             <div style={{ fontSize: 10, color: T.muted }}>Lv {appState.level} · {rank.name}</div>
           </div>
-        </div>
+          <Ic n="chevRight" size={14} color={T.muted} />
+        </button>
         <button onClick={() => signOut({ callbackUrl: '/login' })} style={{
           width: '100%', padding: '7px 12px', borderRadius: 8, border: `1px solid ${T.border}`,
           background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
@@ -98,6 +129,8 @@ export function Sidebar() {
           Гарах
         </button>
       </div>
+
+      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} displayName={userName} />
     </div>
   );
 }

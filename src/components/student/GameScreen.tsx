@@ -1,14 +1,49 @@
 'use client';
 import React, { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { GameMapPhase } from './game/GameMapPhase';
 import { GameQuizPhase } from './game/GameQuizPhase';
 import { GameResultPhase } from './game/GameResultPhase';
+import { GamePathAdminPanel } from './game/GamePathAdminPanel';
 import {
   getTopics, getQuestions, getSettings, getLivesState, setLivesState,
-  setNodeStars, calcStars, type GameQuestion, type GameTopic,
+  setNodeStars, calcStars, hydrateGamePathFromApi, getLessonSequence, type GameQuestion, type GameTopic,
 } from '@/lib/game-data';
 import { useAppState } from '@/lib/app-state-context';
 import type { AppState, Screen } from '@/types';
+
+const PASS_RATIO = 0.6;
+
+function wipKey(topicId: string, level: number) {
+  return `cp_quiz_wip:${topicId}:${level}`;
+}
+function readWip(topicId: string, level: number): { currentQ: number; score: number; mistakes: number } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(wipKey(topicId, level));
+    if (!raw) return null;
+    const o = JSON.parse(raw) as { currentQ?: number; score?: number; mistakes?: number };
+    if (typeof o.currentQ !== 'number') return null;
+    return { currentQ: o.currentQ, score: Number(o.score) || 0, mistakes: Number(o.mistakes) || 0 };
+  } catch {
+    return null;
+  }
+}
+function clearWip(topicId: string, level: number) {
+  if (typeof window === 'undefined') return;
+  try { sessionStorage.removeItem(wipKey(topicId, level)); } catch {}
+}
+function saveWip(topicId: string, level: number, payload: { currentQ: number; score: number; mistakes: number }) {
+  if (typeof window === 'undefined') return;
+  try { sessionStorage.setItem(wipKey(topicId, level), JSON.stringify(payload)); } catch {}
+}
+
+function buildLevelQuestions(topic: GameTopic, level: number): GameQuestion[] {
+  const allQs = getQuestions().filter(q => q.topicId === topic.id);
+  const PER   = 5;
+  const start = ((level - 1) * PER) % Math.max(allQs.length, 1);
+  return allQs.length > 0 ? [...allQs, ...allQs].slice(start, start + PER) : getQuestions().slice(0, PER);
+}
 
 interface Props {
   onNav: (s: Screen) => void;
@@ -50,7 +85,9 @@ function NoLivesOverlay({ refillAt, coins, refillCoins, livesCount, onRefillCoin
 }
 
 export function GameScreen({ onNav: _onNav, state, setState }: Props) {
+  const { data: session } = useSession();
   const { refreshStats } = useAppState();
+  const isAdmin = session?.user?.role === 'admin';
   const [topicIdx, setTopicIdx]     = useState(0);
   const [phase, setPhase]           = useState<'map' | 'quiz' | 'result'>('map');
   const [selectedLv, setSelectedLv] = useState<{ topic: GameTopic; level: number } | null>(null);
@@ -64,6 +101,15 @@ export function GameScreen({ onNav: _onNav, state, setState }: Props) {
   const [lives, setLives]           = useState(settings.livesCount);
   const [noLives, setNoLives]       = useState(false);
   const [refillAt, setRefillAt]     = useState<number | null>(null);
+  const [mapReload, setMapReload]   = useState(0);
+  const [resumePrompt, setResumePrompt] = useState<{
+    topic: GameTopic; level: number;
+    wip: { currentQ: number; score: number; mistakes: number };
+  } | null>(null);
+
+  useEffect(() => {
+    void hydrateGamePathFromApi().finally(() => setMapReload(r => r + 1));
+  }, []);
 
   useEffect(() => {
     const ls = getLivesState(settings.livesCount);
@@ -76,23 +122,62 @@ export function GameScreen({ onNav: _onNav, state, setState }: Props) {
     }
   }, [settings.livesCount]);
 
-  function startLevel(topic: GameTopic, level: number) {
-    if (lives <= 0) { setNoLives(true); return; }
-    const allQs = getQuestions().filter(q => q.topicId === topic.id);
-    const PER   = 5;
-    const start = ((level - 1) * PER) % Math.max(allQs.length, 1);
-    const slice = allQs.length > 0 ? [...allQs, ...allQs].slice(start, start + PER) : getQuestions().slice(0, PER);
+  function enterQuiz(topic: GameTopic, level: number, slice: GameQuestion[], resume?: { currentQ: number; score: number; mistakes: number }) {
+    if (!resume) clearWip(topic.id, level);
     setSelectedLv({ topic, level });
     setQuestions(slice);
-    setCurrentQ(0); setSelected(null); setFeedback(null); setScore(0); setMistakes(0);
+    if (resume) {
+      setCurrentQ(resume.currentQ);
+      setScore(resume.score);
+      setMistakes(resume.mistakes);
+    } else {
+      setCurrentQ(0);
+      setScore(0);
+      setMistakes(0);
+    }
+    setSelected(null);
+    setFeedback(null);
     setPhase('quiz');
+  }
+
+  function startLevel(topic: GameTopic, level: number) {
+    if (lives <= 0) { setNoLives(true); return; }
+    const slice = buildLevelQuestions(topic, level);
+    const wip = readWip(topic.id, level);
+    if (wip && wip.currentQ > 0 && wip.currentQ < slice.length) {
+      setResumePrompt({ topic, level, wip });
+      return;
+    }
+    enterQuiz(topic, level, slice);
+  }
+
+  function confirmResumeContinue() {
+    if (!resumePrompt) return;
+    const { topic, level, wip } = resumePrompt;
+    const slice = buildLevelQuestions(topic, level);
+    setResumePrompt(null);
+    enterQuiz(topic, level, slice, wip);
+  }
+
+  function confirmResumeFresh() {
+    if (!resumePrompt) return;
+    const { topic, level } = resumePrompt;
+    clearWip(topic.id, level);
+    const slice = buildLevelQuestions(topic, level);
+    setResumePrompt(null);
+    enterQuiz(topic, level, slice);
   }
 
   function handleCheck() {
     if (feedback) {
       setFeedback(null); setSelected(null);
       if (currentQ >= questions.length - 1) {
-        if (selectedLv) setNodeStars(selectedLv.topic.id, selectedLv.level - 1, calcStars(mistakes));
+        const total = questions.length;
+        const passed = total > 0 && score / total >= PASS_RATIO;
+        if (passed && selectedLv) {
+          setNodeStars(selectedLv.topic.id, selectedLv.level - 1, calcStars(mistakes));
+          clearWip(selectedLv.topic.id, selectedLv.level);
+        }
         setPhase('result');
         refreshStats();
       } else {
@@ -132,24 +217,77 @@ export function GameScreen({ onNav: _onNav, state, setState }: Props) {
 
   if (phase === 'map') return (
     <>
-      <GameMapPhase state={{ ...state, lives }} topicIdx={topicIdx} onTopicIdx={setTopicIdx}
+      {isAdmin && (
+        <GamePathAdminPanel
+          onSaved={() => {
+            void hydrateGamePathFromApi().finally(() => setMapReload(r => r + 1));
+          }}
+        />
+      )}
+      <GameMapPhase state={{ ...state, lives }} topicIdx={topicIdx} onTopicIdx={setTopicIdx} reloadSignal={mapReload}
         onSelectLevel={(topicName, level) => {
           const topic = topics.find(t => t.name === topicName) ?? topics[topicIdx] ?? topics[0];
           if (topic) startLevel(topic, level);
         }}
       />
+      {resumePrompt && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 350, background: 'rgba(5,10,22,0.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+          <div style={{ background: '#fff', borderRadius: 28, padding: '32px 28px', maxWidth: 380, width: '100%', textAlign: 'center', boxShadow: '0 24px 60px rgba(0,0,0,0.35)' }}>
+            <div style={{ fontSize: 40, lineHeight: 1, marginBottom: 12 }}>📚</div>
+            <div style={{ fontWeight: 900, fontSize: 20, color: '#0f172a', marginBottom: 10 }}>{getLessonSequence()[resumePrompt.level - 1]?.title ?? resumePrompt.topic.name}</div>
+            <div style={{ fontSize: 14, color: '#64748b', lineHeight: 1.55, marginBottom: 22 }}>
+              Та <span style={{ fontWeight: 900, color: '#7c3aed' }}>{resumePrompt.wip.currentQ + 1}-р асуулт</span> хүртэл хүрсэн байна. Хаанаас үргэлжлүүлэх вэ?
+            </div>
+            <button type="button" onClick={confirmResumeContinue} style={{ width: '100%', padding: '14px 18px', borderRadius: 16, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: '#fff', fontWeight: 800, fontSize: 15, marginBottom: 10, fontFamily: 'Plus Jakarta Sans, sans-serif', boxShadow: '0 6px 20px rgba(124,58,237,0.35)' }}>
+              ▶ {resumePrompt.wip.currentQ + 1}-р асуултаас үргэлжлүүлэх
+            </button>
+            <button type="button" onClick={confirmResumeFresh} style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: 'transparent', color: '#64748b', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+              Эхнээс эхлэх
+            </button>
+            <button type="button" onClick={() => setResumePrompt(null)} style={{ marginTop: 8, width: '100%', padding: '10px', border: 'none', background: 'transparent', color: '#94a3b8', fontSize: 13, cursor: 'pointer', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+              Болих
+            </button>
+          </div>
+        </div>
+      )}
       {noLives && <NoLivesOverlay refillAt={refillAt} coins={state.coins} refillCoins={settings.livesRefillCoins} livesCount={settings.livesCount} onRefillCoins={handleRefillCoins} onClose={() => setNoLives(false)} />}
     </>
   );
 
   if (phase === 'quiz' && selectedLv) return (
     <>
-      <GameQuizPhase questions={questions} topicName={selectedLv.topic.name} topicColor={selectedLv.topic.color} level={selectedLv.level} lives={lives} maxLives={settings.livesCount} currentQ={currentQ} selected={selected} feedback={feedback} onSelect={setSelected} onCheck={handleCheck} onBack={() => setPhase('map')} />
+      <GameQuizPhase questions={questions} topicName={selectedLv.topic.name} topicColor={selectedLv.topic.color} level={selectedLv.level} lives={lives} maxLives={settings.livesCount} currentQ={currentQ} selected={selected} feedback={feedback} onSelect={setSelected} onCheck={handleCheck} onBack={() => {
+        saveWip(selectedLv.topic.id, selectedLv.level, { currentQ, score, mistakes });
+        setPhase('map');
+      }} />
       {noLives && <NoLivesOverlay refillAt={refillAt} coins={state.coins} refillCoins={settings.livesRefillCoins} livesCount={settings.livesCount} onRefillCoins={handleRefillCoins} onClose={() => setNoLives(false)} />}
     </>
   );
 
+  const totalQ = questions.length;
+  const passed = totalQ > 0 && score / totalQ >= PASS_RATIO;
+
   return (
-    <GameResultPhase score={score} total={questions.length} mistakes={mistakes} xpEarned={score * settings.xpPerCorrect} coinsEarned={score * settings.coinsPerCorrect} topicName={selectedLv?.topic.name ?? ''} topicColor={selectedLv?.topic.color ?? '#2563EB'} level={selectedLv?.level ?? 1} onBackMap={() => setPhase('map')} onRetry={() => { setCurrentQ(0); setScore(0); setMistakes(0); setSelected(null); setFeedback(null); setPhase('quiz'); }} />
+    <GameResultPhase
+      score={score}
+      total={totalQ}
+      mistakes={mistakes}
+      xpEarned={score * settings.xpPerCorrect}
+      coinsEarned={score * settings.coinsPerCorrect}
+      topicName={selectedLv?.topic.name ?? ''}
+      topicColor={selectedLv?.topic.color ?? '#2563EB'}
+      level={selectedLv?.level ?? 1}
+      passed={passed}
+      onBackMap={() => setPhase('map')}
+      onRetry={() => {
+        if (selectedLv) clearWip(selectedLv.topic.id, selectedLv.level);
+        setCurrentQ(0);
+        setScore(0);
+        setMistakes(0);
+        setSelected(null);
+        setFeedback(null);
+        setPhase('quiz');
+      }}
+    />
   );
 }

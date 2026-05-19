@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { User } from "@/models/User";
 import { Payment } from "@/models/Payment";
+import { AttemptModel } from "@/models/AttemptModel";
 import { requireAdmin } from "@/lib/auth";
 
 export async function GET() {
@@ -19,16 +20,39 @@ export async function GET() {
     premiumUsers,
     todayActive,
     payments,
-    _totalCoinSpent,
+    totalStudents,
+    totalXpAgg,
+    attemptsToday,
+    studentsWithAttempt,
+    avgScoreAgg,
   ] = await Promise.all([
     User.countDocuments(),
     User.countDocuments({ isPremium: true }),
     User.countDocuments({ lastLoginDate: { $gte: today } }),
     Payment.find({ status: "success" }).select("amount createdAt"),
-    User.aggregate([{ $group: { _id: null, total: { $sum: "$coins" } } }]),
+    User.countDocuments({ role: "student" }),
+    User.aggregate([{ $group: { _id: null, total: { $sum: "$xp" } } }]),
+    AttemptModel.countDocuments({ isSubmitted: true, finishedAt: { $gte: today } }),
+    AttemptModel.distinct("studentId", { isSubmitted: true }),
+    AttemptModel.aggregate([
+      { $match: { isSubmitted: true, totalQuestions: { $gt: 0 } } },
+      {
+        $project: {
+          pct: { $multiply: [{ $divide: ['$score', '$totalQuestions'] }, 100] },
+        },
+      },
+      { $group: { _id: null, avg: { $avg: '$pct' } } },
+    ]),
   ]);
 
   const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
+  const totalXP = (totalXpAgg[0] as { total?: number } | undefined)?.total ?? 0;
+
+  const avgRow = avgScoreAgg[0] as { avg?: number } | undefined;
+  const avgScore = avgRow?.avg != null ? Math.round(avgRow.avg) : 0;
+
+  const completionRate =
+    totalStudents > 0 ? Math.min(100, Math.round((studentsWithAttempt.length / totalStudents) * 100)) : 0;
 
   // Last 7 days new users
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -55,5 +79,14 @@ export async function GET() {
     newUsersLast7,
     byProvince,
     recentPayments,
+    dashboard: {
+      totalStudents,
+      activeToday: todayActive,
+      avgScore,
+      totalXP,
+      sessionsToday: attemptsToday,
+      completionRate,
+      weakTopics: [] as { name: string; pct: number; color: string }[],
+    },
   });
 }

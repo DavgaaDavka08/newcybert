@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   await connectDB();
   const [questions, total] = await Promise.all([
     Question.find(query)
-      .populate("categoryId", "name icon")
+      .populate("categoryId", "name icon color")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit),
@@ -36,9 +36,9 @@ export async function POST(req: NextRequest) {
   if (error) return error;
 
   const body = await req.json();
-  const { categoryId, level, question, options, correctIndex, explanation, difficulty, xpReward, coinReward } = body;
+  const { categoryId, level, question, formula, options, correctIndex, explanation, difficulty, xpReward, coinReward } = body;
 
-  if (!categoryId || !level || !question || !options || correctIndex === undefined || !explanation) {
+  if (!categoryId || !question || !options || correctIndex === undefined) {
     return NextResponse.json({ error: "Бүх заавал талбарыг бөглөнө үү" }, { status: 400 });
   }
   if (options.length !== 4) {
@@ -47,7 +47,13 @@ export async function POST(req: NextRequest) {
 
   await connectDB();
   const q = await Question.create({
-    categoryId, level, question, options, correctIndex, explanation,
+    categoryId,
+    level: level ?? 1,
+    question,
+    formula: formula || undefined,
+    options,
+    correctIndex,
+    explanation: explanation ?? "",
     difficulty: difficulty ?? "medium",
     xpReward: xpReward ?? 10,
     coinReward: coinReward ?? 5,

@@ -1,8 +1,15 @@
 'use client';
 
-export interface GameTopic {
-  id: string; name: string; icon: string; color: string;
-}
+import type { GameTopic as GameTopicBase, LessonType as LessonTypeBase } from '@/lib/game-defaults';
+import {
+  DEFAULT_TOPICS as DEF_TOPICS,
+  DEFAULT_LESSON_SEQUENCE as DEF_LESSON_SEQ,
+  LEVELS_PER_TOPIC as LPT,
+} from '@/lib/game-defaults';
+
+export type GameTopic = GameTopicBase;
+export type LessonType = LessonTypeBase;
+
 export interface GameQuestion {
   id: string; topicId: string; q: string; opts: string[]; correct: number; exp: string;
 }
@@ -12,38 +19,25 @@ export interface GameSettings {
 }
 export interface LivesState { lives: number; refillAt: number | null; }
 
-export type LessonType   = 'lesson' | 'quiz' | 'lab' | 'boss' | 'review';
 export type LessonStatus = 'completed' | 'current' | 'locked';
 
 export interface SubjectLesson { id: string; title: string; type: LessonType; xp: number; coins: number; }
 export interface Subject { id: string; title: string; color: string; icon: string; progress: number; lessons: SubjectLesson[]; }
 
-export const DEFAULT_LESSON_SEQUENCE: Omit<SubjectLesson, 'id'>[] = [
-  { title: 'Давталт 1', type: 'lesson', xp: 10, coins: 5  },
-  { title: 'Давталт 2', type: 'lesson', xp: 10, coins: 5  },
-  { title: 'Сорил 1',   type: 'quiz',   xp: 20, coins: 10 },
-  { title: 'Давталт 3', type: 'lesson', xp: 10, coins: 5  },
-  { title: 'Туршилт',   type: 'lab',    xp: 15, coins: 8  },
-  { title: 'Давталт 4', type: 'lesson', xp: 10, coins: 5  },
-  { title: 'Давталт 5', type: 'lesson', xp: 10, coins: 5  },
-  { title: 'Сорил 2',   type: 'quiz',   xp: 20, coins: 10 },
-  { title: 'Дүгнэлт',   type: 'review', xp: 15, coins: 8  },
-  { title: 'Дарга',     type: 'boss',   xp: 50, coins: 25 },
-];
+export const DEFAULT_LESSON_SEQUENCE: Omit<SubjectLesson, 'id'>[] = DEF_LESSON_SEQ.map(n => ({
+  title: n.title,
+  type: n.type,
+  xp: n.xp,
+  coins: n.coins,
+}));
 
 export function generateDefaultLessons(topicId: string): SubjectLesson[] {
   return DEFAULT_LESSON_SEQUENCE.map((item, i) => ({ ...item, id: `${topicId}_lesson_${i}` }));
 }
 
-export const LEVELS_PER_TOPIC = 10;
+export const LEVELS_PER_TOPIC = LPT;
 
-export const DEFAULT_TOPICS: GameTopic[] = [
-  { id: 't1', name: 'Цахилгаан',    icon: 'zap',      color: '#2563EB' },
-  { id: 't2', name: 'Механик',       icon: 'game',     color: '#D97706' },
-  { id: 't3', name: 'Дулаан',        icon: 'flame',    color: '#DC2626' },
-  { id: 't4', name: 'Соронзон',      icon: 'award',    color: '#7C3AED' },
-  { id: 't5', name: 'Хэмжигдэхүүн', icon: 'barChart', color: '#0D9488' },
-];
+export const DEFAULT_TOPICS: GameTopic[] = DEF_TOPICS;
 
 export const DEFAULT_QUESTIONS: GameQuestion[] = [
   { id: 'q1',  topicId: 't1', q: 'Ом-ын хуулийн томьёо?',              opts: ['V=IR','F=ma','P=IV','E=mc²'],              correct: 0, exp: 'V = I × R — Вольт = Ампер × Ом' },
@@ -67,7 +61,14 @@ export const DEFAULT_SETTINGS: GameSettings = {
   livesCount: 5, xpPerCorrect: 10, coinsPerCorrect: 5, livesRefillCoins: 50, livesRefillMinutes: 300,
 };
 
-const KEYS = { topics: 'cp_topics', questions: 'cp_questions', settings: 'cp_settings', lives: 'cp_lives', stars: 'cp_stars' };
+const KEYS = {
+  topics: 'cp_topics',
+  questions: 'cp_questions',
+  settings: 'cp_settings',
+  lives: 'cp_lives',
+  stars: 'cp_stars',
+  lessonSeq: 'cp_lesson_seq',
+};
 
 function load<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback;
@@ -85,7 +86,34 @@ export const setQuestions = (v: GameQuestion[]) => save(KEYS.questions, v);
 export const getSettings  = () => load<GameSettings>(KEYS.settings, DEFAULT_SETTINGS);
 export const setSettings  = (v: GameSettings) => save(KEYS.settings, v);
 
-export const getLivesState  = (def: number): LivesState => load<LivesState>(KEYS.lives, { lives: def, refillAt: null });
+export const getLessonSequence = (): Omit<SubjectLesson, 'id'>[] =>
+  load<Omit<SubjectLesson, 'id'>[]>(KEYS.lessonSeq, DEFAULT_LESSON_SEQUENCE);
+
+export const setLessonSequence = (v: Omit<SubjectLesson, 'id'>[]) => save(KEYS.lessonSeq, v);
+
+/** Серверээс замыг татаж localStorage-д хадгална (сурагчийн тоглоом). */
+export async function hydrateGamePathFromApi(): Promise<boolean> {
+  try {
+    const r = await fetch('/api/game/path');
+    if (!r.ok) return false;
+    const d = await r.json();
+    if (Array.isArray(d.topics) && d.topics.length) setTopics(d.topics);
+    if (Array.isArray(d.lessonNodes) && d.lessonNodes.length === LPT) {
+      setLessonSequence(
+        d.lessonNodes.map((n: { title: string; type: string; xp?: number; coins?: number }) => ({
+          title: String(n.title ?? ''),
+          type: (['lesson', 'quiz', 'lab', 'boss', 'review'].includes(n.type) ? n.type : 'lesson') as LessonType,
+          xp: Number(n.xp) || 10,
+          coins: Number(n.coins) || 5,
+        }))
+      );
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+export const getLivesState = (def: number): LivesState => load<LivesState>(KEYS.lives, { lives: def, refillAt: null });
 export const setLivesState  = (v: LivesState) => save(KEYS.lives, v);
 export const getStars       = (): Record<string, number[]> => load(KEYS.stars, {});
 export const setNodeStars   = (topicId: string, nodeIdx: number, stars: number) => {

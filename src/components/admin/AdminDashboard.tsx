@@ -1,13 +1,24 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { T } from '@/styles/tokens';
 import { Ic, Badge } from '@/components/ui';
 import { LiveGameControl } from './LiveGameControl';
 import { ConnectedStudents } from './ConnectedStudents';
 import { LiveLeaderboard } from './LiveLeaderboard';
-import { AnalyticsCards } from './AnalyticsCards';
+import { AnalyticsCards, type DashboardAnalytics } from './AnalyticsCards';
+import { QuestionBank } from './QuestionBank';
 
-type AdminTab = 'overview' | 'live' | 'students' | 'analytics';
+const EMPTY_DASH: DashboardAnalytics = {
+  totalStudents: 0,
+  activeToday: 0,
+  avgScore: 0,
+  totalXP: 0,
+  sessionsToday: 0,
+  completionRate: 0,
+  weakTopics: [],
+};
+
+type AdminTab = 'overview' | 'live' | 'students' | 'analytics' | 'questions';
 
 interface AdminDashboardProps {
   adminName?: string;
@@ -16,12 +27,34 @@ interface AdminDashboardProps {
 export function AdminDashboard({ adminName = 'Багш' }: AdminDashboardProps) {
   const [tab, setTab]           = useState<AdminTab>('overview');
   const [sessionActive, setSessionActive] = useState(false);
+  const [dash, setDash]         = useState<DashboardAnalytics | null>(null);
+  const [dashLoading, setDashLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/admin/stats');
+        const d = r.ok ? await r.json() : null;
+        const board = d?.dashboard as DashboardAnalytics | undefined;
+        if (!cancelled) setDash(board ?? EMPTY_DASH);
+      } catch {
+        if (!cancelled) setDash(EMPTY_DASH);
+      } finally {
+        if (!cancelled) setDashLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const TABS: { id: AdminTab; label: string; icon: string; color: string }[] = [
     { id: 'overview',   label: 'Тойм',       icon: 'home',     color: T.blue   },
     { id: 'live',       label: 'Шууд тоглолт', icon: 'wifi',   color: T.green  },
     { id: 'students',   label: 'Сурагчид',   icon: 'users',    color: T.purple },
     { id: 'analytics',  label: 'Статистик',  icon: 'barChart', color: T.amber  },
+    { id: 'questions',  label: 'Асуултын сан', icon: 'task',   color: T.purple },
   ];
 
   return (
@@ -77,7 +110,11 @@ export function AdminDashboard({ adminName = 'Багш' }: AdminDashboardProps) 
               <div style={{ background: 'linear-gradient(120deg, #0D9488 0%, #2563EB 60%, #7C3AED 100%)', borderRadius: 18, padding: '24px 28px', color: '#fff', boxShadow: '0 8px 32px rgba(13,148,136,0.25)', position: 'relative', overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', right: 24, top: -20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', pointerEvents: 'none' }} />
                 <div style={{ fontWeight: 900, fontSize: 20, marginBottom: 8 }}>Сайн уу, {adminName}! 👋</div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginBottom: 20 }}>Өнөөдөр 23 сурагч идэвхтэй байна. Шинэ тоглолт эхлүүлэх үү?</div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginBottom: 20 }}>
+                  {dashLoading
+                    ? 'Статистик ачаалж байна…'
+                    : `Өнөөдөр ${dash?.activeToday ?? 0} хэрэглэгч идэвхтэй. Шинэ тоглолт эхлүүлэх үү?`}
+                </div>
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button onClick={() => setTab('live')} style={{ padding: '10px 20px', borderRadius: 10, background: '#FFD23F', color: '#0F172A', fontWeight: 800, fontSize: 13, border: 'none', cursor: 'pointer', fontFamily: 'Plus Jakarta Sans, sans-serif', boxShadow: '0 4px 16px rgba(255,210,63,0.4)' }}>
                     🎮 Тоглолт эхлэх
@@ -88,7 +125,13 @@ export function AdminDashboard({ adminName = 'Багш' }: AdminDashboardProps) 
                 </div>
               </div>
 
-              <AnalyticsCards />
+              {dashLoading ? (
+                <div style={{ padding: 40, textAlign: 'center', color: T.muted, background: '#fff', borderRadius: 14, border: `1px solid ${T.border}` }}>
+                  Статистик ачаалж байна…
+                </div>
+              ) : (
+                <AnalyticsCards stats={dash ?? EMPTY_DASH} />
+              )}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -116,10 +159,18 @@ export function AdminDashboard({ adminName = 'Багш' }: AdminDashboardProps) 
 
         {tab === 'analytics' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20 }}>
-            <AnalyticsCards />
+            {dashLoading ? (
+              <div style={{ padding: 40, textAlign: 'center', color: T.muted, background: '#fff', borderRadius: 14, border: `1px solid ${T.border}` }}>
+                Статистик ачаалж байна…
+              </div>
+            ) : (
+              <AnalyticsCards stats={dash ?? EMPTY_DASH} />
+            )}
             <LiveLeaderboard />
           </div>
         )}
+
+        {tab === 'questions' && <QuestionBank />}
       </div>
     </div>
   );

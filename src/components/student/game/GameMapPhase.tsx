@@ -4,9 +4,12 @@ import Image from 'next/image';
 import { Ic } from '@/components/ui';
 import {
   getTopics, getStars, getSettings, LEVELS_PER_TOPIC,
-  DEFAULT_LESSON_SEQUENCE, type LessonType, type GameTopic,
+  getLessonSequence,
+  type LessonType, type GameTopic,
 } from '@/lib/game-data';
 import type { AppState } from '@/types';
+
+type TopicState = 'completed' | 'active' | 'locked';
 
 type OffsetType = 'center' | 'off-l' | 'off-l2' | 'off-r' | 'off-r2';
 const NODE_OFFSETS: OffsetType[] = ['center','off-l','off-r','center','off-l2','off-r','center','off-l','off-r2','center'];
@@ -29,7 +32,13 @@ const TYPE_LABEL: Record<LessonType, string | null> = {
   lesson: null, quiz: 'СОРИЛ', lab: 'ТУРШИЛТ', boss: 'ДАРГА', review: 'ДҮГНЭЛТ',
 };
 
-type TopicState = 'completed' | 'active' | 'locked';
+function isTopicFullyDone(topicId: string, stars: Record<string, number[]>): boolean {
+  const ts = stars[topicId] ?? [];
+  for (let i = 0; i < LEVELS_PER_TOPIC; i++) {
+    if ((ts[i] ?? 0) <= 0) return false;
+  }
+  return true;
+}
 function getTopicState(topicId: string, stars: Record<string, number[]>): TopicState {
   const ts = stars[topicId] ?? [];
   const done = ts.filter(s => s > 0).length;
@@ -175,7 +184,7 @@ function LessonNode({ index, type, nodeStatus, starCount, topicColor, topicState
       {hov && nodeStatus !== 'locked' && (
         <div style={{ position: 'absolute', bottom: size + (nodeStatus === 'done' ? 46 : 16), left: '50%', transform: 'translateX(-50%)', background: `linear-gradient(135deg, ${activeClr}, ${activeClr}dd)`, borderRadius: 18, padding: '14px 20px', minWidth: 190, zIndex: 20, boxShadow: `0 12px 40px ${activeClr}66`, pointerEvents: 'none' }}>
           <div style={{ position: 'absolute', bottom: -7, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderTop: `8px solid ${activeClr}` }} />
-          <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 10 }}>{DEFAULT_LESSON_SEQUENCE[index]?.title ?? `Давталт ${index + 1}`}</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 10 }}>{getLessonSequence()[index]?.title ?? `Давталт ${index + 1}`}</div>
           <div style={{ background: 'rgba(255,255,255,.2)', border: '2px solid rgba(255,255,255,.5)', borderRadius: 12, padding: '10px 14px', textAlign: 'center', fontWeight: 900, fontSize: 15, color: '#fff' }}>
             ЭХЛЭХ · +{xpReward} XP
           </div>
@@ -186,21 +195,30 @@ function LessonNode({ index, type, nodeStatus, starCount, topicColor, topicState
 }
 
 // ── SubjectSection ────────────────────────────────────────────
-function SubjectSection({ topic, topicIdx, topicStars, currentNodeIdx, topicState, isActiveTopic, xpPerCorrect, onSelectLevel }: {
+function SubjectSection({ topic, topicIdx, topicStars, currentNodeIdx, topicState, isActiveTopic, xpPerCorrect, topicChainLocked, onSelectLevel }: {
   topic: GameTopic; topicIdx: number; topicStars: number[]; currentNodeIdx: number;
-  topicState: TopicState; isActiveTopic: boolean; xpPerCorrect: number; onSelectLevel: (level: number) => void;
+  topicState: TopicState; isActiveTopic: boolean; xpPerCorrect: number; topicChainLocked: boolean;
+  onSelectLevel: (level: number) => void;
 }) {
   const done = topicStars.filter(s => s > 0).length;
+  const seq = getLessonSequence();
   return (
-    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', pointerEvents: topicChainLocked ? 'none' : 'auto' }}>
+      {topicChainLocked && (
+        <div style={{ position: 'absolute', inset: -8, zIndex: 8, borderRadius: 20, background: 'rgba(3,8,20,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}>
+          <div style={{ textAlign: 'center', padding: 16, color: '#e2e8f0', fontWeight: 800, fontSize: 13, maxWidth: 280 }}>
+            🔒 Өмнөх сэдвийн бүх түвшинг амжилттай дуусгасны дараа нээгдэнэ
+          </div>
+        </div>
+      )}
       <SubjectSectionBanner topic={topic} topicIdx={topicIdx} done={done} total={LEVELS_PER_TOPIC} topicState={topicState} />
       {Array.from({ length: LEVELS_PER_TOPIC }).map((_, i) => {
         const nodeSt     = topicStars[i] ?? 0;
         const isDone     = nodeSt > 0;
-        const isCurr     = i === currentNodeIdx;
-        const isLock     = i > currentNodeIdx;
+        const isCurr     = !topicChainLocked && i === currentNodeIdx;
+        const isLock     = topicChainLocked || i > currentNodeIdx;
         const nodeStatus: 'done' | 'current' | 'locked' = isDone ? 'done' : isCurr ? 'current' : 'locked';
-        const meta       = DEFAULT_LESSON_SEQUENCE[i] ?? { type: 'lesson' as LessonType, xp: 10 };
+        const meta       = seq[i] ?? { type: 'lesson' as LessonType, xp: 10 };
         const offset     = NODE_OFFSETS[i] ?? 'center';
         const prevDone   = i > 0 && (topicStars[i-1] ?? 0) > 0;
         const xpReward   = meta.type === 'boss' ? xpPerCorrect * 10 : meta.type === 'quiz' ? xpPerCorrect * 7 : xpPerCorrect * 5;
@@ -257,9 +275,11 @@ interface Props {
   topicIdx: number;
   onTopicIdx: (i: number) => void;
   onSelectLevel: (topic: string, level: number) => void;
+  /** Increment after server path sync so the map re-reads localStorage. */
+  reloadSignal?: number;
 }
 
-export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicIdx, onSelectLevel }: Props) {
+export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicIdx, onSelectLevel, reloadSignal = 0 }: Props) {
   const [topics, setTopicsState] = useState<GameTopic[]>([]);
   const [stars, setStars]        = useState<Record<string, number[]>>({});
   const [settings]               = useState(getSettings());
@@ -267,7 +287,7 @@ export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicI
   useEffect(() => {
     setTopicsState(getTopics());
     setStars(getStars());
-  }, []);
+  }, [reloadSignal]);
 
   if (!topics.length) return null;
 
@@ -306,9 +326,11 @@ export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicI
               const currentNodeIdx = Math.min(done, LEVELS_PER_TOPIC - 1);
               const topicState     = getTopicState(topic.id, stars);
               const nextTopic      = topics[ti + 1];
+              const prevTopicId    = ti > 0 ? topics[ti - 1]?.id : null;
+              const topicChainLocked = ti > 0 && prevTopicId != null && !isTopicFullyDone(prevTopicId, stars);
               return (
                 <React.Fragment key={topic.id}>
-                  <SubjectSection topic={topic} topicIdx={ti} topicStars={topicStars} currentNodeIdx={currentNodeIdx} topicState={topicState} isActiveTopic={ti === activeTopicIdx} xpPerCorrect={settings.xpPerCorrect} onSelectLevel={level => onSelectLevel(topic.name, level)} />
+                  <SubjectSection topic={topic} topicIdx={ti} topicStars={topicStars} currentNodeIdx={currentNodeIdx} topicState={topicState} isActiveTopic={ti === activeTopicIdx} xpPerCorrect={settings.xpPerCorrect} topicChainLocked={topicChainLocked} onSelectLevel={level => onSelectLevel(topic.name, level)} />
                   {ti < topics.length - 1 && <SubjectDivider nextName={nextTopic?.name} />}
                 </React.Fragment>
               );

@@ -6,6 +6,8 @@ interface Props {
   score: number; total: number; mistakes: number;
   xpEarned: number; coinsEarned: number;
   topicName: string; topicColor: string; level: number;
+  /** Түвшинг амжилттай дуусгасан эсэх (дараагийн зангилаа нээгдэнэ). */
+  passed: boolean;
   onBackMap: () => void; onRetry: () => void;
 }
 
@@ -39,15 +41,17 @@ function StarDisplay({ stars }: { stars: number }) {
   );
 }
 
-export function GameResultPhase({ score, total, mistakes, xpEarned, coinsEarned, topicName, topicColor, level, onBackMap, onRetry }: Props) {
-  const stars = calcStars(mistakes);
+export function GameResultPhase({ score, total, mistakes, xpEarned, coinsEarned, topicName, topicColor, level, passed, onBackMap, onRetry }: Props) {
+  const stars = passed ? calcStars(mistakes) : 0;
   const pct   = Math.round((score / total) * 100);
   const messages = [
     { min: 0,  color: '#DC2626', title: 'Дахин оролдоорой!', sub: 'Алдаа нь суралцахын эх үүсвэр.' },
     { min: 50, color: '#D97706', title: 'Муугүй!',           sub: 'Бага зэрэг дутав, дахин давтаад үзэ.' },
     { min: 80, color: '#16A34A', title: 'Гайхалтай! 🎉',     sub: 'Маш сайн дүн! Ирэх level-д шилж.' },
   ];
-  const msg = [...messages].reverse().find(m => pct >= m.min) ?? messages[0];
+  const msg = passed
+    ? ([...messages].reverse().find(m => pct >= m.min) ?? messages[0])
+    : { min: 0, color: '#DC2626', title: 'Дахин оролдоорой!', sub: 'Түвшинг бүрэн амжилттай дуусгахын тулд илүү их зөв хариу шаардлагатай.' };
 
   return (
     <div style={{ maxWidth: 420, margin: '24px auto', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
@@ -71,7 +75,7 @@ export function GameResultPhase({ score, total, mistakes, xpEarned, coinsEarned,
               </div>
             ))}
           </div>
-          {(xpEarned > 0 || coinsEarned > 0) && (
+          {passed && (xpEarned > 0 || coinsEarned > 0) && (
             <div style={{ display: 'flex', gap: 10, marginBottom: 20, padding: '12px 16px', borderRadius: 12, background: 'linear-gradient(135deg,#F5F3FF,#EFF6FF)', border: '1px solid #DDD6FE' }}>
               <div style={{ flex: 1, textAlign: 'center' }}>
                 <div style={{ fontWeight: 800, fontSize: 18, color: '#7C3AED' }}>+{xpEarned}</div>
@@ -84,13 +88,26 @@ export function GameResultPhase({ score, total, mistakes, xpEarned, coinsEarned,
               </div>
             </div>
           )}
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={onBackMap} style={{ flex: 1, padding: '12px', borderRadius: 12, border: '2px solid #E2E8F0', background: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', color: '#475569', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
-              Буцах
-            </button>
-            <button onClick={onRetry} style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', background: `linear-gradient(135deg, ${topicColor}, ${topicColor}cc)`, fontWeight: 800, fontSize: 14, cursor: 'pointer', color: '#fff', boxShadow: `0 4px 16px ${topicColor}44`, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
-              Дахин
-            </button>
+          <div style={{ display: 'flex', gap: 10, flexDirection: passed ? 'row' : 'column' }}>
+            {passed ? (
+              <>
+                <button type="button" onClick={onBackMap} style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', background: `linear-gradient(135deg, ${topicColor}, ${topicColor}cc)`, fontWeight: 800, fontSize: 14, cursor: 'pointer', color: '#fff', boxShadow: `0 4px 16px ${topicColor}44`, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+                  Үргэлжлүүлэх
+                </button>
+                <button type="button" onClick={onRetry} style={{ flex: 1, padding: '12px', borderRadius: 12, border: '2px solid #E2E8F0', background: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', color: '#475569', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+                  Дахин тоглох
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" onClick={onRetry} style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #DC2626, #B91C1C)', fontWeight: 800, fontSize: 15, cursor: 'pointer', color: '#fff', boxShadow: '0 4px 16px rgba(220,38,38,0.35)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+                  Дахин хийх
+                </button>
+                <button type="button" onClick={onBackMap} style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: 'transparent', fontWeight: 700, fontSize: 14, cursor: 'pointer', color: '#94A3B8', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+                  Буцах
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

@@ -51,14 +51,6 @@ const MOCK_Q = {
   correct: 0,
   votes: [72, 12, 10, 6],
 };
-const MOCK_PLAYERS = [
-  { name: "Батбаяр Э.", initials: "БЭ", score: 1840, streak: 4 },
-  { name: "Номин С.", initials: "НС", score: 1760, streak: 5 },
-  { name: "Саруул Д.", initials: "СД", score: 1640, streak: 3 },
-  { name: "Энхжин Б.", initials: "ЭБ", score: 1520, streak: 0 },
-  { name: "Мөнхбат Т.", initials: "МТ", score: 1380, streak: 2 },
-  { name: "Дөлгөөн О.", initials: "ДО", score: 1200, streak: 1 },
-];
 
 const CHART_DATA = [45, 72, 38, 91, 64, 83, 57];
 
@@ -68,6 +60,13 @@ function initials(u: User) {
 }
 function fmtDate(s: string) {
   return new Date(s).toLocaleDateString("mn-MN", { year: "numeric", month: "short", day: "numeric" });
+}
+
+function initialsFromDisplayName(name: string) {
+  const p = name.trim().split(/\s+/).filter(Boolean);
+  if (p.length >= 2) return `${p[0][0] ?? ""}${p[1][0] ?? ""}`.toUpperCase() || "?";
+  const w = p[0] || "?";
+  return w.slice(0, 2).toUpperCase();
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -106,11 +105,37 @@ export default function AdminPage() {
   const [liveRevealed, setLiveRevealed] = useState(false);
   const [liveQIdx, setLiveQIdx] = useState(4);
   const LIVE_PIN = "847291";
+  const [liveLbPlayers, setLiveLbPlayers] = useState<
+    { name: string; initials: string; score: number; streak: number }[]
+  >([]);
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
     if (status === "authenticated" && session?.user?.role !== "admin") router.replace("/dashboard");
   }, [status, session, router]);
+
+  useEffect(() => {
+    if (tab !== "live") return;
+    let cancelled = false;
+    fetch("/api/leaderboard")
+      .then(r => (r.ok ? r.json() : { entries: [] }))
+      .then(d => {
+        const entries = Array.isArray(d.entries) ? d.entries : [];
+        const rows = entries.slice(0, 12).map((e: { name: string; xp?: number; streak?: number }) => ({
+          name: e.name || "Сурагч",
+          initials: initialsFromDisplayName(e.name || ""),
+          score: e.xp ?? 0,
+          streak: e.streak ?? 0,
+        }));
+        if (!cancelled) setLiveLbPlayers(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setLiveLbPlayers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tab]);
 
   useEffect(() => {
     if (livePhase !== "active" || liveRevealed) return;
@@ -538,8 +563,11 @@ export default function AdminPage() {
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,auto)", gap: 16, columnGap: 28 }}>
                           {[
                             { label: "Асуулт", value: `${liveQIdx}/10` },
-                            { label: "Сурагчид", value: MOCK_PLAYERS.length },
-                            { label: "Хариулсан", value: `${liveRevealed ? MOCK_PLAYERS.length : Math.floor(MOCK_PLAYERS.length * 0.78)}/${MOCK_PLAYERS.length}` },
+                            { label: "Сурагчид", value: String(liveLbPlayers.length) },
+                            {
+                              label: "Хариулсан",
+                              value: `${liveRevealed ? liveLbPlayers.length : Math.floor(liveLbPlayers.length * 0.78)}/${Math.max(1, liveLbPlayers.length)}`,
+                            },
                           ].map((m, i) => (
                             <div key={i}>
                               <div className="label" style={{ marginBottom: 2 }}>{m.label}</div>
@@ -622,14 +650,21 @@ export default function AdminPage() {
                       <h3>Тэргүүлэгчид</h3>
                       <span className="badge green dot">Шууд</span>
                     </div>
-                    <span style={{ fontSize: 12, color: "var(--muted)" }}>{MOCK_PLAYERS.length} холбогдсон</span>
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>{liveLbPlayers.length} (XP жагсаалт)</span>
                   </div>
                   <div className="scrollbar" style={{ maxHeight: 520, overflowY: "auto" }}>
                     <table className="table">
                       <thead><tr><th style={{ width: 40 }}>#</th><th>Сурагч</th><th style={{ textAlign: "right", paddingRight: 16 }}>Оноо</th></tr></thead>
                       <tbody>
-                        {MOCK_PLAYERS.map((p, i) => (
-                          <tr key={i}>
+                        {liveLbPlayers.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} style={{ padding: 24, textAlign: "center", color: "var(--muted)" }}>
+                              Сурагчийн өгөгдөл алга
+                            </td>
+                          </tr>
+                        ) : (
+                        liveLbPlayers.map((p, i) => (
+                          <tr key={`${p.name}-${i}`}>
                             <td style={{ color: "var(--muted)", fontVariantNumeric: "tabular-nums", fontWeight: i < 3 ? 600 : 400 }}>
                               {i + 1}
                             </td>
@@ -644,7 +679,8 @@ export default function AdminPage() {
                             </td>
                             <td style={{ textAlign: "right", fontWeight: 600, color: "var(--text)", fontVariantNumeric: "tabular-nums", paddingRight: 16 }}>{p.score.toLocaleString()}</td>
                           </tr>
-                        ))}
+                        ))
+                        )}
                       </tbody>
                     </table>
                   </div>

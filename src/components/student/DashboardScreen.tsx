@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { T } from "@/styles/tokens";
 import { Label, Ic, Bar, Ring } from "@/components/ui";
 import { Topbar } from "@/components/layout/Topbar";
-import { getRank, LEADERBOARD } from "@/lib/mock-data";
+import { getRank } from "@/lib/ranks";
 import type { AppState, Screen } from "@/types";
 
 interface ExamPreview {
@@ -18,17 +18,51 @@ interface Props {
 }
 
 
+interface LeaderEntry {
+  id: string;
+  name: string;
+  level: number;
+  xp: number;
+}
+
 export function DashboardScreen({ onNav, state }: Props) {
   const rank = getRank(state.xp);
   const xpInLevel = state.xp % 100;
   const router = useRouter();
   const [exams, setExams] = useState<ExamPreview[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>([]);
+  const [examAttemptsCount, setExamAttemptsCount] = useState<number | null>(null);
+  const [avgExamScorePct, setAvgExamScorePct] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/exam/exams")
       .then(r => r.ok ? r.json() : [])
       .then(d => setExams(Array.isArray(d) ? d.slice(0, 3) : []))
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/leaderboard")
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        const e = d?.entries;
+        setLeaderboard(Array.isArray(e) ? e.slice(0, 5) : []);
+      })
+      .catch(() => setLeaderboard([]));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/user/dashboard-summary")
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!d) return;
+        setExamAttemptsCount(typeof d.examAttemptsCount === "number" ? d.examAttemptsCount : 0);
+        setAvgExamScorePct(typeof d.avgExamScorePct === "number" ? d.avgExamScorePct : null);
+      })
+      .catch(() => {
+        setExamAttemptsCount(null);
+        setAvgExamScorePct(null);
+      });
   }, []);
 
   return (
@@ -160,16 +194,16 @@ export function DashboardScreen({ onNav, state }: Props) {
             icon: "trophy",
           },
           {
-            label: "Нийт сорил",
-            value: "12",
-            sub: "2 энэ долоо",
+            label: "Нийт шалгалт",
+            value: examAttemptsCount == null ? "—" : String(examAttemptsCount),
+            sub: "Өгсөн шалгалт",
             color: T.purple,
             icon: "exam",
           },
           {
             label: "Дундаж оноо",
-            value: "72%",
-            sub: "5% өссөн",
+            value: avgExamScorePct == null ? "—" : `${avgExamScorePct}%`,
+            sub: avgExamScorePct == null ? "Шалгалт өгөөд үүснэ" : "Шалгалтын дундаж",
             color: T.green,
             icon: "award",
           },
@@ -322,14 +356,19 @@ export function DashboardScreen({ onNav, state }: Props) {
           >
             <Ic n="trophy" size={14} color={T.amber} /> Шилдэг оюутнууд
           </div>
-          {LEADERBOARD.slice(0, 4).map((p, i) => (
+          {leaderboard.length === 0 ? (
+            <div style={{ fontSize: 12, color: T.muted, padding: "8px 0", textAlign: "center" }}>
+              Жагсаалт хоосон байна
+            </div>
+          ) : (
+            leaderboard.map((p, i) => (
             <div
-              key={i}
+              key={p.id}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 10,
-                marginBottom: i < 3 ? 10 : 0,
+                marginBottom: i < leaderboard.length - 1 ? 10 : 0,
                 padding: "6px 8px",
                 borderRadius: 8,
                 background: i === 0 ? T.amber + "0a" : "transparent",
@@ -356,7 +395,8 @@ export function DashboardScreen({ onNav, state }: Props) {
                 {p.xp.toLocaleString()} XP
               </span>
             </div>
-          ))}
+          ))
+          )}
         </div>
       </div>
 
@@ -375,7 +415,7 @@ export function DashboardScreen({ onNav, state }: Props) {
               📝 Шалгалтын систем
             </div>
             <div style={{ fontWeight: 900, fontSize: 18, color: "#fff", marginBottom: 4 }}>
-              Шалгалт өгч мэдлэгээ баталга
+              Шалгалт өгч мэдлэгээ баталгаажуулна уу
             </div>
             <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)" }}>
               Хугацаатай шалгалт, автомат үр дүн
