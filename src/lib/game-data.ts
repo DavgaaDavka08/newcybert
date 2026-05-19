@@ -127,3 +127,51 @@ export const calcStars = (mistakes: number): 0 | 1 | 2 | 3 => {
   if (mistakes <= 2) return 2;
   return 1;
 };
+
+// ── V2: DB-driven topics with subtopics ────────────────────────
+
+export interface GameSubtopic {
+  id: string;
+  name: string;
+  description: string;
+  order: number;
+}
+
+export interface GameTopicWithSubtopics {
+  id: string;
+  name: string;
+  color: string;
+  icon: string;
+  description: string;
+  subtopics: GameSubtopic[];
+}
+
+const KEYS_V2 = {
+  topicsV2: 'cp_topics_v2',
+  starsV2:  'cp_stars_v2',
+};
+
+export const getTopicsV2     = (): GameTopicWithSubtopics[] => load(KEYS_V2.topicsV2, []);
+export const setTopicsV2     = (v: GameTopicWithSubtopics[]) => save(KEYS_V2.topicsV2, v);
+
+export const getStarsV2      = (): Record<string, number> => load(KEYS_V2.starsV2, {});
+export const setSubtopicStars = (subtopicId: string, stars: number) => {
+  const all = getStarsV2();
+  all[subtopicId] = stars;
+  save(KEYS_V2.starsV2, all);
+};
+
+export async function hydrateTopicsV2(): Promise<boolean> {
+  try {
+    const r = await fetch('/api/game/topics');
+    if (!r.ok) return false;
+    const d = await r.json();
+    if (Array.isArray(d.topics) && d.topics.length) {
+      setTopicsV2(d.topics);
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}

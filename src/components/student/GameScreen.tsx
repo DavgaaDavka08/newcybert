@@ -7,7 +7,9 @@ import { GameResultPhase } from './game/GameResultPhase';
 import { GamePathAdminPanel } from './game/GamePathAdminPanel';
 import {
   getTopics, getQuestions, getSettings, getLivesState, setLivesState,
-  setNodeStars, calcStars, hydrateGamePathFromApi, getLessonSequence, type GameQuestion, type GameTopic,
+  setNodeStars, calcStars, hydrateGamePathFromApi, hydrateTopicsV2, getLessonSequence,
+  getTopicsV2, setSubtopicStars,
+  type GameQuestion, type GameTopic,
 } from '@/lib/game-data';
 import { useAppState } from '@/lib/app-state-context';
 import type { AppState, Screen } from '@/types';
@@ -90,7 +92,7 @@ export function GameScreen({ onNav: _onNav, state, setState }: Props) {
   const isAdmin = session?.user?.role === 'admin';
   const [topicIdx, setTopicIdx]     = useState(0);
   const [phase, setPhase]           = useState<'map' | 'quiz' | 'result'>('map');
-  const [selectedLv, setSelectedLv] = useState<{ topic: GameTopic; level: number } | null>(null);
+  const [selectedLv, setSelectedLv] = useState<{ topic: GameTopic; level: number; subtopicId?: string } | null>(null);
   const [questions, setQuestions]   = useState<GameQuestion[]>([]);
   const [currentQ, setCurrentQ]     = useState(0);
   const [selected, setSelected]     = useState<number | null>(null);
@@ -108,7 +110,10 @@ export function GameScreen({ onNav: _onNav, state, setState }: Props) {
   } | null>(null);
 
   useEffect(() => {
-    void hydrateGamePathFromApi().finally(() => setMapReload(r => r + 1));
+    // Try V2 (DB-driven subtopics) first, fall back to legacy path
+    void hydrateTopicsV2().then(ok => {
+      if (!ok) return hydrateGamePathFromApi();
+    }).finally(() => setMapReload(r => r + 1));
   }, []);
 
   useEffect(() => {
@@ -122,9 +127,9 @@ export function GameScreen({ onNav: _onNav, state, setState }: Props) {
     }
   }, [settings.livesCount]);
 
-  function enterQuiz(topic: GameTopic, level: number, slice: GameQuestion[], resume?: { currentQ: number; score: number; mistakes: number }) {
+  function enterQuiz(topic: GameTopic, level: number, slice: GameQuestion[], resume?: { currentQ: number; score: number; mistakes: number }, subtopicId?: string) {
     if (!resume) clearWip(topic.id, level);
-    setSelectedLv({ topic, level });
+    setSelectedLv({ topic, level, subtopicId });
     setQuestions(slice);
     if (resume) {
       setCurrentQ(resume.currentQ);
@@ -151,6 +156,35 @@ export function GameScreen({ onNav: _onNav, state, setState }: Props) {
     enterQuiz(topic, level, slice);
   }
 
+  async function startSubtopicLevel(topicName: string, subtopicId: string) {
+    if (lives <= 0) { setNoLives(true); return; }
+    try {
+      const r = await fetch(`/api/game/subtopic-questions/${subtopicId}`);
+      const d = await r.json();
+      const qs: GameQuestion[] = (d.questions ?? []).map((q: { id: string; q: string; opts: string[]; correct: number; exp: string }) => ({
+        id: q.id,
+        topicId: subtopicId,
+        q: q.q,
+        opts: q.opts,
+        correct: q.correct,
+        exp: q.exp,
+      }));
+      if (!qs.length) return; // no questions yet
+      // Build a synthetic GameTopic for this subtopic context
+      const v2topics = getTopicsV2();
+      const v2topic = v2topics.find(t => t.name === topicName) ?? v2topics[0];
+      const syntheticTopic: GameTopic = {
+        id: subtopicId,
+        name: topicName,
+        color: v2topic?.color ?? '#2563EB',
+        icon: v2topic?.icon ?? '⚡',
+      };
+      enterQuiz(syntheticTopic, 1, qs, undefined, subtopicId);
+    } catch {
+      // silently fail
+    }
+  }
+
   function confirmResumeContinue() {
     if (!resumePrompt) return;
     const { topic, level, wip } = resumePrompt;
@@ -175,7 +209,11 @@ export function GameScreen({ onNav: _onNav, state, setState }: Props) {
         const total = questions.length;
         const passed = total > 0 && score / total >= PASS_RATIO;
         if (passed && selectedLv) {
-          setNodeStars(selectedLv.topic.id, selectedLv.level - 1, calcStars(mistakes));
+          if (selectedLv.subtopicId) {
+            setSubtopicStars(selectedLv.subtopicId, calcStars(mistakes));
+          } else {
+            setNodeStars(selectedLv.topic.id, selectedLv.level - 1, calcStars(mistakes));
+          }
           clearWip(selectedLv.topic.id, selectedLv.level);
         }
         setPhase('result');
@@ -226,6 +264,11 @@ export function GameScreen({ onNav: _onNav, state, setState }: Props) {
       )}
       <GameMapPhase state={{ ...state, lives }} topicIdx={topicIdx} onTopicIdx={setTopicIdx} reloadSignal={mapReload}
         onSelectLevel={(topicName, level) => {
+          // V2: subtopicId is passed as a string
+          if (typeof level === 'string') {
+            void startSubtopicLevel(topicName, level);
+            return;
+          }
           const topic = topics.find(t => t.name === topicName) ?? topics[topicIdx] ?? topics[0];
           if (topic) startLevel(topic, level);
         }}

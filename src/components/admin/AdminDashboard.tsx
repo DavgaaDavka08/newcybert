@@ -7,6 +7,7 @@ import { ConnectedStudents } from './ConnectedStudents';
 import { LiveLeaderboard } from './LiveLeaderboard';
 import { AnalyticsCards, type DashboardAnalytics } from './AnalyticsCards';
 import { QuestionBank } from './QuestionBank';
+import { ContentManager } from './ContentManager';
 
 const EMPTY_DASH: DashboardAnalytics = {
   totalStudents: 0,
@@ -18,7 +19,7 @@ const EMPTY_DASH: DashboardAnalytics = {
   weakTopics: [],
 };
 
-type AdminTab = 'overview' | 'live' | 'students' | 'analytics' | 'questions';
+type AdminTab = 'overview' | 'live' | 'students' | 'analytics' | 'content' | 'questions';
 
 interface AdminDashboardProps {
   adminName?: string;
@@ -54,6 +55,7 @@ export function AdminDashboard({ adminName = 'Багш' }: AdminDashboardProps) 
     { id: 'live',       label: 'Шууд тоглолт', icon: 'wifi',   color: T.green  },
     { id: 'students',   label: 'Сурагчид',   icon: 'users',    color: T.purple },
     { id: 'analytics',  label: 'Статистик',  icon: 'barChart', color: T.amber  },
+    { id: 'content',    label: 'Агуулга',      icon: 'lesson', color: T.green  },
     { id: 'questions',  label: 'Асуултын сан', icon: 'task',   color: T.purple },
   ];
 
@@ -170,6 +172,7 @@ export function AdminDashboard({ adminName = 'Багш' }: AdminDashboardProps) 
           </div>
         )}
 
+        {tab === 'content' && <ContentManager />}
         {tab === 'questions' && <QuestionBank />}
       </div>
     </div>
