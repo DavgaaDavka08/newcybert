@@ -2,9 +2,10 @@
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
+import { ContentManager } from "@/components/admin/ContentManager";
 
 // ── Types ─────────────────────────────────────────────────────
-type Tab = "overview" | "live" | "users" | "questions" | "categories" | "exams";
+type Tab = "overview" | "content" | "live" | "users" | "questions" | "categories" | "exams";
 
 interface Stats {
   totalUsers: number; premiumUsers: number; todayActive: number;
@@ -250,12 +251,13 @@ export default function AdminPage() {
   });
 
   const NAV: { id: Tab; label: string; icon: string }[] = [
-    { id: "overview",   label: "Тойм",         icon: "⊞" },
-    { id: "live",       label: "Тэргүүлэгчид", icon: "🏆" },
-    { id: "users",      label: "Хэрэглэгчид",  icon: "👥" },
-    { id: "questions",  label: "Асуултын сан", icon: "❓" },
-    { id: "categories", label: "Ангилал",       icon: "📂" },
-    { id: "exams",      label: "Шалгалтууд",   icon: "📝" },
+    { id: "overview",   label: "Тойм",              icon: "⊞" },
+    { id: "content",    label: "Тоглоомын агуулга", icon: "🎮" },
+    { id: "live",       label: "Тэргүүлэгчид",      icon: "🏆" },
+    { id: "users",      label: "Хэрэглэгчид",       icon: "👥" },
+    { id: "questions",  label: "Асуултын сан",      icon: "❓" },
+    { id: "categories", label: "Ангилал",           icon: "📂" },
+    { id: "exams",      label: "Шалгалтууд",        icon: "📝" },
   ];
 
   if (status === "loading") return (
@@ -479,6 +481,19 @@ export default function AdminPage() {
                   )}
                 </>
               )}
+            </div>
+          )}
+
+          {/* ═══ GAME CONTENT ═══════════════════════════ */}
+          {tab === "content" && (
+            <div>
+              <div className="page-header">
+                <h1 className="page-title">Тоглоомын агуулга</h1>
+                <p className="page-sub">
+                  Сэдэв → дэд сэдэв (хичээл) → асуулт. Хадгалсны дараа сурагчийн «Давталт» дэлгэцэнд харагдана.
+                </p>
+              </div>
+              <ContentManager />
             </div>
           )}
 
