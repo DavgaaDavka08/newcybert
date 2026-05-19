@@ -5,7 +5,8 @@ import { Ic } from '@/components/ui';
 import {
   getTopics, getStars, getSettings, LEVELS_PER_TOPIC,
   getLessonSequence,
-  type LessonType, type GameTopic,
+  getTopicsV2, getStarsV2,
+  type LessonType, type GameTopic, type GameTopicWithSubtopics,
 } from '@/lib/game-data';
 import type { AppState } from '@/types';
 
@@ -274,21 +275,214 @@ interface Props {
   state: AppState;
   topicIdx: number;
   onTopicIdx: (i: number) => void;
-  onSelectLevel: (topic: string, level: number) => void;
+  onSelectLevel: (topic: string, level: number | string) => void;
   /** Increment after server path sync so the map re-reads localStorage. */
   reloadSignal?: number;
 }
 
+// ── V2: Single subtopic node ───────────────────────────────────
+function SubtopicNode({ sub, index, topicColor, subtopicStars, prevDone, onSelect }: {
+  sub: GameSubtopic;
+  index: number;
+  topicColor: string;
+  subtopicStars: Record<string, number>;
+  prevDone: boolean;
+  onSelect: () => void;
+}) {
+  const [hov, setHov] = useState(false);
+  const isDone = (subtopicStars[sub.id] ?? 0) > 0;
+  const isCurr = !isDone && prevDone;
+  const isLock = !isDone && !prevDone;
+  const nodeStatus: 'done' | 'current' | 'locked' = isDone ? 'done' : isCurr ? 'current' : 'locked';
+  const offset = NODE_OFFSETS[index % NODE_OFFSETS.length] ?? 'center';
+  const starCount = subtopicStars[sub.id] ?? 0;
+  const size = nodeStatus === 'current' ? 88 : 72;
+
+  let circleBg = '', circleBorder = '', circleShadow = '';
+  if (nodeStatus === 'done') {
+    circleBg = `linear-gradient(148deg, ${topicColor}, ${topicColor}cc)`;
+    circleBorder = `3px solid ${topicColor}88`;
+    circleShadow = `0 10px 30px ${topicColor}66, 0 2px 10px rgba(0,0,0,.3), inset 0 2px 0 rgba(255,255,255,.22)`;
+  } else if (nodeStatus === 'current') {
+    circleBg = `linear-gradient(148deg, ${topicColor}, ${topicColor}cc)`;
+    circleBorder = '4px solid rgba(255,255,255,0.7)';
+    circleShadow = `0 12px 36px ${topicColor}99, 0 2px 10px rgba(0,0,0,.3), inset 0 2px 0 rgba(255,255,255,.3)`;
+  } else {
+    circleBg = 'linear-gradient(148deg,#1a2438,#101725)';
+    circleBorder = '3px solid rgba(255,255,255,0.06)';
+    circleShadow = 'none';
+  }
+
+  return (
+    <>
+      {index > 0 && (
+        <div style={{ width: '100%', display: 'flex', justifyContent: 'center', height: 30 }}>
+          <div style={{ width: 4, height: 30, borderRadius: 99, background: prevDone ? `repeating-linear-gradient(to bottom,${topicColor} 0 6px,transparent 6px 12px)` : 'repeating-linear-gradient(to bottom,rgba(255,255,255,0.18) 0 6px,transparent 6px 12px)', boxShadow: prevDone ? `0 0 12px ${topicColor}88` : 'none' }} />
+        </div>
+      )}
+      <div style={{ position: 'relative', width: '100%', display: 'flex', ...OFFSET_STYLES[offset] }}>
+        {nodeStatus === 'current' && (
+          <>
+            <div style={{ position: 'absolute', width: size + 24, height: size + 24, top: -12, left: '50%', transform: 'translateX(-50%)', borderRadius: '50%', border: `3px solid ${topicColor}`, opacity: 0.55, animation: 'cp-pulse 2.2s ease-in-out infinite', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', width: size + 48, height: size + 48, top: -24, left: '50%', transform: 'translateX(-50%)', borderRadius: '50%', border: `2px solid ${topicColor}`, opacity: 0.35, animation: 'cp-pulse 2.2s ease-in-out infinite 0.5s', pointerEvents: 'none' }} />
+          </>
+        )}
+        {nodeStatus === 'current' && (
+          <div style={{ position: 'absolute', top: -44, left: '50%', transform: 'translateX(-50%)', background: '#fff', color: '#0b1424', fontSize: 11, fontWeight: 900, padding: '8px 16px', borderRadius: 14, letterSpacing: '0.08em', boxShadow: '0 8px 24px rgba(0,0,0,.4)', zIndex: 6, whiteSpace: 'nowrap' }}>
+            ЭХЛЭХ
+            <div style={{ position: 'absolute', left: '50%', bottom: -7, transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderTop: '8px solid #fff' }} />
+          </div>
+        )}
+        <div
+          onClick={!isLock ? onSelect : undefined}
+          onMouseEnter={() => !isLock && setHov(true)}
+          onMouseLeave={() => setHov(false)}
+          style={{ width: size, height: size, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isLock ? 'default' : 'pointer', background: circleBg, border: circleBorder, boxShadow: circleShadow, transition: 'transform 0.18s cubic-bezier(.34,1.56,.64,1)', transform: hov && !isLock ? 'scale(1.08) translateY(-3px)' : 'scale(1)' }}
+        >
+          {nodeStatus === 'done' && <svg width={size*0.43} height={size*0.43} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
+          {nodeStatus === 'current' && <svg width={size*0.44} height={size*0.44} viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" fill="#fff" /></svg>}
+          {nodeStatus === 'locked' && <svg width={size*0.37} height={size*0.37} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>}
+        </div>
+        {nodeStatus === 'done' && (
+          <div style={{ position: 'absolute', bottom: -28, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 4 }}>
+            {[0,1,2].map(si => <svg key={si} width={13} height={13} viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" fill={si < starCount ? '#fcd34d' : 'transparent'} stroke={si < starCount ? '#f59e0b' : 'rgba(255,255,255,.22)'} strokeWidth="1.5" /></svg>)}
+          </div>
+        )}
+        {hov && !isLock && (
+          <div style={{ position: 'absolute', bottom: size + (nodeStatus === 'done' ? 46 : 16), left: '50%', transform: 'translateX(-50%)', background: `linear-gradient(135deg, ${topicColor}, ${topicColor}dd)`, borderRadius: 18, padding: '14px 20px', minWidth: 190, zIndex: 20, boxShadow: `0 12px 40px ${topicColor}66`, pointerEvents: 'none' }}>
+            <div style={{ position: 'absolute', bottom: -7, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderTop: `8px solid ${topicColor}` }} />
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 10 }}>{sub.name}</div>
+            {sub.description && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', marginBottom: 10 }}>{sub.description}</div>}
+            <div style={{ background: 'rgba(255,255,255,.2)', border: '2px solid rgba(255,255,255,.5)', borderRadius: 12, padding: '10px 14px', textAlign: 'center', fontWeight: 900, fontSize: 15, color: '#fff' }}>
+              ЭХЛЭХ
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ── V2: Subtopic-based section ─────────────────────────────────
+function SubtopicSection({ topic, subtopicStars, onSelectSubtopic }: {
+  topic: GameTopicWithSubtopics;
+  subtopicStars: Record<string, number>;
+  onSelectSubtopic: (subtopicId: string) => void;
+}) {
+  const done = topic.subtopics.filter(s => (subtopicStars[s.id] ?? 0) > 0).length;
+  const total = topic.subtopics.length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const bg = `linear-gradient(118deg, ${topic.color}dd, ${topic.color})`;
+  const glow = `0 12px 44px ${topic.color}44, 0 2px 10px rgba(0,0,0,.3)`;
+
+  return (
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+      {/* Banner */}
+      <div style={{ width: '100%', borderRadius: 22, padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, background: bg, boxShadow: glow, border: '1px solid rgba(255,255,255,.18)', marginBottom: 32 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,.85)', textTransform: 'uppercase', marginBottom: 4 }}>
+            {topic.icon} Сэдэв
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', marginBottom: 10 }}>{topic.name}</div>
+          <div style={{ height: 5, borderRadius: 99, background: 'rgba(255,255,255,.22)', overflow: 'hidden', maxWidth: 180 }}>
+            <div style={{ height: '100%', width: `${pct}%`, borderRadius: 99, background: 'rgba(255,255,255,.7)', transition: 'width 0.5s' }} />
+          </div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,.7)', fontWeight: 700, marginTop: 4 }}>{done}/{total}</div>
+        </div>
+      </div>
+
+      {/* Subtopic nodes */}
+      {topic.subtopics.map((sub, i) => {
+        const prevDone = i === 0 || (subtopicStars[topic.subtopics[i - 1]?.id ?? ''] ?? 0) > 0;
+        return (
+          <SubtopicNode
+            key={sub.id}
+            sub={sub}
+            index={i}
+            topicColor={topic.color}
+            subtopicStars={subtopicStars}
+            prevDone={prevDone}
+            onSelect={() => onSelectSubtopic(sub.id)}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicIdx, onSelectLevel, reloadSignal = 0 }: Props) {
-  const [topics, setTopicsState] = useState<GameTopic[]>([]);
-  const [stars, setStars]        = useState<Record<string, number[]>>({});
-  const [settings]               = useState(getSettings());
+  const [topics, setTopicsState]     = useState<GameTopic[]>([]);
+  const [topicsV2, setTopicsV2State] = useState<GameTopicWithSubtopics[]>([]);
+  const [stars, setStars]            = useState<Record<string, number[]>>({});
+  const [starsV2, setStarsV2State]   = useState<Record<string, number>>({});
+  const [settings]                   = useState(getSettings());
 
   useEffect(() => {
-    setTopicsState(getTopics());
-    setStars(getStars());
+    const v2 = getTopicsV2();
+    if (v2.length > 0) {
+      setTopicsV2State(v2);
+      setStarsV2State(getStarsV2());
+    } else {
+      setTopicsState(getTopics());
+      setStars(getStars());
+    }
   }, [reloadSignal]);
 
+  // V2 mode: DB-driven subtopic map
+  if (topicsV2.length > 0) {
+    return (
+      <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: 'Plus Jakarta Sans, sans-serif', position: 'relative' }}>
+        <AtmosphereLayer />
+        <div style={{ position: 'relative', zIndex: 2, flexShrink: 0, padding: '10px 24px', background: 'rgba(5,10,22,0.6)', backdropFilter: 'blur(14px)', borderBottom: '1px solid rgba(120,180,255,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 20 }}>
+          {[
+            { icon: 'award', val: state.xp,                clr: '#c4b5fd', bg: 'rgba(139,92,246,.18)' },
+            { icon: 'coin',  val: state.coins,             clr: '#fde68a', bg: 'rgba(245,184,0,.18)'  },
+            { icon: 'flame', val: `${state.streak} өдөр`, clr: '#fca5a5', bg: 'rgba(239,68,68,.18)'  },
+          ].map((s, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: '#9fb2cf', fontWeight: 600 }}>
+              <div style={{ width: 26, height: 26, borderRadius: 7, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Ic n={s.icon} size={13} color={s.clr} />
+              </div>
+              <span style={{ fontWeight: 800, color: '#eaf2ff' }}>{s.val}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', position: 'relative', zIndex: 2 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '44px 24px 100px' }}>
+            <div style={{ width: '100%', maxWidth: 480 }}>
+              {topicsV2.map((topic, ti) => (
+                <React.Fragment key={topic.id}>
+                  <SubtopicSection
+                    topic={topic}
+                    subtopicStars={starsV2}
+                    onSelectSubtopic={subtopicId => onSelectLevel(topic.name, subtopicId)}
+                  />
+                  {ti < topicsV2.length - 1 && (
+                    <div style={{ margin: '48px 0', display: 'flex', alignItems: 'center', gap: 16, width: '100%' }}>
+                      <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent)' }} />
+                      <span style={{ color: 'rgba(255,255,255,.4)', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', whiteSpace: 'nowrap' }}>↓ {topicsV2[ti + 1]?.name}</span>
+                      <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent)' }} />
+                    </div>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        </div>
+        <style>{`
+          @keyframes atm-twinkle { from{opacity:.6} to{opacity:1} }
+          @keyframes atm-f1 { 0%,100%{transform:translateY(0) rotate(-3deg)} 50%{transform:translateY(-26px) rotate(2deg)} }
+          @keyframes atm-f2 { 0%,100%{transform:translateY(0) rotate(2deg)} 50%{transform:translateY(-18px) rotate(-3deg)} }
+          @keyframes atm-rise { 0%{transform:translateY(0);opacity:0} 10%{opacity:.6} 90%{opacity:.5} 100%{transform:translateY(-700px);opacity:0} }
+          @keyframes cp-pulse { 0%,100%{transform:translateX(-50%) scale(1);opacity:.55} 50%{transform:translateX(-50%) scale(1.15);opacity:.85} }
+          @keyframes cp-bob   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+          @keyframes cp-glow  { 0%,100%{opacity:.6} 50%{opacity:1} }
+        `}</style>
+      </div>
+    );
+  }
+
+  // Legacy mode
   if (!topics.length) return null;
 
   const activeTopicIdx = (() => {
