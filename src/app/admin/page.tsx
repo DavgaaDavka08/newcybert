@@ -88,6 +88,8 @@ export default function AdminPage() {
   const [catModal, setCatModal] = useState(false);
   const [qForm, setQForm] = useState(DEFAULT_QFORM);
   const [catForm, setCatForm] = useState(DEFAULT_CATFORM);
+  const [editingQ, setEditingQ] = useState<Question | null>(null);
+  const [editingCat, setEditingCat] = useState<Category | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   /* Exam state */
@@ -184,13 +186,31 @@ export default function AdminPage() {
 
   async function saveQuestion() {
     setSubmitting(true);
-    await fetch("/api/admin/questions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(qForm) });
-    setSubmitting(false); setQModal(false); setQForm(DEFAULT_QFORM); loadQuestions();
+    if (editingQ) {
+      await fetch("/api/admin/questions", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editingQ._id, ...qForm }) });
+    } else {
+      await fetch("/api/admin/questions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(qForm) });
+    }
+    setSubmitting(false); setQModal(false); setQForm(DEFAULT_QFORM); setEditingQ(null); loadQuestions();
+  }
+  async function deleteQuestion(id: string) {
+    if (!confirm("Асуултыг устгах уу?")) return;
+    await fetch(`/api/admin/questions?id=${id}`, { method: "DELETE" });
+    loadQuestions();
   }
   async function saveCategory() {
     setSubmitting(true);
-    await fetch("/api/admin/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(catForm) });
-    setSubmitting(false); setCatModal(false); setCatForm(DEFAULT_CATFORM); loadCategories();
+    if (editingCat) {
+      await fetch("/api/admin/categories", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editingCat._id, ...catForm }) });
+    } else {
+      await fetch("/api/admin/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(catForm) });
+    }
+    setSubmitting(false); setCatModal(false); setCatForm(DEFAULT_CATFORM); setEditingCat(null); loadCategories();
+  }
+  async function deleteCategory(id: string) {
+    if (!confirm("Ангиллыг устгах уу?")) return;
+    await fetch(`/api/admin/categories?id=${id}`, { method: "DELETE" });
+    loadCategories();
   }
   async function saveExam() {
     setSubmitting(true);
@@ -817,8 +837,12 @@ export default function AdminPage() {
                         <td style={{ color: "var(--indigo)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>+{q.xpReward}</td>
                         <td style={{ textAlign: "right" }}>
                           <div className="actions" style={{ justifyContent: "flex-end" }}>
-                            <button type="button" className="btn sm">Засах</button>
-                            <button type="button" className="btn sm danger">Устгах</button>
+                            <button type="button" className="btn sm" onClick={() => {
+                              setEditingQ(q);
+                              setQForm({ categoryId: typeof q.categoryId === "object" ? (q.categoryId as any)._id ?? "" : q.categoryId ?? "", level: q.level, question: q.question, options: (q as any).options ?? ["","","",""], correctIndex: (q as any).correctIndex ?? 0, explanation: (q as any).explanation ?? "", difficulty: q.difficulty, xpReward: q.xpReward, coinReward: (q as any).coinReward ?? 5 });
+                              setQModal(true);
+                            }}>Засах</button>
+                            <button type="button" className="btn sm danger" onClick={() => deleteQuestion(q._id)}>Устгах</button>
                           </div>
                         </td>
                       </tr>
@@ -855,8 +879,12 @@ export default function AdminPage() {
                       <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>{c.name}</div>
                       <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 14 }}>{c.totalLevels} level · Дараалал {c.order}</div>
                       <div style={{ display: "flex", gap: 6 }}>
-                        <button type="button" className="btn sm" style={{ flex: 1 }}>Засах</button>
-                        <button type="button" className="btn sm" style={{ flex: 1 }}>Асуултууд</button>
+                        <button type="button" className="btn sm" style={{ flex: 1 }} onClick={() => {
+                          setEditingCat(c);
+                          setCatForm({ name: c.name, icon: c.icon ?? "", color: c.color ?? "#4F46E5", totalLevels: c.totalLevels, order: c.order });
+                          setCatModal(true);
+                        }}>Засах</button>
+                        <button type="button" className="btn sm danger" style={{ flex: 1 }} onClick={() => deleteCategory(c._id)}>Устгах</button>
                       </div>
                     </div>
                   </div>
@@ -1077,11 +1105,11 @@ export default function AdminPage() {
 
       {/* ══ QUESTION MODAL ════════════════════════════════ */}
       {qModal && (
-        <div className="modal-overlay" onClick={() => setQModal(false)}>
+        <div className="modal-overlay" onClick={() => { setQModal(false); setEditingQ(null); setQForm(DEFAULT_QFORM); }}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-head">
-              <h2>Асуулт нэмэх</h2>
-              <button type="button" className="icon-btn" onClick={() => setQModal(false)} title="Хаах">×</button>
+              <h2>{editingQ ? "Асуулт засах" : "Асуулт нэмэх"}</h2>
+              <button type="button" className="icon-btn" onClick={() => { setQModal(false); setEditingQ(null); setQForm(DEFAULT_QFORM); }} title="Хаах">×</button>
             </div>
             <div className="modal-body">
               <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 140px", gap: 12, marginBottom: 14 }}>
@@ -1135,8 +1163,8 @@ export default function AdminPage() {
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn" onClick={() => setQModal(false)}>Болих</button>
-              <button className="btn primary" disabled={submitting} onClick={saveQuestion}>{submitting ? "Хадгалж байна..." : "Хадгалах"}</button>
+              <button className="btn" onClick={() => { setQModal(false); setEditingQ(null); setQForm(DEFAULT_QFORM); }}>Болих</button>
+              <button className="btn primary" disabled={submitting} onClick={saveQuestion}>{submitting ? "Хадгалж байна..." : editingQ ? "Хадгалах" : "Нэмэх"}</button>
             </div>
           </div>
         </div>
@@ -1144,11 +1172,11 @@ export default function AdminPage() {
 
       {/* ══ CATEGORY MODAL ════════════════════════════════ */}
       {catModal && (
-        <div className="modal-overlay" onClick={() => setCatModal(false)}>
+        <div className="modal-overlay" onClick={() => { setCatModal(false); setEditingCat(null); setCatForm(DEFAULT_CATFORM); }}>
           <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
             <div className="modal-head">
-              <h2>Ангилал нэмэх</h2>
-              <button type="button" className="icon-btn" onClick={() => setCatModal(false)} title="Хаах">×</button>
+              <h2>{editingCat ? "Ангилал засах" : "Ангилал нэмэх"}</h2>
+              <button type="button" className="icon-btn" onClick={() => { setCatModal(false); setEditingCat(null); setCatForm(DEFAULT_CATFORM); }} title="Хаах">×</button>
             </div>
             <div className="modal-body">
               <div className="field">
@@ -1175,8 +1203,8 @@ export default function AdminPage() {
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn" onClick={() => setCatModal(false)}>Болих</button>
-              <button className="btn primary" disabled={submitting} onClick={saveCategory}>{submitting ? "Хадгалж байна..." : "Хадгалах"}</button>
+              <button className="btn" onClick={() => { setCatModal(false); setEditingCat(null); setCatForm(DEFAULT_CATFORM); }}>Болих</button>
+              <button className="btn primary" disabled={submitting} onClick={saveCategory}>{submitting ? "Хадгалж байна..." : editingCat ? "Хадгалах" : "Нэмэх"}</button>
             </div>
           </div>
         </div>
