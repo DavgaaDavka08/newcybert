@@ -481,24 +481,45 @@ function SubtopicSection({ topic, subtopicStars, onSelectSubtopic }: {
 }
 
 export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicIdx, onSelectLevel, onBackToDashboard, reloadSignal = 0 }: Props) {
-  const [topics, setTopicsState]     = useState<GameTopic[]>([]);
   const [topicsV2, setTopicsV2State] = useState<GameTopicWithSubtopics[]>([]);
-  const [stars, setStars]            = useState<Record<string, number[]>>({});
   const [starsV2, setStarsV2State]   = useState<Record<string, number>>({});
-  const [settings]                   = useState(getSettings());
+  const [loaded, setLoaded]          = useState(false);
 
   useEffect(() => {
-    const v2 = getTopicsV2();
-    if (v2.length > 0) {
-      setTopicsV2State(v2);
-      setStarsV2State(getStarsV2());
-    } else {
-      setTopicsState(getTopics());
-      setStars(getStars());
-    }
+    setTopicsV2State(getTopicsV2());
+    setStarsV2State(getStarsV2());
+    setLoaded(true);
   }, [reloadSignal]);
 
-  // V2 mode: DB-driven subtopic map
+  const mapStyles = `
+    @keyframes atm-twinkle { from{opacity:.6} to{opacity:1} }
+    @keyframes atm-f1 { 0%,100%{transform:translateY(0) rotate(-3deg)} 50%{transform:translateY(-26px) rotate(2deg)} }
+    @keyframes atm-f2 { 0%,100%{transform:translateY(0) rotate(2deg)} 50%{transform:translateY(-18px) rotate(-3deg)} }
+    @keyframes atm-rise { 0%{transform:translateY(0);opacity:0} 10%{opacity:.6} 90%{opacity:.5} 100%{transform:translateY(-700px);opacity:0} }
+    @keyframes cp-pulse { 0%,100%{transform:translateX(-50%) scale(1);opacity:.55} 50%{transform:translateX(-50%) scale(1.15);opacity:.85} }
+    @keyframes cp-bob   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+    @keyframes cp-glow  { 0%,100%{opacity:.6} 50%{opacity:1} }
+  `;
+
+  if (loaded && topicsV2.length === 0) {
+    return (
+      <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: 'Plus Jakarta Sans, sans-serif', position: 'relative' }}>
+        <AtmosphereLayer />
+        <MapStatsBar state={state} onBackToDashboard={onBackToDashboard} />
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, position: 'relative', zIndex: 2 }}>
+          <div style={{ maxWidth: 400, textAlign: 'center', color: '#fff' }}>
+            <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.9 }}>Φ</div>
+            <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 12px' }}>Хичээл байхгүй байна</h2>
+            <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6, margin: 0 }}>
+              Админ самбарт «Тоглоомын курс» хэсгээс сэдэв, хичээл, асуулт нэмсний дараа энд харагдана.
+            </p>
+          </div>
+        </div>
+        <style>{mapStyles}</style>
+      </div>
+    );
+  }
+
   if (topicsV2.length > 0) {
     return (
       <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: 'Plus Jakarta Sans, sans-serif', position: 'relative' }}>
@@ -539,52 +560,9 @@ export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicI
     );
   }
 
-  // Legacy mode
-  if (!topics.length) return null;
-
-  const activeTopicIdx = (() => {
-    const idx = topics.findIndex(t => (stars[t.id] ?? []).filter(s => s > 0).length < LEVELS_PER_TOPIC);
-    return idx < 0 ? topics.length - 1 : idx;
-  })();
-
   return (
-    <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: 'Plus Jakarta Sans, sans-serif', position: 'relative' }}>
-      <AtmosphereLayer />
-
+    <div style={{ width: '100vw', height: '100vh', background: '#0a0f1a' }}>
       <MapStatsBar state={state} onBackToDashboard={onBackToDashboard} />
-
-      {/* Scrollable map */}
-      <div style={{ flex: 1, overflowY: 'auto', position: 'relative', zIndex: 2 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '44px 24px 100px' }}>
-          <div style={{ width: '100%', maxWidth: 480 }}>
-            {topics.map((topic, ti) => {
-              const topicStars     = stars[topic.id] ?? [];
-              const done           = topicStars.filter(s => s > 0).length;
-              const currentNodeIdx = Math.min(done, LEVELS_PER_TOPIC - 1);
-              const topicState     = getTopicState(topic.id, stars);
-              const nextTopic      = topics[ti + 1];
-              const prevTopicId    = ti > 0 ? topics[ti - 1]?.id : null;
-              const topicChainLocked = ti > 0 && prevTopicId != null && !isTopicFullyDone(prevTopicId, stars);
-              return (
-                <React.Fragment key={topic.id}>
-                  <SubjectSection topic={topic} topicIdx={ti} topicStars={topicStars} currentNodeIdx={currentNodeIdx} topicState={topicState} isActiveTopic={ti === activeTopicIdx} xpPerCorrect={settings.xpPerCorrect} topicChainLocked={topicChainLocked} onSelectLevel={level => onSelectLevel(topic.name, level)} />
-                  {ti < topics.length - 1 && <SubjectDivider nextName={nextTopic?.name} />}
-                </React.Fragment>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes atm-twinkle { from{opacity:.6} to{opacity:1} }
-        @keyframes atm-f1 { 0%,100%{transform:translateY(0) rotate(-3deg)} 50%{transform:translateY(-26px) rotate(2deg)} }
-        @keyframes atm-f2 { 0%,100%{transform:translateY(0) rotate(2deg)} 50%{transform:translateY(-18px) rotate(-3deg)} }
-        @keyframes atm-rise { 0%{transform:translateY(0);opacity:0} 10%{opacity:.6} 90%{opacity:.5} 100%{transform:translateY(-700px);opacity:0} }
-        @keyframes cp-pulse { 0%,100%{transform:translateX(-50%) scale(1);opacity:.55} 50%{transform:translateX(-50%) scale(1.15);opacity:.85} }
-        @keyframes cp-bob   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
-        @keyframes cp-glow  { 0%,100%{opacity:.6} 50%{opacity:1} }
-      `}</style>
     </div>
   );
 }

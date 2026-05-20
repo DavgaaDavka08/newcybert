@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import "./admin.css";
 import { ContentManager } from "@/components/admin/ContentManager";
 import { VideoLessonManager } from "@/components/admin/VideoLessonManager";
+import { SeedPhysicsPanel } from "@/components/admin/SeedPhysicsPanel";
 import { AdminIcon, type AdminIconName } from "@/components/admin/AdminIcon";
 
 // ── Types ─────────────────────────────────────────────────────
@@ -63,6 +64,7 @@ export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
+  const [contentKey, setContentKey] = useState(0);
 
   // Toast
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -602,7 +604,8 @@ export default function AdminPage() {
                   </p>
                 </div>
               </div>
-              <ContentManager />
+              <SeedPhysicsPanel onSeeded={() => setContentKey((k) => k + 1)} />
+              <ContentManager key={contentKey} />
             </div>
           )}
 

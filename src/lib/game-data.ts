@@ -79,9 +79,9 @@ function save(key: string, val: unknown) {
   try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
 }
 
-export const getTopics    = () => load<GameTopic[]>(KEYS.topics, DEFAULT_TOPICS);
+export const getTopics    = () => load<GameTopic[]>(KEYS.topics, []);
 export const setTopics    = (v: GameTopic[]) => save(KEYS.topics, v);
-export const getQuestions = () => load<GameQuestion[]>(KEYS.questions, DEFAULT_QUESTIONS);
+export const getQuestions = () => load<GameQuestion[]>(KEYS.questions, []);
 export const setQuestions = (v: GameQuestion[]) => save(KEYS.questions, v);
 export const getSettings  = () => load<GameSettings>(KEYS.settings, DEFAULT_SETTINGS);
 export const setSettings  = (v: GameSettings) => save(KEYS.settings, v);

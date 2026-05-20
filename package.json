@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "seed:physics": "npx tsx scripts/seed-physics-content.ts",
+    "seed:physics:clear": "npx tsx scripts/seed-physics-content.ts --clear"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
