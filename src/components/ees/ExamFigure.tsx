@@ -8,7 +8,10 @@ export function ExamFigure({ kind }: { kind: EesIllustration }) {
   if (!kind) return null;
   if (kind === "voltmeter") return <VoltmeterIllustration />;
 
-  const labels: Record<Exclude<NonNullable<EesIllustration>, "voltmeter">, string> = {
+  const labels: Record<
+    Exclude<NonNullable<EesIllustration>, "voltmeter">,
+    string
+  > = {
     "velocity-graph": "Хурд-хугацааны график",
     "heating-graph": "Температур-хугацааны график (нафталин)",
     "mass-square": "Квадрат дээрх бөмбөлгүүд",
@@ -39,12 +42,27 @@ export function ExamFigure({ kind }: { kind: EesIllustration }) {
         fontWeight: 600,
       }}
     >
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5" style={{ margin: "0 auto 8px", display: "block" }}>
+      <svg
+        width="48"
+        height="48"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#94a3b8"
+        strokeWidth="1.5"
+        style={{ margin: "0 auto 8px", display: "block" }}
+      >
         <rect x="3" y="3" width="18" height="18" rx="2" />
         <path d="M8 12h8M12 8v8" />
       </svg>
       {label}
-      <div style={{ fontSize: 11, fontWeight: 500, marginTop: 4, color: "#94a3b8" }}>
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 500,
+          marginTop: 4,
+          color: "#94a3b8",
+        }}
+      >
         (Шалгалтын зураг — даалгаврын өгөгдөлд үзүүлсэн)
       </div>
     </div>
