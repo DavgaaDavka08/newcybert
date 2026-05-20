@@ -44,7 +44,7 @@ interface Props {
   setState?: (fn: (s: AppState) => AppState) => void;
 }
 
-function NoLivesOverlay({ refillAt, coins, refillCoins, livesCount, onRefillCoins, onClose }: {
+function NoLivesOverlay({ refillAt, coins, refillCoins, livesCount: _livesCount, onRefillCoins, onClose }: {
   refillAt: number | null; coins: number; refillCoins: number; livesCount: number;
   onRefillCoins: () => void; onClose: () => void;
 }) {

@@ -10,9 +10,10 @@ const BG_URL = '/475450911_537240926008065_5395618463015848016_n.jpg';
 
 export function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: T.bg }}>
+    <div className="dash-shell" style={{ display: 'flex', minHeight: '100vh', background: T.bg }}>
       <Sidebar />
       <main
+        className="dash-main"
         style={{
           position: 'relative',
           flex: 1,

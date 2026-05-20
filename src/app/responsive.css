@@ -1,0 +1,106 @@
+/* Global responsive utilities */
+
+/* Prevent horizontal scroll on mobile */
+html {
+  overflow-x: hidden;
+}
+
+img,
+video,
+svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Dashboard shell (student) */
+@media (max-width: 900px) {
+  .dash-shell {
+    flex-direction: column !important;
+  }
+
+  .dash-sidebar {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    position: relative !important;
+    border-right: none !important;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .dash-main {
+    min-height: 0 !important;
+    width: 100% !important;
+  }
+}
+
+/* Admin course builder — stacks panels on tablet */
+@media (max-width: 1100px) {
+  .admin-root .course-wizard-step .course-step-text span {
+    display: none;
+  }
+}
+
+/* Tables scroll horizontally on small screens */
+@media (max-width: 768px) {
+  .admin-root .table-wrap,
+  .table-scroll-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-root .table {
+    min-width: 520px;
+  }
+
+  .admin-root .stat-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .admin-root .quick-cards {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-root .stat-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-root .main {
+    padding: 16px 12px !important;
+  }
+}
+
+/* Video / premium pages */
+@media (max-width: 640px) {
+  .media-upload-tabs {
+    flex-direction: column !important;
+  }
+
+  .premium-grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Game map — safe areas & node offsets */
+@media (max-width: 640px) {
+  .game-map-scroll {
+    padding: 32px 12px 80px !important;
+  }
+
+  .game-map-scroll [style*="paddingLeft: 72"],
+  .game-map-scroll [style*="paddingRight: 72"] {
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .dash-main {
+    padding: 16px 12px !important;
+  }
+
+  .premium-page-hero h1 {
+    font-size: 26px !important;
+  }
+}

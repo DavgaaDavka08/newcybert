@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { T } from "@/styles/tokens";
 import { BackButton } from "@/components/ui/BackButton";
 
@@ -41,7 +40,6 @@ const COMPARE = [
 
 export default function PremiumPage() {
   const { data: session } = useSession();
-  const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
   const [_purchaseOk, setPurchaseOk] = useState<string | null>(null);
 
@@ -88,7 +86,7 @@ export default function PremiumPage() {
         </div>
 
         {/* Plans grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, marginBottom: 48, maxWidth: 640, margin: "0 auto 48px" }}>
+        <div className="premium-grid-2" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, marginBottom: 48, maxWidth: 640, margin: "0 auto 48px" }}>
           {PLANS.map(plan => (
             <PlanCard key={plan.id} plan={plan} loading={loading === plan.id} onBuy={() => handlePurchase(plan.id)} isPremium={isPremium && (plan.id === "premium_monthly" || plan.id === "premium_pro")} />
           ))}

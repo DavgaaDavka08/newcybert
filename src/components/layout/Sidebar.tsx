@@ -19,7 +19,7 @@ export function Sidebar() {
   const userName        = session?.user?.name ?? appState.name;
 
   return (
-    <div style={{
+    <div className="dash-sidebar" style={{
       width: 230, flexShrink: 0, background: '#FFFFFF',
       display: 'flex', flexDirection: 'column', height: '100vh',
       position: 'sticky', top: 0, zIndex: 10,

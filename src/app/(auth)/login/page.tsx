@@ -1,5 +1,6 @@
 // src/app/(auth)/login/page.tsx
 "use client";
+import "../auth.css";
 import { useState, useEffect, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -231,7 +232,7 @@ function RegisterTab({ onSwitch }: { onSwitch: () => void }) {
       )}
 
       <form onSubmit={handleSubmit}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+        <div className="auth-register-grid" style={{ marginBottom: 10 }}>
           <div>
             <label style={lbl}>ОВОГ</label>
             <input value={form.lastName} onChange={e => upd("lastName", e.target.value)}
@@ -266,7 +267,7 @@ function RegisterTab({ onSwitch }: { onSwitch: () => void }) {
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+        <div className="auth-register-grid" style={{ marginBottom: 10 }}>
           <div>
             <label style={lbl}>УТАСНЫ ДУГААР</label>
             <input value={form.phone} onChange={e => upd("phone", e.target.value)}
@@ -343,18 +344,9 @@ function AuthContent() {
   }, [searchParams]);
 
   return (
-    <div style={{
-      display: "flex", minHeight: "100vh",
-      fontFamily: "Nunito, 'Plus Jakarta Sans', sans-serif",
-      background: "#0D0D15",
-    }}>
+    <div className="auth-page">
       {/* ── LEFT PANEL ── */}
-      <div style={{
-        width: "50%", flexShrink: 0, position: "relative", overflow: "hidden",
-        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-        background: "linear-gradient(160deg, #0D0D18 0%, #0a0a14 100%)",
-        borderRight: "1px solid rgba(255,255,255,0.05)",
-      }}>
+      <div className="auth-panel-left">
         {/* Glow behind mascot */}
         <div style={{
           position: "absolute", width: 360, height: 360, borderRadius: "50%",
@@ -391,40 +383,23 @@ function AuthContent() {
           </div>
         ))}
 
-        {/* Logo */}
-        <div style={{ position: "absolute", top: 28, left: 28 }}>
-          <img src="/cyberphysic-logo.png" alt="CyberPhysic"
-            style={{ height: 36, filter: "brightness(0) invert(1)", opacity: 0.9 }} />
+        <div className="auth-logo-wrap">
+          <img src="/cyberphysic-logo.png" alt="CyberPhysic" />
         </div>
 
-        {/* Mascot */}
-        <div style={{ position: "relative", zIndex: 1, textAlign: "center" }}>
-          <div style={{ animation: "float 4s ease-in-out infinite", display: "inline-block", marginBottom: 20 }}>
-            <img src="/cyberpysics.png" alt="mascot"
-              style={{
-                width: 200, height: 200, objectFit: "contain",
-                mixBlendMode: "screen",
-                filter: "drop-shadow(0 0 40px rgba(255,210,63,0.5))",
-              }} />
+        <div className="auth-hero">
+          <div className="auth-hero-mascot">
+            <img src="/cyberpysics.png" alt="mascot" />
           </div>
-          <h2 style={{ fontSize: 22, fontWeight: 900, color: "#E2E8F0", marginBottom: 10 }}>
-            CyberPhysics
-          </h2>
-          <p style={{ color: "#64748B", fontSize: 14, lineHeight: 1.7, maxWidth: 260 }}>
+          <h2>CyberPhysics</h2>
+          <p>
             Физикийг тоглоомоор сур.<br />XP цуглуул. Streak хадгал.
           </p>
         </div>
-
-        <style>{`@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }`}</style>
       </div>
 
       {/* ── RIGHT PANEL ── */}
-      <div style={{
-        width: "50%", position: "relative",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "32px 48px", overflowY: "auto", overflowX: "hidden",
-        background: "#0D0D15",
-      }}>
+      <div className="auth-panel-right">
         {/* Background shapes */}
         {BG_SHAPES.map((sh, i) => (
           <div key={i} style={{
@@ -450,27 +425,15 @@ function AuthContent() {
           </div>
         ))}
 
-        {/* Form card */}
-        <div style={{
-          position: "relative", zIndex: 1, width: "100%", maxWidth: 420,
-          background: "#13131F", borderRadius: 22, padding: "32px 30px",
-          boxShadow: "0 8px 48px rgba(0,0,0,0.4)",
-          border: "1px solid rgba(255,255,255,0.07)",
-        }}>
-          {/* Tabs */}
-          <div style={{
-            display: "flex", background: "rgba(255,255,255,0.05)",
-            borderRadius: 10, padding: 4, marginBottom: 24,
-          }}>
+        <div className="auth-form-card">
+          <div className="auth-tabs">
             {(["login", "register"] as const).map(t => (
-              <button key={t} onClick={() => setTab(t)} style={{
-                flex: 1, padding: "9px", borderRadius: 8,
-                background: tab === t ? "#fff" : "transparent",
-                color: tab === t ? "#0D0D15" : "#64748B",
-                fontWeight: 800, fontSize: 14, border: "none",
-                cursor: "pointer", fontFamily: "inherit",
-                transition: "all .2s",
-              }}>
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                className={`auth-tab-btn ${tab === t ? "auth-tab-btn--active" : "auth-tab-btn--inactive"}`}
+              >
                 {t === "login" ? "Нэвтрэх" : "Бүртгүүлэх"}
               </button>
             ))}
