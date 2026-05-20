@@ -64,8 +64,8 @@ export const authOptions: NextAuthOptions = {
         const password = credentials.password;
 
         // ── Hardcoded admin ──────────────────────────
-        const adminEmail = process.env.ADMIN_EMAIL ?? "admin@gmail.com";
-        const adminPass  = process.env.ADMIN_PASS  ?? "TCB-757";
+        const adminEmail = (process.env.ADMIN_EMAIL ?? "admin@gmail.com").toLowerCase().trim();
+        const adminPass  = (process.env.ADMIN_PASS ?? "TCB-757").trim();
 
         if (email === adminEmail && password === adminPass) {
           return {

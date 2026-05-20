@@ -6,9 +6,9 @@ import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { PROVINCES, SCHOOL_GRADES } from "@/lib/mn-constants";
 import {
+  getLoginCallbackUrl,
   getSafeCallbackUrl,
   mapAuthError,
-  waitForSession,
 } from "@/lib/auth-redirect";
 
 /* ─── Decorative shapes on the right bg ─── */
@@ -79,7 +79,7 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
     setLoading(true);
     try {
       const res = await signIn("credentials", {
-        email,
+        email: email.trim(),
         password,
         redirect: false,
       });
@@ -93,9 +93,8 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
         setLoading(false);
         return;
       }
-      const sess = await waitForSession();
-      const dest = getSafeCallbackUrl(callbackUrl, sess?.user?.role);
-      window.location.href = dest;
+      // Full navigation so the session cookie is applied before /admin middleware runs
+      window.location.href = getLoginCallbackUrl(callbackUrl);
     } catch {
       setError("Сүлжээний алдаа. Дахин оролдоно уу.");
       setLoading(false);
@@ -128,6 +127,16 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
         <span style={{ color: "#475569", fontSize: 12 }}>эсвэл</span>
         <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
       </div>
+
+      {callbackUrl.startsWith("/admin") && (
+        <div style={{
+          background: "rgba(79,70,229,0.12)", border: "1px solid rgba(99,102,241,0.35)",
+          borderRadius: 8, padding: "10px 12px", marginBottom: 14,
+          color: "#A5B4FC", fontSize: 12, lineHeight: 1.5,
+        }}>
+          Admin самбарт нэвтрэх. Vercel дээр <strong>ADMIN_EMAIL</strong> / <strong>ADMIN_PASS</strong> тохируулсан эсэхээ шалгана уу.
+        </div>
+      )}
 
       {error && (
         <div style={{

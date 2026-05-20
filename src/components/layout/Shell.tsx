@@ -62,7 +62,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             aria-expanded={mobileNavOpen}
             onClick={() => setMobileNavOpen(true)}
           >
-            <Ic n="menu" size={20} color={T.text} />
+            <Ic n="menu" size={26} color={T.text} />
           </button>
           <span className="dash-mobile-header-title">CyberPhysics</span>
         </header>

@@ -6,15 +6,23 @@ export function getSafeCallbackUrl(
 ): string {
   if (role === "admin") return "/admin";
 
+  if (role && role !== "admin" && callbackUrl?.startsWith("/admin")) {
+    return "/dashboard";
+  }
+
   if (!callbackUrl || !callbackUrl.startsWith("/") || callbackUrl.startsWith("//")) {
     return "/dashboard";
   }
 
-  if (callbackUrl.startsWith("/admin")) {
-    return "/dashboard";
-  }
-
   return callbackUrl;
+}
+
+/** Credentials sign-in: NextAuth reads this after cookie is set. */
+export function getLoginCallbackUrl(callbackUrl: string | null | undefined): string {
+  if (callbackUrl?.startsWith("/") && !callbackUrl.startsWith("//")) {
+    return callbackUrl;
+  }
+  return "/dashboard";
 }
 
 /** Poll session after credentials sign-in (cookie may lag one tick). */

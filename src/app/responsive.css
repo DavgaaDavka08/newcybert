@@ -44,17 +44,23 @@ svg {
   }
 
   .dash-menu-btn {
-    width: 44px;
-    height: 44px;
-    border-radius: 10px;
-    border: 1px solid #e2e8f0;
+    width: 52px;
+    height: 52px;
+    min-width: 52px;
+    min-height: 52px;
+    border-radius: 12px;
+    border: 1.5px solid #cbd5e1;
     background: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     flex-shrink: 0;
-    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
+  }
+
+  .dash-menu-btn:active {
+    transform: scale(0.96);
   }
 
   .dash-mobile-header-title {
@@ -242,10 +248,69 @@ svg {
   }
 
   .game-map-scroll {
-    padding: 32px 12px 80px !important;
+    padding: 24px 10px 72px !important;
   }
 
   .premium-page-hero h1 {
     font-size: 26px !important;
+  }
+}
+
+/* ── Game map (full screen) ──────────────────────────────────── */
+
+.game-map-screen {
+  width: 100%;
+  max-width: 100vw;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.game-map-stats-bar {
+  flex-wrap: wrap;
+  gap: 10px !important;
+  padding: 10px 12px !important;
+}
+
+.game-map-stats-bar button {
+  min-height: 44px;
+  padding: 10px 14px !important;
+  font-size: 14px !important;
+}
+
+.game-map-stats-pills {
+  width: 100%;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px !important;
+  margin-left: 0 !important;
+}
+
+.game-map-stats-pills > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.game-map-stats-pills span:last-child {
+  font-size: 11px !important;
+}
+
+@media (max-width: 640px) {
+  .game-map-node-row {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    justify-content: center !important;
+  }
+
+  .game-map-topic-banner {
+    padding: 14px 16px !important;
+    margin-bottom: 24px !important;
+  }
+
+  .game-map-topic-banner h3,
+  .game-map-topic-banner [style*="fontSize: 20"] {
+    font-size: 17px !important;
   }
 }

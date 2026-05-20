@@ -11,10 +11,10 @@ type OffsetType = 'center' | 'off-l' | 'off-l2' | 'off-r' | 'off-r2';
 const NODE_OFFSETS: OffsetType[] = ['center','off-l','off-r','center','off-l2','off-r','center','off-l','off-r2','center'];
 const OFFSET_STYLES: Record<OffsetType, React.CSSProperties> = {
   center: { justifyContent: 'center' },
-  'off-l':  { justifyContent: 'flex-start', paddingLeft: 72 },
-  'off-l2': { justifyContent: 'flex-start', paddingLeft: 24 },
-  'off-r':  { justifyContent: 'flex-end',   paddingRight: 72 },
-  'off-r2': { justifyContent: 'flex-end',   paddingRight: 24 },
+  'off-l':  { justifyContent: 'flex-start', paddingLeft: 48 },
+  'off-l2': { justifyContent: 'flex-start', paddingLeft: 16 },
+  'off-r':  { justifyContent: 'flex-end',   paddingRight: 48 },
+  'off-r2': { justifyContent: 'flex-end',   paddingRight: 16 },
 };
 
 // ── Atmosphere ────────────────────────────────────────────────
@@ -70,6 +70,7 @@ interface Props {
 function MapStatsBar({ state, onBackToDashboard }: { state: AppState; onBackToDashboard?: () => void }) {
   return (
     <div
+      className="game-map-stats-bar"
       style={{
         position: 'relative',
         zIndex: 2,
@@ -110,7 +111,7 @@ function MapStatsBar({ state, onBackToDashboard }: { state: AppState; onBackToDa
       ) : (
         <div />
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginLeft: 'auto' }}>
+      <div className="game-map-stats-pills" style={{ display: 'flex', alignItems: 'center', gap: 20, marginLeft: 'auto' }}>
         {[
           { icon: 'award', val: state.xp, clr: '#c4b5fd', bg: 'rgba(139,92,246,.18)' },
           { icon: 'coin', val: state.coins, clr: '#fde68a', bg: 'rgba(245,184,0,.18)' },
@@ -170,7 +171,7 @@ function SubtopicNode({ sub, index, topicColor, subtopicStars, prevDone, onSelec
           <div style={{ width: 4, height: 30, borderRadius: 99, background: prevDone ? `repeating-linear-gradient(to bottom,${topicColor} 0 6px,transparent 6px 12px)` : 'repeating-linear-gradient(to bottom,rgba(255,255,255,0.18) 0 6px,transparent 6px 12px)', boxShadow: prevDone ? `0 0 12px ${topicColor}88` : 'none' }} />
         </div>
       )}
-      <div style={{ position: 'relative', width: '100%', display: 'flex', ...OFFSET_STYLES[offset] }}>
+      <div className="game-map-node-row" style={{ position: 'relative', width: '100%', display: 'flex', ...OFFSET_STYLES[offset] }}>
         <div
           role="button"
           tabIndex={isLock ? -1 : 0}
@@ -234,7 +235,7 @@ function SubtopicSection({ topic, subtopicStars, onSelectSubtopic }: {
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
       {/* Banner */}
-      <div style={{ width: '100%', borderRadius: 22, padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, background: bg, boxShadow: glow, border: '1px solid rgba(255,255,255,.18)', marginBottom: 32 }}>
+      <div className="game-map-topic-banner" style={{ width: '100%', borderRadius: 22, padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, background: bg, boxShadow: glow, border: '1px solid rgba(255,255,255,.18)', marginBottom: 32 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,.85)', textTransform: 'uppercase', marginBottom: 4 }}>
             {topic.icon} Сэдэв
@@ -289,7 +290,7 @@ export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicI
 
   if (loaded && topicsV2.length === 0) {
     return (
-      <div style={{ width: '100%', maxWidth: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: 'Plus Jakarta Sans, sans-serif', position: 'relative' }}>
+      <div className="game-map-screen" style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: 'Plus Jakarta Sans, sans-serif', position: 'relative' }}>
         <AtmosphereLayer />
         <MapStatsBar state={state} onBackToDashboard={onBackToDashboard} />
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, position: 'relative', zIndex: 2 }}>
@@ -308,7 +309,7 @@ export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicI
 
   if (topicsV2.length > 0) {
     return (
-      <div style={{ width: '100%', maxWidth: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: 'Plus Jakarta Sans, sans-serif', position: 'relative' }}>
+      <div className="game-map-screen" style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: 'Plus Jakarta Sans, sans-serif', position: 'relative' }}>
         <AtmosphereLayer />
         <MapStatsBar state={state} onBackToDashboard={onBackToDashboard} />
         <div style={{ flex: 1, overflowY: 'auto', position: 'relative', zIndex: 2 }}>
@@ -347,7 +348,7 @@ export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicI
   }
 
   return (
-    <div style={{ width: '100%', maxWidth: '100vw', height: '100vh', background: '#0a0f1a' }}>
+    <div className="game-map-screen" style={{ height: '100vh', background: '#0a0f1a' }}>
       <MapStatsBar state={state} onBackToDashboard={onBackToDashboard} />
     </div>
   );
