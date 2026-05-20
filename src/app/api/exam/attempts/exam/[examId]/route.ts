@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { AttemptModel } from '@/models/AttemptModel';
+import { requireAdmin } from '@/lib/auth';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ examId: string }> }) {
+  const { error } = await requireAdmin();
+  if (error) return error;
+
   try {
     await connectDB();
     const { examId } = await params;

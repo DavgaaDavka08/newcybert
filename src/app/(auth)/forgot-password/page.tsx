@@ -35,7 +35,7 @@ export default function ForgotPasswordPage() {
         borderRadius: 20, border: "1px solid rgba(255,255,255,0.07)", padding: "40px 32px",
       }}>
         <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <div style={{ fontSize: 44, marginBottom: 10 }}>🔐</div>
+          <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(255,255,255,0.06)", display: "grid", placeItems: "center", margin: "0 auto 14px", fontSize: 14, fontWeight: 800, color: "#93C5FD", letterSpacing: "0.04em" }}>CP</div>
           <h1 style={{ fontSize: 24, fontWeight: 900, color: "#E2E8F0", marginBottom: 8 }}>
             Нууц үг сэргээх
           </h1>

@@ -1,7 +1,15 @@
 // src/app/layout.tsx
 import type { Metadata } from "next";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+  variable: "--font-jakarta",
+});
 
 function metadataBaseUrl(): URL {
   const explicit = process.env.NEXT_PUBLIC_APP_URL;
@@ -30,14 +38,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="mn">
-      <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body>
+    <html lang="mn" className={jakarta.variable}>
+      <body className={jakarta.className}>
         <Providers>{children}</Providers>
       </body>
     </html>

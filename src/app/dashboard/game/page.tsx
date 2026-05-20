@@ -14,9 +14,9 @@ export default function DashboardGamePage() {
 
   if (status === "loading") return (
     <div style={{
-      minHeight: "100vh", background: "#050d1d",
+      minHeight: "100vh", background: "#F0F4F8",
       display: "flex", alignItems: "center", justifyContent: "center",
-      color: "#9fb2cf", fontFamily: "Plus Jakarta Sans, sans-serif",
+      color: "#64748B", fontFamily: "inherit",
     }}>
       Ачаалж байна...
     </div>

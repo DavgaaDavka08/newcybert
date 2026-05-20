@@ -84,7 +84,7 @@ function NoLivesOverlay({ refillAt, coins, refillCoins, livesCount, onRefillCoin
   );
 }
 
-export function GameScreen({ onNav: _onNav, state, setState }: Props) {
+export function GameScreen({ onNav, state, setState }: Props) {
   const { refreshStats } = useAppState();
   const [topicIdx, setTopicIdx]     = useState(0);
   const [phase, setPhase]           = useState<'map' | 'quiz' | 'result'>('map');
@@ -252,6 +252,7 @@ export function GameScreen({ onNav: _onNav, state, setState }: Props) {
   if (phase === 'map') return (
     <>
       <GameMapPhase state={{ ...state, lives }} topicIdx={topicIdx} onTopicIdx={setTopicIdx} reloadSignal={mapReload}
+        onBackToDashboard={() => onNav('dashboard')}
         onSelectLevel={(topicName, level) => {
           // V2: subtopicId is passed as a string
           if (typeof level === 'string') {

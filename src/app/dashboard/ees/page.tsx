@@ -34,7 +34,7 @@ export default function EesPracticePage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
+    <div style={{ minHeight: "100vh", background: T.bg, fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
       <header
         style={{
           background: "#fff",

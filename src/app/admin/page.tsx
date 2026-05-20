@@ -1,11 +1,13 @@
 "use client";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
+import "./admin.css";
 import { ContentManager } from "@/components/admin/ContentManager";
+import { VideoLessonManager } from "@/components/admin/VideoLessonManager";
 
 // ── Types ─────────────────────────────────────────────────────
-type Tab = "overview" | "content" | "live" | "users" | "questions" | "categories" | "exams";
+type Tab = "overview" | "content" | "live" | "users" | "questions" | "categories" | "exams" | "videos";
 
 interface Toast { id: number; msg: string; type: "ok" | "err"; }
 interface Stats {
@@ -40,7 +42,7 @@ interface LbEntry { name: string; initials: string; score: number; streak: numbe
 
 // ── Defaults ──────────────────────────────────────────────────
 const EMPTY_Q = { categoryId: "", level: 1, question: "", options: ["", "", "", ""], correctIndex: 0, explanation: "", difficulty: "medium", xpReward: 10, coinReward: 5 };
-const EMPTY_CAT = { name: "", icon: "", color: "#4F46E5", totalLevels: 5, order: 0 };
+const EMPTY_CAT = { name: "", icon: "", color: "#4F46E5", totalLevels: 5, order: 0, isActive: true };
 const EMPTY_EXAM = { title: "", description: "", duration: 60, questions: [{ id: "1", question: "", options: [{ id: "A", text: "" }, { id: "B", text: "" }, { id: "C", text: "" }, { id: "D", text: "" }], correctAnswer: "A" }] };
 const PAGE_SIZE = 20;
 
@@ -84,7 +86,8 @@ export default function AdminPage() {
   const [selectedExam, setSelectedExam] = useState<ExamItem | null>(null);
 
   // UI
-  const [search, setSearch] = useState("");
+  const [userSearch, setUserSearch] = useState("");
+  const [questionSearch, setQuestionSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("all");
   const [qCatFilter, setQCatFilter] = useState("all");
   const [qDiffFilter, setQDiffFilter] = useState("all");
@@ -107,7 +110,7 @@ export default function AdminPage() {
   // Auth guard
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
-    if (status === "authenticated" && (session?.user as any)?.role !== "admin") router.replace("/dashboard");
+    if (status === "authenticated" && session?.user?.role !== "admin") router.replace("/dashboard");
   }, [status, session, router]);
 
   // ── Loaders ──────────────────────────────────────────────────
@@ -187,12 +190,11 @@ export default function AdminPage() {
   // Tab data loading
   useEffect(() => {
     if (tab === "overview") loadStats();
-    if (tab === "users") { loadUsers(1, userRoleFilter, search); }
-    if (tab === "questions") { loadQuestions(1, qCatFilter, qDiffFilter, search); loadCategories(); }
+    if (tab === "users") loadUsers(1, userRoleFilter, userSearch);
+    if (tab === "questions") { loadQuestions(1, qCatFilter, qDiffFilter, questionSearch); loadCategories(); }
     if (tab === "categories") loadCategories();
     if (tab === "exams") loadExams();
     if (tab === "live") loadLeaderboard();
-    setSearch("");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
@@ -213,7 +215,7 @@ export default function AdminPage() {
         toast("Асуулт нэмэгдлээ");
       }
       closeQModal();
-      loadQuestions(qPage, qCatFilter, qDiffFilter, search);
+      loadQuestions(qPage, qCatFilter, qDiffFilter, questionSearch);
     } catch {
       toast("Хадгалах үед алдаа гарлаа", "err");
     }
@@ -226,7 +228,7 @@ export default function AdminPage() {
       const r = await fetch(`/api/admin/questions?id=${id}`, { method: "DELETE" });
       if (!r.ok) throw new Error();
       toast("Асуулт устгагдлаа");
-      loadQuestions(qPage, qCatFilter, qDiffFilter, search);
+      loadQuestions(qPage, qCatFilter, qDiffFilter, questionSearch);
     } catch {
       toast("Устгах үед алдаа гарлаа", "err");
     }
@@ -287,12 +289,27 @@ export default function AdminPage() {
 
   function openEditCat(c: Category) {
     setEditingCat(c);
-    setCatForm({ name: c.name, icon: c.icon ?? "", color: c.color ?? "#4F46E5", totalLevels: c.totalLevels, order: c.order });
+    setCatForm({ name: c.name, icon: c.icon ?? "", color: c.color ?? "#4F46E5", totalLevels: c.totalLevels, order: c.order, isActive: c.isActive ?? true });
     setCatModal(true);
   }
 
   function closeCatModal() {
     setCatModal(false); setEditingCat(null); setCatForm({ ...EMPTY_CAT });
+  }
+
+  async function toggleCategoryActive(c: Category) {
+    try {
+      const r = await fetch("/api/admin/categories", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: c._id, isActive: !c.isActive }),
+      });
+      if (!r.ok) throw new Error();
+      toast(c.isActive ? "Ангилал идэвхгүй боллоо" : "Ангилал идэвхжлээ");
+      loadCategories();
+    } catch {
+      toast("Алдаа гарлаа", "err");
+    }
   }
 
   // ── Exam CRUD ─────────────────────────────────────────────────
@@ -373,7 +390,7 @@ export default function AdminPage() {
       });
       if (!r.ok) throw new Error();
       toast(!current ? "Premium эрх нэмэгдлээ" : "Premium эрх авагдлаа");
-      loadUsers(userPage, userRoleFilter, search);
+      loadUsers(userPage, userRoleFilter, userSearch);
     } catch {
       toast("Алдаа гарлаа", "err");
     }
@@ -389,7 +406,7 @@ export default function AdminPage() {
       });
       if (!r.ok) throw new Error();
       toast("Дүр өөрчлөгдлөө");
-      loadUsers(userPage, userRoleFilter, search);
+      loadUsers(userPage, userRoleFilter, userSearch);
     } catch {
       toast("Алдаа гарлаа", "err");
     }
@@ -401,7 +418,7 @@ export default function AdminPage() {
       const r = await fetch(`/api/admin/users?userId=${id}`, { method: "DELETE" });
       if (!r.ok) throw new Error();
       toast("Хэрэглэгч устгагдлаа");
-      loadUsers(userPage, userRoleFilter, search);
+      loadUsers(userPage, userRoleFilter, userSearch);
     } catch {
       toast("Устгах үед алдаа гарлаа", "err");
     }
@@ -412,114 +429,25 @@ export default function AdminPage() {
     !examSearch || e.title.toLowerCase().includes(examSearch.toLowerCase())
   );
 
-  const NAV: { id: Tab; label: string; icon: string }[] = [
-    { id: "overview",   label: "Тойм",              icon: "⊞" },
-    { id: "content",    label: "Тоглоомын агуулга", icon: "🎮" },
-    { id: "live",       label: "Тэргүүлэгчид",      icon: "🏆" },
-    { id: "users",      label: "Хэрэглэгчид",       icon: "👥" },
-    { id: "questions",  label: "Асуултын сан",      icon: "❓" },
-    { id: "categories", label: "Ангилал",           icon: "📂" },
-    { id: "exams",      label: "Шалгалтууд",        icon: "📝" },
+  const NAV: { id: Tab; label: string; abbr: string }[] = [
+    { id: "overview",   label: "Тойм",              abbr: "Т" },
+    { id: "content",    label: "Тоглоомын агуулга", abbr: "А" },
+    { id: "live",       label: "Тэргүүлэгчид",      abbr: "Л" },
+    { id: "users",      label: "Хэрэглэгчид",       abbr: "Х" },
+    { id: "questions",  label: "Асуултын сан",      abbr: "?" },
+    { id: "categories", label: "Ангилал",           abbr: "К" },
+    { id: "exams",      label: "Шалгалтууд",        abbr: "Ш" },
+    { id: "videos",     label: "Видео хичээл",      abbr: "В" },
   ];
 
   if (status === "loading") return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Inter, sans-serif", color: "#64748B" }}>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748B" }}>
       Ачаалж байна…
     </div>
   );
 
   return (
-    <>
-      <style>{`
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: "Inter", system-ui, -apple-system, sans-serif; background: #F1F5F9; color: #0F172A; font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
-        button { font-family: inherit; cursor: pointer; border: 0; }
-        input, select, textarea { font-family: inherit; }
-        .shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
-        .sidebar { position: sticky; top: 0; height: 100vh; background: #fff; border-right: 1px solid #E2E8F0; display: flex; flex-direction: column; }
-        .main { min-width: 0; padding: 28px 32px; overflow-y: auto; max-height: 100vh; }
-        .brand { padding: 20px 16px 16px; border-bottom: 1px solid #F1F5F9; }
-        .brand-title { font-size: 15px; font-weight: 700; color: #0F172A; letter-spacing: -.01em; }
-        .brand-sub { font-size: 10px; font-weight: 600; color: #6366F1; text-transform: uppercase; letter-spacing: .08em; margin-top: 1px; }
-        .nav { padding: 10px 8px; flex: 1; }
-        .nav-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border-radius: 7px; background: transparent; color: #64748B; font-size: 13.5px; font-weight: 500; text-align: left; transition: all .12s; margin-bottom: 2px; }
-        .nav-item:hover { background: #F8FAFC; color: #0F172A; }
-        .nav-item.active { background: #EEF2FF; color: #4F46E5; font-weight: 600; }
-        .nav-icon { font-size: 15px; width: 20px; text-align: center; }
-        .user-area { padding: 12px 14px; border-top: 1px solid #F1F5F9; display: flex; align-items: center; gap: 10px; }
-        .avatar { width: 32px; height: 32px; border-radius: 50%; background: #EEF2FF; color: #4F46E5; font-size: 12px; font-weight: 700; display: grid; place-items: center; flex-shrink: 0; }
-        .signout-btn { font-size: 12px; color: #94A3B8; background: transparent; padding: 4px 8px; border-radius: 5px; border: 1px solid #E2E8F0; transition: all .1s; }
-        .signout-btn:hover { color: #DC2626; border-color: #FCA5A5; background: #FEF2F2; }
-        .page-header { margin-bottom: 24px; }
-        .page-title { font-size: 20px; font-weight: 700; color: #0F172A; letter-spacing: -.02em; }
-        .page-sub { font-size: 13px; color: #64748B; margin-top: 3px; }
-        .card { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; }
-        .card-head { padding: 14px 18px; border-bottom: 1px solid #F1F5F9; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-        .card-head h3 { font-size: 14px; font-weight: 600; color: #0F172A; }
-        .card-head .sub { font-size: 12px; color: #94A3B8; margin-top: 1px; }
-        .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
-        .stat-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; padding: 16px 18px; }
-        .stat-label { font-size: 12px; font-weight: 500; color: #64748B; }
-        .stat-value { font-size: 26px; font-weight: 700; color: #0F172A; margin: 8px 0 4px; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-        .stat-trend { font-size: 12px; color: #94A3B8; }
-        .stat-trend.up { color: #16A34A; }
-        .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-        .spacer { flex: 1; }
-        .btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; font-size: 13px; font-weight: 500; background: #fff; color: #374151; border: 1px solid #E2E8F0; border-radius: 7px; transition: all .1s; white-space: nowrap; }
-        .btn:hover { background: #F8FAFC; border-color: #CBD5E1; }
-        .btn.primary { background: #4F46E5; color: #fff; border-color: #4F46E5; }
-        .btn.primary:hover { background: #4338CA; border-color: #4338CA; }
-        .btn.danger { color: #DC2626; }
-        .btn.danger:hover { background: #FEF2F2; border-color: #FCA5A5; }
-        .btn.sm { height: 30px; padding: 0 10px; font-size: 12px; }
-        .btn:disabled { opacity: .5; cursor: not-allowed; }
-        .input, .select, .textarea { width: 100%; height: 36px; padding: 0 10px; background: #fff; border: 1px solid #E2E8F0; border-radius: 7px; color: #0F172A; font-size: 13px; outline: none; transition: border-color .1s, box-shadow .1s; }
-        .textarea { height: auto; padding: 10px; resize: vertical; line-height: 1.5; }
-        .input:focus, .select:focus, .textarea:focus { border-color: #6366F1; box-shadow: 0 0 0 3px rgba(99,102,241,.1); }
-        .label { display: block; font-size: 11px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 5px; }
-        .field { margin-bottom: 14px; }
-        .search-wrap { display: flex; align-items: center; height: 34px; padding: 0 10px; gap: 8px; border: 1px solid #E2E8F0; border-radius: 7px; background: #fff; }
-        .search-wrap input { border: 0; outline: none; flex: 1; font-size: 13px; color: #0F172A; background: transparent; }
-        .table-wrap { border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden; background: #fff; }
-        .table { width: 100%; border-collapse: collapse; }
-        .table th { font-size: 11px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: .05em; padding: 10px 16px; text-align: left; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; }
-        .table td { padding: 12px 16px; font-size: 13px; color: #374151; border-bottom: 1px solid #F8FAFC; vertical-align: middle; }
-        .table tbody tr:last-child td { border-bottom: 0; }
-        .table tbody tr:hover td { background: #FAFBFF; }
-        .row-actions { display: flex; gap: 4px; opacity: 0; transition: opacity .1s; }
-        .table tr:hover .row-actions { opacity: 1; }
-        .pager { padding: 10px 16px; border-top: 1px solid #F1F5F9; display: flex; align-items: center; gap: 8px; font-size: 12px; color: #94A3B8; }
-        .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 5px; }
-        .badge.green { background: #ECFDF5; color: #065F46; }
-        .badge.red { background: #FEF2F2; color: #991B1B; }
-        .badge.amber { background: #FFFBEB; color: #92400E; }
-        .badge.blue { background: #EFF6FF; color: #1D4ED8; }
-        .badge.gray { background: #F1F5F9; color: #475569; }
-        .badge.purple { background: #F5F3FF; color: #6D28D9; }
-        .badge.dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-        .overlay { position: fixed; inset: 0; background: rgba(15,23,42,.4); display: grid; place-items: center; z-index: 100; padding: 20px; animation: fadeIn .1s ease; }
-        .modal { background: #fff; border-radius: 12px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.15); animation: pop .12s ease; }
-        .modal.wide { max-width: 680px; }
-        .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #F1F5F9; position: sticky; top: 0; background: #fff; z-index: 1; }
-        .modal-head h2 { font-size: 16px; font-weight: 700; color: #0F172A; }
-        .modal-body { padding: 18px 20px; }
-        .modal-foot { display: flex; gap: 8px; padding: 14px 20px; border-top: 1px solid #F1F5F9; justify-content: flex-end; position: sticky; bottom: 0; background: #fff; }
-        .close-btn { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 6px; background: transparent; color: #94A3B8; font-size: 18px; transition: all .1s; }
-        .close-btn:hover { background: #F1F5F9; color: #374151; }
-        .empty { padding: 48px 20px; text-align: center; color: #94A3B8; }
-        .empty-icon { font-size: 32px; margin-bottom: 10px; }
-        .empty-title { font-size: 14px; font-weight: 600; color: #475569; margin-bottom: 4px; }
-        .empty-sub { font-size: 13px; }
-        .loading-row td { text-align: center; padding: 32px; color: #94A3B8; }
-        .toast-wrap { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 200; pointer-events: none; }
-        .toast { padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; box-shadow: 0 4px 20px rgba(0,0,0,.12); animation: slideIn .2s ease; }
-        .toast.ok { background: #0F172A; color: #fff; }
-        .toast.err { background: #DC2626; color: #fff; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes pop { from { transform: scale(.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-      `}</style>
-
+    <div className="admin-root">
       <div className="shell">
         {/* ── SIDEBAR ─────────────────────────────────── */}
         <aside className="sidebar">
@@ -530,7 +458,7 @@ export default function AdminPage() {
           <nav className="nav">
             {NAV.map(n => (
               <button key={n.id} className={`nav-item${tab === n.id ? " active" : ""}`} onClick={() => setTab(n.id)}>
-                <span className="nav-icon">{n.icon}</span>
+                <span className="nav-abbr">{n.abbr}</span>
                 {n.label}
               </button>
             ))}
@@ -679,20 +607,20 @@ export default function AdminPage() {
               <div className="toolbar">
                 <div className="search-wrap" style={{ width: 240 }}>
                   <span style={{ color: "#94A3B8" }}>⌕</span>
-                  <input placeholder="Нэр, и-мэйл…" value={search}
-                    onChange={e => { setSearch(e.target.value); }}
+                  <input placeholder="Нэр, и-мэйл…" value={userSearch}
+                    onChange={e => { setUserSearch(e.target.value); }}
                     onKeyDown={e => { if (e.key === "Enter") loadUsers(1, userRoleFilter, (e.target as HTMLInputElement).value); }}
                   />
                 </div>
                 <select className="select" style={{ width: 140 }} value={userRoleFilter}
-                  onChange={e => { setUserRoleFilter(e.target.value); loadUsers(1, e.target.value, search); }}>
+                  onChange={e => { setUserRoleFilter(e.target.value); loadUsers(1, e.target.value, userSearch); }}>
                   <option value="all">Бүх дүр</option>
                   <option value="student">Сурагч</option>
                   <option value="teacher">Багш</option>
                   <option value="admin">Admin</option>
                 </select>
                 <div className="spacer" />
-                <button className="btn" onClick={() => loadUsers(1, userRoleFilter, search)}>Хайх</button>
+                <button className="btn" onClick={() => loadUsers(1, userRoleFilter, userSearch)}>Хайх</button>
               </div>
               <div className="table-wrap">
                 <table className="table">
@@ -759,8 +687,8 @@ export default function AdminPage() {
                 <div className="pager">
                   <span>{users.length ? `${(userPage - 1) * PAGE_SIZE + 1}–${Math.min(userPage * PAGE_SIZE, userTotal)} / ${userTotal}` : "0"}</span>
                   <div className="spacer" />
-                  <button className="btn sm" disabled={userPage <= 1} onClick={() => loadUsers(userPage - 1, userRoleFilter, search)}>‹ Өмнөх</button>
-                  <button className="btn sm" disabled={userPage * PAGE_SIZE >= userTotal} onClick={() => loadUsers(userPage + 1, userRoleFilter, search)}>Дараах ›</button>
+                  <button className="btn sm" disabled={userPage <= 1} onClick={() => loadUsers(userPage - 1, userRoleFilter, userSearch)}>‹ Өмнөх</button>
+                  <button className="btn sm" disabled={userPage * PAGE_SIZE >= userTotal} onClick={() => loadUsers(userPage + 1, userRoleFilter, userSearch)}>Дараах ›</button>
                 </div>
               </div>
             </div>
@@ -775,12 +703,12 @@ export default function AdminPage() {
               </div>
               <div className="toolbar">
                 <select className="select" style={{ width: 160 }} value={qCatFilter}
-                  onChange={e => { setQCatFilter(e.target.value); loadQuestions(1, e.target.value, qDiffFilter, search); }}>
+                  onChange={e => { setQCatFilter(e.target.value); loadQuestions(1, e.target.value, qDiffFilter, questionSearch); }}>
                   <option value="all">Бүх ангилал</option>
                   {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
                 </select>
                 <select className="select" style={{ width: 120 }} value={qDiffFilter}
-                  onChange={e => { setQDiffFilter(e.target.value); loadQuestions(1, qCatFilter, e.target.value, search); }}>
+                  onChange={e => { setQDiffFilter(e.target.value); loadQuestions(1, qCatFilter, e.target.value, questionSearch); }}>
                   <option value="all">Бүх түвшин</option>
                   <option value="easy">Хялбар</option>
                   <option value="medium">Дунд</option>
@@ -788,12 +716,12 @@ export default function AdminPage() {
                 </select>
                 <div className="search-wrap" style={{ width: 220 }}>
                   <span style={{ color: "#94A3B8" }}>⌕</span>
-                  <input placeholder="Асуулт хайх…" value={search}
-                    onChange={e => setSearch(e.target.value)}
+                  <input placeholder="Асуулт хайх…" value={questionSearch}
+                    onChange={e => setQuestionSearch(e.target.value)}
                     onKeyDown={e => { if (e.key === "Enter") loadQuestions(1, qCatFilter, qDiffFilter, (e.target as HTMLInputElement).value); }}
                   />
                 </div>
-                <button className="btn" onClick={() => loadQuestions(1, qCatFilter, qDiffFilter, search)}>Хайх</button>
+                <button className="btn" onClick={() => loadQuestions(1, qCatFilter, qDiffFilter, questionSearch)}>Хайх</button>
                 <div className="spacer" />
                 <button className="btn primary" onClick={() => { setEditingQ(null); setQForm({ ...EMPTY_Q }); setQModal(true); }}>+ Асуулт нэмэх</button>
               </div>
@@ -840,8 +768,8 @@ export default function AdminPage() {
                 <div className="pager">
                   <span>{questions.length ? `${(qPage - 1) * PAGE_SIZE + 1}–${Math.min(qPage * PAGE_SIZE, qTotal)} / ${qTotal}` : "0"}</span>
                   <div className="spacer" />
-                  <button className="btn sm" disabled={qPage <= 1} onClick={() => loadQuestions(qPage - 1, qCatFilter, qDiffFilter, search)}>‹ Өмнөх</button>
-                  <button className="btn sm" disabled={qPage * PAGE_SIZE >= qTotal} onClick={() => loadQuestions(qPage + 1, qCatFilter, qDiffFilter, search)}>Дараах ›</button>
+                  <button className="btn sm" disabled={qPage <= 1} onClick={() => loadQuestions(qPage - 1, qCatFilter, qDiffFilter, questionSearch)}>‹ Өмнөх</button>
+                  <button className="btn sm" disabled={qPage * PAGE_SIZE >= qTotal} onClick={() => loadQuestions(qPage + 1, qCatFilter, qDiffFilter, questionSearch)}>Дараах ›</button>
                 </div>
               </div>
             </div>
@@ -858,7 +786,7 @@ export default function AdminPage() {
                 <button className="btn primary" onClick={() => { setEditingCat(null); setCatForm({ ...EMPTY_CAT }); setCatModal(true); }}>+ Ангилал нэмэх</button>
               </div>
               {categories.length === 0 ? (
-                <div className="card"><div className="empty"><div className="empty-icon">📂</div><div className="empty-title">Ангилал байхгүй байна</div><div className="empty-sub">Дээрх товчоор анхны ангилалаа нэмнэ үү</div></div></div>
+                <div className="card"><div className="empty"><div className="empty-title">Ангилал байхгүй байна</div><div className="empty-sub">Дээрх товчоор анхны ангилалаа нэмнэ үү</div></div></div>
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
                   {categories.map(c => (
@@ -868,7 +796,15 @@ export default function AdminPage() {
                           <div style={{ width: 40, height: 40, borderRadius: 10, background: `${c.color}18`, color: c.color, display: "grid", placeItems: "center", fontSize: 18, fontWeight: 700 }}>
                             {c.icon?.trim() || c.name?.[0]?.toUpperCase() || "?"}
                           </div>
-                          <span className={`badge ${c.isActive ? "green dot" : "gray"}`}>{c.isActive ? "Идэвхтэй" : "Идэвхгүй"}</span>
+                          <button
+                            type="button"
+                            className={`badge ${c.isActive ? "green dot" : "gray"}`}
+                            style={{ cursor: "pointer", border: "none" }}
+                            onClick={() => toggleCategoryActive(c)}
+                            title="Идэвхжүүлэх / идэвхгүй болгох"
+                          >
+                            {c.isActive ? "Идэвхтэй" : "Идэвхгүй"}
+                          </button>
                         </div>
                         <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>{c.name}</div>
                         <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 14 }}>{c.totalLevels} level · Дараалал {c.order}</div>
@@ -907,7 +843,7 @@ export default function AdminPage() {
                   </div>
                   <div className="table-wrap">
                     {filteredExams.length === 0 ? (
-                      <div className="empty"><div className="empty-icon">📝</div><div className="empty-title">{examSearch ? "Тохирох шалгалт олдсонгүй" : "Шалгалт байхгүй байна"}</div></div>
+                      <div className="empty"><div className="empty-title">{examSearch ? "Тохирох шалгалт олдсонгүй" : "Шалгалт байхгүй байна"}</div></div>
                     ) : (
                       <table className="table">
                         <thead>
@@ -990,6 +926,8 @@ export default function AdminPage() {
               </div>
             </div>
           )}
+
+          {tab === "videos" && <VideoLessonManager />}
         </main>
       </div>
 
@@ -1096,6 +1034,10 @@ export default function AdminPage() {
                   <input type="number" className="input" value={catForm.order} min={0} onChange={e => setCatForm(f => ({ ...f, order: +e.target.value }))} />
                 </div>
               </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, fontSize: 13, color: "#374151", cursor: "pointer" }}>
+                <input type="checkbox" checked={catForm.isActive} onChange={e => setCatForm(f => ({ ...f, isActive: e.target.checked }))} style={{ accentColor: "#4F46E5", width: 16, height: 16 }} />
+                Идэвхтэй ангилал (тоглоомд харагдана)
+              </label>
             </div>
             <div className="modal-foot">
               <button className="btn" onClick={closeCatModal}>Болих</button>
@@ -1164,11 +1106,11 @@ export default function AdminPage() {
       )}
 
       {/* ── TOASTS ──────────────────────────────────── */}
-      <div className="toast-wrap">
+      <div className="admin-toast-wrap">
         {toasts.map(t => (
-          <div key={t.id} className={`toast ${t.type}`}>{t.msg}</div>
+          <div key={t.id} className={`admin-toast ${t.type}`}>{t.msg}</div>
         ))}
       </div>
-    </>
+    </div>
   );
 }

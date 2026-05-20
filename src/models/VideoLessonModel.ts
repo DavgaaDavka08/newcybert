@@ -1,8 +1,11 @@
 import mongoose, { Schema } from "mongoose";
 
+export type VideoLessonMediaType = "video" | "pdf";
+
 export interface IVideoLesson {
   title: string;
   description: string;
+  mediaType: VideoLessonMediaType;
   publicId: string;
   url: string;
   thumbnailUrl?: string;
@@ -17,6 +20,7 @@ const VideoLessonSchema = new Schema(
   {
     title: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
+    mediaType: { type: String, enum: ["video", "pdf"], default: "video" },
     publicId: { type: String, required: true },
     url: { type: String, required: true },
     thumbnailUrl: { type: String },

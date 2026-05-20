@@ -11,12 +11,21 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const categoryId = searchParams.get("categoryId");
   const level = searchParams.get("level");
+  const difficulty = searchParams.get("difficulty");
+  const search = searchParams.get("search")?.trim();
   const page = parseInt(searchParams.get("page") ?? "1");
   const limit = parseInt(searchParams.get("limit") ?? "20");
 
-  const query: any = {};
+  const query: Record<string, unknown> = {};
   if (categoryId) query.categoryId = categoryId;
   if (level) query.level = parseInt(level);
+  if (difficulty && difficulty !== "all") query.difficulty = difficulty;
+  if (search) {
+    query.$or = [
+      { question: { $regex: search, $options: "i" } },
+      { explanation: { $regex: search, $options: "i" } },
+    ];
+  }
 
   await connectDB();
   const [questions, total] = await Promise.all([

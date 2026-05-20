@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   try {
     await connectDB();
     const topicId = req.nextUrl.searchParams.get('topicId');
-    const query = topicId ? { topicId, isActive: true } : { isActive: true };
+    const query = topicId ? { topicId } : {};
     const subtopics = await SubtopicModel.find(query).sort({ order: 1 }).lean();
     return NextResponse.json({ subtopics });
   } catch {

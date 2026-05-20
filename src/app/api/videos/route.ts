@@ -4,6 +4,7 @@ import type { Session } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { connectDB } from "@/lib/mongodb";
 import { VideoLessonModel } from "@/models/VideoLessonModel";
+import { VideoProgressModel } from "@/models/VideoProgressModel";
 
 export async function GET(req: NextRequest) {
   try {
@@ -29,7 +30,14 @@ export async function GET(req: NextRequest) {
     }
 
     const rows = await VideoLessonModel.find().sort({ createdAt: -1 }).lean();
-    return NextResponse.json(rows);
+
+    let completedIds: string[] = [];
+    if (session?.user?.id && session.user.id !== "admin-hardcoded") {
+      const progress = await VideoProgressModel.find({ userId: session.user.id }, { videoId: 1 }).lean();
+      completedIds = progress.map((p) => String(p.videoId));
+    }
+
+    return NextResponse.json({ videos: rows, completedIds });
   } catch (err: unknown) {
     const m = err instanceof Error ? err.message : "Server error";
     console.error("[GET /api/videos]", m);
@@ -46,7 +54,8 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { title, description, publicId, url, thumbnailUrl, durationSec, width, height } = body;
+    const { title, description, mediaType, publicId, url, thumbnailUrl, durationSec, width, height } = body;
+    const type = mediaType === "pdf" ? "pdf" : "video";
 
     if (!title?.trim()) {
       return NextResponse.json({ error: "Гарчиг оруулна уу" }, { status: 400 });
@@ -60,9 +69,10 @@ export async function POST(req: NextRequest) {
     const doc = await VideoLessonModel.create({
       title: title.trim(),
       description: typeof description === "string" ? description : "",
+      mediaType: type,
       publicId: String(publicId).trim(),
       url: String(url).trim(),
-      thumbnailUrl: thumbnailUrl ? String(thumbnailUrl) : undefined,
+      thumbnailUrl: type === "pdf" ? undefined : thumbnailUrl ? String(thumbnailUrl) : undefined,
       durationSec: typeof durationSec === "number" ? durationSec : undefined,
       width: typeof width === "number" ? width : undefined,
       height: typeof height === "number" ? height : undefined,

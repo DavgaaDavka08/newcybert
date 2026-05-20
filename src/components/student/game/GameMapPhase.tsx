@@ -276,8 +276,70 @@ interface Props {
   topicIdx: number;
   onTopicIdx: (i: number) => void;
   onSelectLevel: (topic: string, level: number | string) => void;
+  onBackToDashboard?: () => void;
   /** Increment after server path sync so the map re-reads localStorage. */
   reloadSignal?: number;
+}
+
+function MapStatsBar({ state, onBackToDashboard }: { state: AppState; onBackToDashboard?: () => void }) {
+  return (
+    <div
+      style={{
+        position: 'relative',
+        zIndex: 2,
+        flexShrink: 0,
+        padding: '10px 20px',
+        background: 'rgba(5,10,22,0.6)',
+        backdropFilter: 'blur(14px)',
+        borderBottom: '1px solid rgba(120,180,255,0.10)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 16,
+      }}
+    >
+      {onBackToDashboard ? (
+        <button
+          type="button"
+          onClick={onBackToDashboard}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '8px 14px',
+            borderRadius: 10,
+            border: '1px solid rgba(255,255,255,0.14)',
+            background: 'rgba(255,255,255,0.08)',
+            color: '#eaf2ff',
+            fontWeight: 700,
+            fontSize: 13,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            flexShrink: 0,
+          }}
+        >
+          <Ic n="chevLeft" size={16} color="#eaf2ff" />
+          Нүүр хуудас
+        </button>
+      ) : (
+        <div />
+      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginLeft: 'auto' }}>
+        {[
+          { icon: 'award', val: state.xp, clr: '#c4b5fd', bg: 'rgba(139,92,246,.18)' },
+          { icon: 'coin', val: state.coins, clr: '#fde68a', bg: 'rgba(245,184,0,.18)' },
+          { icon: 'flame', val: `${state.streak} өдөр`, clr: '#fca5a5', bg: 'rgba(239,68,68,.18)' },
+        ].map((s, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: '#9fb2cf', fontWeight: 600 }}>
+            <div style={{ width: 26, height: 26, borderRadius: 7, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Ic n={s.icon} size={13} color={s.clr} />
+            </div>
+            <span style={{ fontWeight: 800, color: '#eaf2ff' }}>{s.val}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // ── V2: Single subtopic node ───────────────────────────────────
@@ -410,7 +472,7 @@ function SubtopicSection({ topic, subtopicStars, onSelectSubtopic }: {
   );
 }
 
-export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicIdx, onSelectLevel, reloadSignal = 0 }: Props) {
+export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicIdx, onSelectLevel, onBackToDashboard, reloadSignal = 0 }: Props) {
   const [topics, setTopicsState]     = useState<GameTopic[]>([]);
   const [topicsV2, setTopicsV2State] = useState<GameTopicWithSubtopics[]>([]);
   const [stars, setStars]            = useState<Record<string, number[]>>({});
@@ -433,20 +495,7 @@ export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicI
     return (
       <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: 'Plus Jakarta Sans, sans-serif', position: 'relative' }}>
         <AtmosphereLayer />
-        <div style={{ position: 'relative', zIndex: 2, flexShrink: 0, padding: '10px 24px', background: 'rgba(5,10,22,0.6)', backdropFilter: 'blur(14px)', borderBottom: '1px solid rgba(120,180,255,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 20 }}>
-          {[
-            { icon: 'award', val: state.xp,                clr: '#c4b5fd', bg: 'rgba(139,92,246,.18)' },
-            { icon: 'coin',  val: state.coins,             clr: '#fde68a', bg: 'rgba(245,184,0,.18)'  },
-            { icon: 'flame', val: `${state.streak} өдөр`, clr: '#fca5a5', bg: 'rgba(239,68,68,.18)'  },
-          ].map((s, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: '#9fb2cf', fontWeight: 600 }}>
-              <div style={{ width: 26, height: 26, borderRadius: 7, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Ic n={s.icon} size={13} color={s.clr} />
-              </div>
-              <span style={{ fontWeight: 800, color: '#eaf2ff' }}>{s.val}</span>
-            </div>
-          ))}
-        </div>
+        <MapStatsBar state={state} onBackToDashboard={onBackToDashboard} />
         <div style={{ flex: 1, overflowY: 'auto', position: 'relative', zIndex: 2 }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '44px 24px 100px' }}>
             <div style={{ width: '100%', maxWidth: 480 }}>
@@ -494,21 +543,7 @@ export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicI
     <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: 'Plus Jakarta Sans, sans-serif', position: 'relative' }}>
       <AtmosphereLayer />
 
-      {/* Stats bar */}
-      <div style={{ position: 'relative', zIndex: 2, flexShrink: 0, padding: '10px 24px', background: 'rgba(5,10,22,0.6)', backdropFilter: 'blur(14px)', borderBottom: '1px solid rgba(120,180,255,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 20 }}>
-        {[
-          { icon: 'award', val: state.xp,                clr: '#c4b5fd', bg: 'rgba(139,92,246,.18)' },
-          { icon: 'coin',  val: state.coins,             clr: '#fde68a', bg: 'rgba(245,184,0,.18)'  },
-          { icon: 'flame', val: `${state.streak} өдөр`, clr: '#fca5a5', bg: 'rgba(239,68,68,.18)'  },
-        ].map((s, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: '#9fb2cf', fontWeight: 600 }}>
-            <div style={{ width: 26, height: 26, borderRadius: 7, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Ic n={s.icon} size={13} color={s.clr} />
-            </div>
-            <span style={{ fontWeight: 800, color: '#eaf2ff' }}>{s.val}</span>
-          </div>
-        ))}
-      </div>
+      <MapStatsBar state={state} onBackToDashboard={onBackToDashboard} />
 
       {/* Scrollable map */}
       <div style={{ flex: 1, overflowY: 'auto', position: 'relative', zIndex: 2 }}>

@@ -47,7 +47,7 @@ export default function ExamListPage() {
             <Ic n="chevLeft" size={16} /> Буцах
           </button>
           <div style={{ width: 1, height: 20, background: T.border }} />
-          <div style={{ fontWeight: 800, fontSize: 16, color: T.text }}>📝 Шалгалтууд</div>
+          <div style={{ fontWeight: 800, fontSize: 16, color: T.text }}>Шалгалтууд</div>
         </div>
         <div style={{ fontSize: 13, color: T.muted }}>
           Сайн уу, {session?.user?.name?.split(" ")[0]}
@@ -57,7 +57,7 @@ export default function ExamListPage() {
       <div style={{ maxWidth: 800, margin: "0 auto", padding: "32px 24px" }}>
         {/* Hero */}
         <div style={{ background: "linear-gradient(120deg, #1e3a8a 0%, #4F46E5 100%)", borderRadius: 18, padding: "24px 28px", marginBottom: 28, color: "#fff", boxShadow: "0 8px 32px rgba(79,70,229,0.25)" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(255,255,255,0.7)", marginBottom: 6 }}>📝 Шалгалтын систем</div>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(255,255,255,0.7)", marginBottom: 6 }}>Шалгалтын систем</div>
           <div style={{ fontWeight: 900, fontSize: 20, marginBottom: 8 }}>Шалгалт өгч мэдлэгээ шалга</div>
           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.75)" }}>Хугацаатай асуултуудад хариулж, үр дүнгээ шууд харна уу.</div>
         </div>
@@ -65,7 +65,7 @@ export default function ExamListPage() {
         {/* Exam list */}
         {exams.length === 0 ? (
           <div style={{ textAlign: "center", padding: "64px 0", color: T.muted }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+            <Ic n="task" size={40} color={T.muted} style={{ marginBottom: 12, opacity: 0.45 }} />
             <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Шалгалт байхгүй байна</div>
             <div style={{ fontSize: 13 }}>Admin шинэ шалгалт нэмэхийг хүлээнэ үү</div>
           </div>
@@ -96,7 +96,7 @@ function ExamCard({ exam, onStart }: { exam: Exam; onStart: () => void }) {
       <div style={{ flex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: done ? T.greenLight : "#EEF2FF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
-            {done ? "✅" : "📝"}
+            <Ic n={done ? "check" : "task"} size={18} color={done ? T.green : T.blue} />
           </div>
           <div>
             <div style={{ fontWeight: 800, fontSize: 15, color: T.text }}>{exam.title}</div>

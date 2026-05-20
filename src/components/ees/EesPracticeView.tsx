@@ -1,18 +1,26 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
 import { T } from "@/styles/tokens";
 import { Ic } from "@/components/ui/Icon";
 import {
   buildEesQuestions,
   EES_META,
-  QUESTION_TAB_LABELS,
+  getQuestionTabLabels,
   REFERENCE_TEXT,
   type EesOption,
+  type EesQuestion,
 } from "@/lib/ees-data";
-import { VoltmeterIllustration } from "./VoltmeterIllustration";
+import { ExamFigure } from "./ExamFigure";
+import {
+  clearEesState,
+  formatTimer,
+  loadEesState,
+  saveEesState,
+} from "@/lib/ees-storage";
 
-type Phase = "hub" | "quiz";
+type Phase = "hub" | "quiz" | "finished";
 
 function MiniHeart({ filled }: { filled: boolean }) {
   return (
@@ -27,24 +35,110 @@ function MiniCopy() {
 }
 
 export function EesPracticeView() {
+  const { data: session, update: updateSession } = useSession();
   const questions = useMemo(() => buildEesQuestions(), []);
+  const tabLabels = useMemo(() => getQuestionTabLabels(questions), [questions]);
+  const choiceQuestions = useMemo(() => questions.filter((q) => q.type === "choice"), [questions]);
+
   const [phase, setPhase] = useState<Phase>("hub");
   const [hubTab, setHubTab] = useState(0);
   const [refOpen, setRefOpen] = useState(true);
   const [qIndex, setQIndex] = useState(0);
   const [favorites, setFavorites] = useState<Set<number>>(() => new Set());
   const [answers, setAnswers] = useState<Record<number, EesOption["id"]>>({});
+  const [solutionsUnlocked, setSolutionsUnlocked] = useState<Set<number>>(() => new Set());
   const [solutionOpenFor, setSolutionOpenFor] = useState<number | null>(null);
-  const [mockCoins, setMockCoins] = useState(5);
+  const [coins, setCoins] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [timeLeft, setTimeLeft] = useState(EES_META.durationMin * 60);
+  const [hydrated, setHydrated] = useState(false);
+
+  const pillsRef = useRef<HTMLDivElement>(null);
+  const pillRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const pushToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2600);
   }, []);
 
-  const previewQ = questions[Math.min(hubTab, questions.length - 1)];
+  // Load saved progress + user coins
+  useEffect(() => {
+    const saved = loadEesState();
+    if (saved) {
+      setAnswers(saved.answers ?? {});
+      setFavorites(new Set(saved.favorites ?? []));
+      setHubTab(saved.hubTab ?? 0);
+      setSolutionsUnlocked(new Set(saved.solutionsUnlocked ?? []));
+    }
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    saveEesState({
+      answers,
+      favorites: [...favorites],
+      hubTab,
+      solutionsUnlocked: [...solutionsUnlocked],
+    });
+  }, [answers, favorites, hubTab, solutionsUnlocked, hydrated]);
+
+  useEffect(() => {
+    const fromSession = session?.user?.coins;
+    if (typeof fromSession === "number") {
+      setCoins(fromSession);
+      return;
+    }
+    fetch("/api/user/stats")
+      .then((r) => r.json())
+      .then((d) => {
+        if (typeof d.coins === "number") setCoins(d.coins);
+      })
+      .catch(() => setCoins(0));
+  }, [session?.user?.coins]);
+
+  // Quiz timer
+  useEffect(() => {
+    if (phase !== "quiz" || timeLeft <= 0) return;
+    const id = window.setInterval(() => {
+      setTimeLeft((t) => {
+        if (t <= 1) {
+          window.clearInterval(id);
+          setPhase("finished");
+          pushToast("Цаг дууслаа. Үр дүнг харна уу.");
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [phase, timeLeft, pushToast]);
+
+  // Scroll active pill into view
+  useEffect(() => {
+    const idx = phase === "hub" ? hubTab : qIndex;
+    pillRefs.current[idx]?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [hubTab, qIndex, phase]);
+
+  const activeIndex = phase === "hub" ? hubTab : qIndex;
+  const previewQ = questions[Math.min(activeIndex, questions.length - 1)];
   const current = questions[qIndex];
+  const answeredCount = Object.keys(answers).length;
+
+  const score = useMemo(() => {
+    let correct = 0;
+    let points = 0;
+    let maxPoints = 0;
+    questions.forEach((q, i) => {
+      if (q.type !== "choice") return;
+      maxPoints += q.points;
+      if (answers[i] === q.correctId) {
+        correct += 1;
+        points += q.points;
+      }
+    });
+    return { correct, points, total: choiceQuestions.length, maxPoints };
+  }, [answers, questions, choiceQuestions.length]);
 
   const toggleFav = (idx: number) => {
     setFavorites((prev) => {
@@ -55,26 +149,86 @@ export function EesPracticeView() {
     });
   };
 
-  const startQuiz = () => {
-    setQIndex(Math.min(hubTab, questions.length - 1));
-    setPhase("quiz");
+  const goToQuestion = (i: number) => {
+    const clamped = Math.max(0, Math.min(questions.length - 1, i));
+    if (phase === "hub") setHubTab(clamped);
+    else setQIndex(clamped);
+    setSolutionOpenFor(solutionsUnlocked.has(clamped) ? clamped : null);
   };
 
-  const buySolution = () => {
+  const startQuiz = () => {
+    setQIndex(Math.min(hubTab, questions.length - 1));
+    setTimeLeft(EES_META.durationMin * 60);
+    setPhase("quiz");
+    pushToast("Сорил эхэллээ. Амжилт хүсье!");
+  };
+
+  const resetProgress = () => {
+    if (!confirm("Бүх хариулт, дуртай болон явцыг цэвэрлэх үү?")) return;
+    setAnswers({});
+    setFavorites(new Set());
+    setSolutionsUnlocked(new Set());
+    setSolutionOpenFor(null);
+    setHubTab(0);
+    setQIndex(0);
+    setPhase("hub");
+    setTimeLeft(EES_META.durationMin * 60);
+    clearEesState();
+    pushToast("Сонголтууд цэвэрлэгдлээ.");
+  };
+
+  const finishQuiz = () => {
+    setPhase("finished");
+  };
+
+  const buySolution = async () => {
     if (solutionOpenFor === qIndex) {
       setSolutionOpenFor(null);
       return;
     }
-    if (mockCoins < 1) {
-      pushToast("Зоос хүрэлцэхгүй байна (жишээ дэмо).");
+    if (solutionsUnlocked.has(qIndex)) {
+      setSolutionOpenFor(qIndex);
       return;
     }
-    setMockCoins((c) => c - 1);
-    setSolutionOpenFor(qIndex);
+    const balance = coins ?? session?.user?.coins ?? 0;
+    if (balance < 1) {
+      pushToast("Зоос хүрэлцэхгүй байна.");
+      return;
+    }
+    try {
+      const r = await fetch("/api/user/award-xp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ coins: -1, reason: "ees-solution" }),
+      });
+      const d = await r.json();
+      if (!r.ok) {
+        pushToast(d.error ?? "Зоос хасахад алдаа гарлаа");
+        return;
+      }
+      setCoins(d.coins);
+      await updateSession?.({ coins: d.coins });
+      setSolutionsUnlocked((prev) => new Set([...prev, qIndex]));
+      setSolutionOpenFor(qIndex);
+    } catch {
+      pushToast("Сүлжээний алдаа");
+    }
   };
 
   const selectAnswer = (id: EesOption["id"]) => {
-    setAnswers((a) => ({ ...a, [qIndex]: id }));
+    const q = questions[activeIndex];
+    if (q?.type !== "choice") return;
+    setAnswers((a) => ({ ...a, [activeIndex]: id }));
+  };
+
+  const copyQuestion = async (q: typeof previewQ) => {
+    const text = `${q.displayNum}. ${q.text}\n${q.options.map((o) => `${o.id}. ${o.text}`).join("\n")}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      pushToast("Асуулт хуулагдлаа");
+    } catch {
+      pushToast("Хуулах боломжгүй");
+    }
   };
 
   const gridBg = {
@@ -83,8 +237,16 @@ export function EesPracticeView() {
     backgroundSize: "18px 18px",
   } as const;
 
+  if (!hydrated) {
+    return (
+      <div style={{ ...gridBg, minHeight: 200, display: "flex", alignItems: "center", justifyContent: "center", color: T.muted, fontSize: 14 }}>
+        Ачаалж байна…
+      </div>
+    );
+  }
+
   return (
-    <div style={{ ...gridBg, minHeight: "100%", paddingBottom: 40, fontFamily: '"Plus Jakarta Sans", system-ui, sans-serif' }}>
+    <div style={{ ...gridBg, minHeight: "calc(100vh - 56px)", paddingBottom: 48, fontFamily: '"Plus Jakarta Sans", system-ui, sans-serif' }}>
       {toast && (
         <div
           style={{
@@ -107,14 +269,17 @@ export function EesPracticeView() {
       )}
 
       <div style={{ maxWidth: 560, margin: "0 auto", padding: "20px 18px 0" }}>
-        {/* Title */}
-        <h1 style={{ margin: "8px 0 14px", textAlign: "center", fontSize: 22, fontWeight: 900, color: "#1e3a8a", letterSpacing: "-0.02em", lineHeight: 1.25 }}>
+        <h1 style={{ margin: "8px 0 6px", textAlign: "center", fontSize: 22, fontWeight: 900, color: "#1e3a8a", letterSpacing: "-0.02em", lineHeight: 1.25 }}>
           {EES_META.title}
         </h1>
+        <p style={{ textAlign: "center", fontSize: 13, color: T.muted, marginBottom: 14 }}>
+          {EES_META.subtitle} · Нэгдүгээр хэсэг {EES_META.totalQuestions} · Хоёрдугаар хэсэг {EES_META.part2Count}
+        </p>
 
         {/* Question pills */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
           <div
+            ref={pillsRef}
             style={{
               flex: 1,
               display: "flex",
@@ -125,43 +290,43 @@ export function EesPracticeView() {
               WebkitOverflowScrolling: "touch",
             }}
           >
-            {QUESTION_TAB_LABELS.map((label, i) => {
-              const active = phase === "hub" ? i === hubTab : i === qIndex;
+            {tabLabels.map((label, i) => {
+              const active = i === activeIndex;
+              const answered = questions[i]?.type === "choice" && answers[i] != null;
+              const fav = favorites.has(i);
               return (
                 <button
                   key={`${label}-${i}`}
+                  ref={(el) => { pillRefs.current[i] = el; }}
                   type="button"
-                  onClick={() => {
-                    if (phase === "hub") setHubTab(i);
-                    else setQIndex(i);
-                  }}
+                  onClick={() => goToQuestion(i)}
                   style={{
                     flexShrink: 0,
                     minWidth: 36,
                     height: 36,
                     borderRadius: 10,
-                    border: active ? `2px solid ${T.purple}` : `1px solid ${T.border}`,
-                    background: "#fff",
+                    border: active ? `2px solid ${T.purple}` : answered ? `2px solid ${T.green}` : `1px solid ${T.border}`,
+                    background: active ? "#faf5ff" : answered ? "#f0fdf4" : "#fff",
                     fontWeight: 700,
                     fontSize: 12,
-                    color: active ? T.purple : T.textSub,
+                    color: active ? T.purple : answered ? T.green : T.textSub,
                     cursor: "pointer",
                     boxShadow: active ? `0 2px 10px ${T.purple}33` : T.shadow,
+                    position: "relative",
                   }}
                 >
                   {label}
+                  {fav && (
+                    <span style={{ position: "absolute", top: 2, right: 3, fontSize: 8, color: T.red }}>♥</span>
+                  )}
                 </button>
               );
             })}
           </div>
           <button
             type="button"
-            title="Шинэчлэх"
-            onClick={() => {
-              setAnswers({});
-              setSolutionOpenFor(null);
-              pushToast("Сонголтууд цэвэрлэгдлээ.");
-            }}
+            title="Дахин эхлэх"
+            onClick={resetProgress}
             style={{
               width: 40,
               height: 40,
@@ -180,10 +345,17 @@ export function EesPracticeView() {
           </button>
         </div>
 
-        {/* Start bar */}
+        {/* Start / timer bar */}
         <button
           type="button"
-          onClick={phase === "hub" ? startQuiz : () => setPhase("hub")}
+          onClick={() => {
+            if (phase === "hub") startQuiz();
+            else if (phase === "quiz") setPhase("hub");
+            else {
+              setPhase("hub");
+              setTimeLeft(EES_META.durationMin * 60);
+            }
+          }}
           style={{
             width: "100%",
             border: "none",
@@ -203,7 +375,7 @@ export function EesPracticeView() {
         >
           <span style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 800, fontSize: 15 }}>
             <Ic n="exam" size={22} color="#fff" />
-            {phase === "hub" ? "СОРИЛ ӨГӨХ" : "ҮЗЭЖ БАЙНА — БУЦАХ"}
+            {phase === "hub" ? "СОРИЛ ӨГӨХ" : phase === "quiz" ? "ҮЗЭЖ БАЙНА — БУЦАХ" : "ДАХИН ЭХЛЭХ"}
           </span>
           <span
             style={{
@@ -215,12 +387,25 @@ export function EesPracticeView() {
               borderRadius: 999,
               fontWeight: 700,
               fontSize: 13,
+              fontVariantNumeric: "tabular-nums",
             }}
           >
-            {EES_META.durationMin} минут
+            {phase === "quiz" ? formatTimer(timeLeft) : `${EES_META.durationMin} минут`}
             <Ic n="chevRight" size={16} color="#fff" />
           </span>
         </button>
+
+        {phase === "quiz" && (
+          <div style={{ marginBottom: 12, fontSize: 12, color: T.muted, textAlign: "center" }}>
+            Хариулсан: <strong style={{ color: T.text }}>{answeredCount}</strong> / {questions.length}
+            {coins != null && (
+              <>
+                {" · "}
+                Зоос: <strong style={{ color: T.text }}>{coins}</strong>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Reference */}
         <div
@@ -260,157 +445,216 @@ export function EesPracticeView() {
           )}
         </div>
 
-        {phase === "hub" ? (
-          <QuestionCard
-            q={previewQ}
-            qIndex={Math.min(hubTab, questions.length - 1)}
-            selected={answers[Math.min(hubTab, questions.length - 1)]}
-            onSelect={() => {}}
-            readOnly
-            favorites={favorites}
-            onToggleFav={() => toggleFav(Math.min(hubTab, questions.length - 1))}
-            solutionOpen={solutionOpenFor === Math.min(hubTab, questions.length - 1)}
-            solutionText=""
-            showSolutionUi={false}
-          />
+        {phase === "finished" ? (
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 18,
+              padding: 24,
+              textAlign: "center",
+              boxShadow: T.shadowMd,
+              border: `1px solid ${T.border}`,
+            }}
+          >
+            <div style={{ fontSize: 40, marginBottom: 8 }}>🎓</div>
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: T.text, marginBottom: 8 }}>Сорил дууслаа</h2>
+            <p style={{ fontSize: 14, color: T.muted, marginBottom: 16 }}>
+              Нэгдүгээр хэсэг: <strong style={{ color: T.green }}>{score.correct}</strong> / {score.total} зөв
+              {" · "}
+              Оноо: <strong style={{ color: T.blue }}>{score.points}</strong> / {score.maxPoints}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setPhase("hub");
+                setTimeLeft(EES_META.durationMin * 60);
+              }}
+              style={{
+                padding: "12px 24px",
+                borderRadius: 12,
+                border: "none",
+                background: T.blue,
+                color: "#fff",
+                fontWeight: 800,
+                fontSize: 14,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              Буцах
+            </button>
+          </div>
         ) : (
           <>
             <QuestionCard
-              q={current}
-              qIndex={qIndex}
-              selected={answers[qIndex]}
+              q={phase === "hub" ? previewQ : current}
+              qIndex={activeIndex}
+              selected={answers[activeIndex]}
               onSelect={selectAnswer}
+              readOnly={false}
+              showFeedback={phase === "quiz"}
+              correctId={phase === "quiz" && questions[activeIndex]?.type === "choice" ? questions[activeIndex].correctId : undefined}
               favorites={favorites}
-              onToggleFav={() => toggleFav(qIndex)}
-              solutionOpen={solutionOpenFor === qIndex}
-              solutionText={current.solution}
-              showSolutionUi
+              onToggleFav={() => toggleFav(activeIndex)}
+              onCopy={() => copyQuestion(phase === "hub" ? previewQ : current)}
+              solutionOpen={solutionOpenFor === activeIndex}
+              solutionText={(phase === "hub" ? previewQ : current).solution}
+              showSolutionUi={phase === "quiz" && solutionsUnlocked.has(activeIndex)}
             />
 
-            <div
-              style={{
-                marginTop: 18,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 10,
-              }}
-            >
-              <button
-                type="button"
-                disabled={qIndex <= 0}
-                onClick={() => setQIndex((i) => Math.max(0, i - 1))}
-                style={{
-                  flex: 1,
-                  padding: "12px 10px",
-                  borderRadius: 12,
-                  border: `1px solid ${T.border}`,
-                  background: "#fff",
-                  fontWeight: 700,
-                  fontSize: 13,
-                  color: qIndex <= 0 ? T.muted : T.text,
-                  cursor: qIndex <= 0 ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                  fontFamily: "inherit",
-                }}
-              >
-                <Ic n="chevLeft" size={16} color={qIndex <= 0 ? T.muted : T.text} />
-                ӨМНӨХ
-              </button>
-              <div
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: 12,
-                  background: "#f1f5f9",
-                  fontWeight: 800,
-                  fontSize: 13,
-                  color: T.textSub,
-                  border: `1px solid ${T.border}`,
-                }}
-              >
-                {qIndex + 1}/{questions.length}
-              </div>
-              <button
-                type="button"
-                disabled={qIndex >= questions.length - 1}
-                onClick={() => setQIndex((i) => Math.min(questions.length - 1, i + 1))}
-                style={{
-                  flex: 1,
-                  padding: "12px 10px",
-                  borderRadius: 12,
-                  border: `2px solid ${T.purple}`,
-                  background: "#faf5ff",
-                  fontWeight: 800,
-                  fontSize: 13,
-                  color: T.purple,
-                  cursor: qIndex >= questions.length - 1 ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                  fontFamily: "inherit",
-                  opacity: qIndex >= questions.length - 1 ? 0.45 : 1,
-                }}
-              >
-                ДАРААГИЙНХ
-                <Ic n="chevRight" size={16} color={T.purple} />
-              </button>
-            </div>
+            {phase === "quiz" && current?.type === "choice" && (
+              <>
+                <div
+                  style={{
+                    marginTop: 18,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 10,
+                  }}
+                >
+                  <button
+                    type="button"
+                    disabled={qIndex <= 0}
+                    onClick={() => goToQuestion(qIndex - 1)}
+                    style={{
+                      flex: 1,
+                      padding: "12px 10px",
+                      borderRadius: 12,
+                      border: `1px solid ${T.border}`,
+                      background: "#fff",
+                      fontWeight: 700,
+                      fontSize: 13,
+                      color: qIndex <= 0 ? T.muted : T.text,
+                      cursor: qIndex <= 0 ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    <Ic n="chevLeft" size={16} color={qIndex <= 0 ? T.muted : T.text} />
+                    ӨМНӨХ
+                  </button>
+                  <div
+                    style={{
+                      padding: "10px 16px",
+                      borderRadius: 12,
+                      background: "#f1f5f9",
+                      fontWeight: 800,
+                      fontSize: 13,
+                      color: T.textSub,
+                      border: `1px solid ${T.border}`,
+                    }}
+                  >
+                    {qIndex + 1}/{questions.length}
+                  </div>
+                  {qIndex >= questions.length - 1 ? (
+                    <button
+                      type="button"
+                      onClick={finishQuiz}
+                      style={{
+                        flex: 1,
+                        padding: "12px 10px",
+                        borderRadius: 12,
+                        border: "none",
+                        background: T.green,
+                        fontWeight: 800,
+                        fontSize: 13,
+                        color: "#fff",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      ДУУСГАХ
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => goToQuestion(qIndex + 1)}
+                      style={{
+                        flex: 1,
+                        padding: "12px 10px",
+                        borderRadius: 12,
+                        border: `2px solid ${T.purple}`,
+                        background: "#faf5ff",
+                        fontWeight: 800,
+                        fontSize: 13,
+                        color: T.purple,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      ДАРААГИЙНХ
+                      <Ic n="chevRight" size={16} color={T.purple} />
+                    </button>
+                  )}
+                </div>
 
-            <div style={{ marginTop: 22, position: "relative" }}>
-              <button
-                type="button"
-                onClick={buySolution}
-                style={{
-                  width: "100%",
-                  border: "none",
-                  borderRadius: 14,
-                  padding: "15px 18px",
-                  background: "linear-gradient(180deg, #22c55e 0%, #16a34a 100%)",
-                  color: "#fff",
-                  fontWeight: 900,
-                  fontSize: 15,
-                  cursor: "pointer",
-                  boxShadow: "0 8px 24px rgba(22,163,74,0.35)",
-                  fontFamily: "inherit",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                }}
-              >
-                <span style={{ fontSize: 17 }}>✨</span>
-                {solutionOpenFor === qIndex ? "БОДОЛТ ХААХ" : "БОДОЛТ ХИЙЛГЭХ"}
-              </button>
-              <div
-                style={{
-                  position: "absolute",
-                  top: -10,
-                  right: 12,
-                  background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
-                  color: "#422006",
-                  fontWeight: 900,
-                  fontSize: 11,
-                  padding: "5px 10px",
-                  borderRadius: 999,
-                  border: "2px solid #fff",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  boxShadow: T.shadowMd,
-                }}
-              >
-                <Ic n="coin" size={13} color="#92400e" />
-                1ш
-              </div>
-              <p style={{ textAlign: "center", marginTop: 10, fontSize: 12, color: T.muted }}>
-                1 зоос ашиглан бодолт авах · үлдсэн:{" "}
-                <strong style={{ color: T.text }}>{mockCoins}</strong>
-              </p>
-            </div>
+                <div style={{ marginTop: 22, position: "relative" }}>
+                  <button
+                    type="button"
+                    onClick={buySolution}
+                    style={{
+                      width: "100%",
+                      border: "none",
+                      borderRadius: 14,
+                      padding: "15px 18px",
+                      background: "linear-gradient(180deg, #22c55e 0%, #16a34a 100%)",
+                      color: "#fff",
+                      fontWeight: 900,
+                      fontSize: 15,
+                      cursor: "pointer",
+                      boxShadow: "0 8px 24px rgba(22,163,74,0.35)",
+                      fontFamily: "inherit",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <span style={{ fontSize: 17 }}>✨</span>
+                    {solutionOpenFor === qIndex
+                      ? "БОДОЛТ ХААХ"
+                      : solutionsUnlocked.has(qIndex)
+                        ? "БОДОЛТ ХАРАХ"
+                        : "БОДОЛТ ХИЙЛГЭХ"}
+                  </button>
+                  {!solutionsUnlocked.has(qIndex) && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: -10,
+                        right: 12,
+                        background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
+                        color: "#422006",
+                        fontWeight: 900,
+                        fontSize: 11,
+                        padding: "5px 10px",
+                        borderRadius: 999,
+                        border: "2px solid #fff",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        boxShadow: T.shadowMd,
+                      }}
+                    >
+                      <Ic n="coin" size={13} color="#92400e" />
+                      1ш
+                    </div>
+                  )}
+                  <p style={{ textAlign: "center", marginTop: 10, fontSize: 12, color: T.muted }}>
+                    1 зоос ашиглан бодолт авах · үлдсэн:{" "}
+                    <strong style={{ color: T.text }}>{coins ?? "—"}</strong>
+                  </p>
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
@@ -424,19 +668,25 @@ function QuestionCard({
   selected,
   onSelect,
   readOnly,
+  showFeedback,
+  correctId,
   favorites,
   onToggleFav,
+  onCopy,
   solutionOpen,
   solutionText,
   showSolutionUi,
 }: {
-  q: ReturnType<typeof buildEesQuestions>[number];
+  q: EesQuestion;
   qIndex: number;
   selected?: EesOption["id"];
   onSelect: (id: EesOption["id"]) => void;
   readOnly?: boolean;
+  showFeedback?: boolean;
+  correctId?: EesOption["id"];
   favorites: Set<number>;
   onToggleFav: () => void;
+  onCopy: () => void;
   solutionOpen: boolean;
   solutionText: string;
   showSolutionUi: boolean;
@@ -469,7 +719,7 @@ function QuestionCard({
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" style={{ border: "none", background: "none", cursor: "pointer", padding: 4 }} aria-label="Хуулах">
+          <button type="button" style={{ border: "none", background: "none", cursor: "pointer", padding: 4 }} aria-label="Хуулах" onClick={onCopy}>
             <MiniCopy />
           </button>
           <button type="button" style={{ border: "none", background: "none", cursor: "pointer", padding: 4 }} onClick={onToggleFav} aria-label="Дуртай">
@@ -478,17 +728,43 @@ function QuestionCard({
         </div>
       </div>
 
-      <p style={{ margin: "12px 0 14px", fontSize: 15, fontWeight: 600, color: T.text, lineHeight: 1.5 }}>{q.text}</p>
-
-      {q.illustration === "voltmeter" && (
-        <div style={{ marginBottom: 16, padding: "10px 8px", background: "#f8fafc", borderRadius: 14, border: `1px solid ${T.border}` }}>
-          <VoltmeterIllustration />
-        </div>
+      {q.type !== "open" && (
+        <p style={{ margin: "12px 0 14px", fontSize: 15, fontWeight: 600, color: T.text, lineHeight: 1.5 }}>{q.text}</p>
       )}
 
+      {q.contextNote && q.type === "choice" && (
+        <div style={{ marginBottom: 14, padding: "12px 14px", background: "#f8fafc", borderRadius: 12, border: `1px solid ${T.border}`, fontSize: 13, color: T.textSub, lineHeight: 1.55, whiteSpace: "pre-wrap" }}>
+          {q.contextNote}
+        </div>
+      )}
+      {q.illustration && (
+        <div style={{ marginBottom: 16, padding: "10px 8px", background: "#f8fafc", borderRadius: 14, border: `1px solid ${T.border}` }}>
+          <ExamFigure kind={q.illustration} />
+        </div>
+      )}
+      {q.type === "open" && (
+        <div style={{ padding: "14px", borderRadius: 12, background: "#fff7ed", border: "1px solid #fdba74", fontSize: 13, color: "#9a3412", lineHeight: 1.65, whiteSpace: "pre-wrap", marginBottom: 8 }}>
+          <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 10 }}>{q.text}</div>
+          {q.contextNote}
+          <p style={{ marginTop: 12, fontSize: 12, color: "#c2410c" }}>Хариултыг хариултын хуудсанд [a,b,c…] форматаар тэмдэглэнэ үү.</p>
+        </div>
+      )}
+      {q.type !== "open" && (
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {q.options.map((opt) => {
           const isSel = selected === opt.id;
+          const isCorrect = showFeedback && correctId === opt.id;
+          const isWrong = showFeedback && isSel && correctId && opt.id !== correctId;
+          let border: string = isSel ? T.blue : T.border;
+          let bg: string = isSel ? T.blueLight : "#fafafa";
+          if (isCorrect && (isSel || selected)) {
+            border = T.green;
+            bg = T.greenLight;
+          }
+          if (isWrong) {
+            border = T.red;
+            bg = "#fef2f2";
+          }
           return (
             <button
               key={opt.id}
@@ -501,8 +777,8 @@ function QuestionCard({
                 gap: 12,
                 padding: "12px 14px",
                 borderRadius: 14,
-                border: `2px solid ${isSel ? T.blue : T.border}`,
-                background: isSel ? T.blueLight : "#fafafa",
+                border: `2px solid ${border}`,
+                background: bg,
                 cursor: readOnly ? "default" : "pointer",
                 textAlign: "left",
                 fontFamily: "inherit",
@@ -532,8 +808,9 @@ function QuestionCard({
           );
         })}
       </div>
+      )}
 
-      {showSolutionUi && solutionOpen && solutionText && (
+      {showSolutionUi && solutionOpen && solutionText && q.type === "choice" && (
         <div
           style={{
             marginTop: 16,

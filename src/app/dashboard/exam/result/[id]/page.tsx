@@ -46,10 +46,10 @@ export default function ExamResultPage() {
   if (!result) return null;
 
   const pct = result.percentage;
-  const grade = pct >= 90 ? { label: "Маш сайн!", color: "#16A34A", bg: "#ECFDF5", emoji: "🏆" }
-    : pct >= 75 ? { label: "Сайн!", color: "#4F46E5", bg: "#EEF2FF", emoji: "🎉" }
-    : pct >= 50 ? { label: "Дунд зэрэг", color: T.amber, bg: T.amberLight, emoji: "📚" }
-    : { label: "Дахин давтах хэрэгтэй", color: T.red, bg: T.redLight, emoji: "💪" };
+  const grade = pct >= 90 ? { label: "Маш сайн!", color: "#16A34A", bg: "#ECFDF5" }
+    : pct >= 75 ? { label: "Сайн!", color: "#4F46E5", bg: "#EEF2FF" }
+    : pct >= 50 ? { label: "Дунд зэрэг", color: T.amber, bg: T.amberLight }
+    : { label: "Дахин давтах хэрэгтэй", color: T.red, bg: T.redLight };
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8f9fc", fontFamily: "Plus Jakarta Sans, sans-serif" }}>
@@ -58,15 +58,17 @@ export default function ExamResultPage() {
         <button onClick={() => router.push("/dashboard/exam")} style={{ background: "none", border: "none", cursor: "pointer", color: T.muted, display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontFamily: "inherit" }}>
           <Ic n="chevLeft" size={16} /> Шалгалтууд руу буцах
         </button>
-        <div style={{ fontWeight: 700, fontSize: 14, color: T.text }}>📊 Үр дүн</div>
+        <div style={{ fontWeight: 700, fontSize: 14, color: T.text }}>Үр дүн</div>
       </div>
 
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "32px 20px" }}>
         {/* Score card */}
         <div style={{ background: "#fff", borderRadius: 18, border: `1px solid ${T.border}`, overflow: "hidden", boxShadow: T.shadowMd, marginBottom: 20 }}>
           <div style={{ background: `linear-gradient(135deg, ${grade.bg}, #fff)`, padding: "32px 28px", textAlign: "center", borderBottom: `1px solid ${T.border}` }}>
-            <div style={{ fontSize: 48, marginBottom: 8 }}>{grade.emoji}</div>
-            <div style={{ fontWeight: 900, fontSize: 24, color: grade.color, marginBottom: 4 }}>{grade.label}</div>
+            <div style={{ fontSize: 48, fontWeight: 900, color: grade.color, marginBottom: 8, fontVariantNumeric: "tabular-nums" }}>
+              {pct}%
+            </div>
+            <div style={{ fontWeight: 800, fontSize: 20, color: grade.color, marginBottom: 4 }}>{grade.label}</div>
             <div style={{ fontSize: 14, color: T.muted }}>{result.examTitle}</div>
           </div>
 

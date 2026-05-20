@@ -4,6 +4,7 @@ import { ExamModel } from '@/models/ExamModel';
 import { AttemptModel } from '@/models/AttemptModel';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { requireAdmin } from '@/lib/auth';
 
 export async function GET() {
   try {
@@ -40,6 +41,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const { error } = await requireAdmin();
+  if (error) return error;
+
   try {
     await connectDB();
     const body = await req.json();

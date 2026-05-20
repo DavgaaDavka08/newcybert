@@ -423,6 +423,7 @@ export function ContentManager() {
 
   async function handleAddTopic(name: string, color: string, icon: string, desc: string) {
     const r = await fetch('/api/admin/topics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, color, icon, description: desc }) });
+    if (!r.ok) { alert('Сэдэв нэмэхэд алдаа гарлаа'); return; }
     const d = await r.json();
     if (d.topic) setTopics(prev => [...prev, d.topic]);
   }
@@ -470,6 +471,7 @@ export function ContentManager() {
   async function handleSaveSubtopic(updated: Partial<Subtopic>) {
     if (!selSubtopic) return;
     const r = await fetch(`/api/admin/subtopics/${selSubtopic._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated) });
+    if (!r.ok) { alert('Хадгалах үед алдаа гарлаа'); return; }
     const d = await r.json();
     if (d.subtopic) {
       const merged = { ...selSubtopic, ...d.subtopic, questions: d.subtopic.questions ?? [] };

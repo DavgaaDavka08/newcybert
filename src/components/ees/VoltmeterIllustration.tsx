@@ -1,6 +1,5 @@
 "use client";
 
-/** Жишээ — олон хэмжигчийн дүрслэл (0–6 В, зүү ~2.6 В) */
 export function VoltmeterIllustration() {
   const cx = 100;
   const cy = 98;
@@ -24,7 +23,16 @@ export function VoltmeterIllustration() {
   const ny = cy - nLen * Math.sin(na);
 
   return (
-    <svg viewBox="0 0 200 118" style={{ width: "100%", maxWidth: 280, height: "auto", display: "block", margin: "0 auto" }}>
+    <svg
+      viewBox="0 0 200 118"
+      style={{
+        width: "100%",
+        maxWidth: 280,
+        height: "auto",
+        display: "block",
+        margin: "0 auto",
+      }}
+    >
       <defs>
         <linearGradient id="vmFace" x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" stopColor="#f8fafc" />
@@ -52,23 +60,67 @@ export function VoltmeterIllustration() {
         const y1 = cy - r1 * Math.sin(a);
         const x2 = cx + r2 * Math.cos(a);
         const y2 = cy - r2 * Math.sin(a);
-        return <line key={v} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#475569" strokeWidth={major ? 2 : 1} strokeLinecap="round" />;
+        return (
+          <line
+            key={v}
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
+            stroke="#475569"
+            strokeWidth={major ? 2 : 1}
+            strokeLinecap="round"
+          />
+        );
       })}
       {[0, 1, 2, 3, 4, 5, 6].map((n) => {
         const a = angleFor(n);
         const tx = cx + (rOuter - 22) * Math.cos(a);
         const ty = cy - (rOuter - 22) * Math.sin(a);
         return (
-          <text key={n} x={tx} y={ty} textAnchor="middle" dominantBaseline="middle" fill="#0f172a" fontSize="12" fontWeight="700" fontFamily="system-ui,sans-serif">
+          <text
+            key={n}
+            x={tx}
+            y={ty}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="#0f172a"
+            fontSize="12"
+            fontWeight="700"
+            fontFamily="system-ui,sans-serif"
+          >
             {n}
           </text>
         );
       })}
-      <text x={cx} y={cy + 6} textAnchor="middle" fill="#0f172a" fontSize="22" fontWeight="900" fontFamily="Georgia,serif">
+      <text
+        x={cx}
+        y={cy + 6}
+        textAnchor="middle"
+        fill="#0f172a"
+        fontSize="22"
+        fontWeight="900"
+        fontFamily="Georgia,serif"
+      >
         V
       </text>
-      <line x1={cx} y1={cy} x2={nx} y2={ny} stroke="#dc2626" strokeWidth="3" strokeLinecap="round" />
-      <circle cx={cx} cy={cy} r="6" fill="#1e293b" stroke="#fff" strokeWidth="2" />
+      <line
+        x1={cx}
+        y1={cy}
+        x2={nx}
+        y2={ny}
+        stroke="#dc2626"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      <circle
+        cx={cx}
+        cy={cy}
+        r="6"
+        fill="#1e293b"
+        stroke="#fff"
+        strokeWidth="2"
+      />
     </svg>
   );
 }

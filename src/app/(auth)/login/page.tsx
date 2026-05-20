@@ -175,7 +175,7 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
       </p>
 
       <p style={{ textAlign: "center", marginTop: 6, fontSize: 12 }}>
-        <a href="/admin-login" style={{ color: "#475569", textDecoration: "none" }}>🔐 Admin нэвтрэх</a>
+        <a href="/login" style={{ color: "#475569", textDecoration: "none" }}>🔐 Admin нэвтрэх</a>
       </p>
     </>
   );
