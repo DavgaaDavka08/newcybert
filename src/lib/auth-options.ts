@@ -18,10 +18,9 @@ interface UserDocForStreak {
   save(): Promise<unknown>;
 }
 
-// Vercel: auto-set NEXTAUTH_URL when only VERCEL_URL is present
-if (!process.env.NEXTAUTH_URL?.trim() && process.env.VERCEL_URL) {
-  process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
-}
+// NEXTAUTH_URL-ийг энд process.env.NEXTAUTH_URL = ... гэж БҮТЭЭХ БОЛОХГҮЙ:
+// Vercel дээр NEXTAUTH_URL=http://localhost:3000 байвал build үед код
+// "http://localhost:3000" = ... болж compile алдаа өгнө.
 
 const authSecret =
   process.env.NEXTAUTH_SECRET?.trim() ||
