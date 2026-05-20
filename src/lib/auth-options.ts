@@ -29,9 +29,13 @@ const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
 const googleConfigured = Boolean(googleClientId && googleClientSecret);
 
+const authSecret =
+  process.env.NEXTAUTH_SECRET?.trim() ||
+  process.env.JWT_SECRET?.trim();
+
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: authSecret,
 
   pages: {
     signIn: "/login",
