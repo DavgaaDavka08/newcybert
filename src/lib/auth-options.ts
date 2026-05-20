@@ -20,6 +20,11 @@ interface UserDocForStreak {
   save(): Promise<unknown>;
 }
 
+// Vercel: auto-set NEXTAUTH_URL when only VERCEL_URL is present
+if (!process.env.NEXTAUTH_URL?.trim() && process.env.VERCEL_URL) {
+  process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
+}
+
 const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
 const googleConfigured = Boolean(googleClientId && googleClientSecret);
@@ -79,7 +84,11 @@ export const authOptions: NextAuthOptions = {
         }
 
         // ── DB user ──────────────────────────────────
-        await connectDB();
+        try {
+          await connectDB();
+        } catch {
+          throw new Error("Серверийн өгөгдлийн сантай холбогдож чадсангүй (MONGODB_URI)");
+        }
         const user = await User.findOne({ email }).select("+password");
 
         if (!user) throw new Error("И-мэйл эсвэл нууц үг буруу байна");

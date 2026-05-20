@@ -9,7 +9,12 @@ import { getRank } from '@/lib/ranks';
 import { useAppState } from '@/lib/app-state-context';
 import { ProfileModal } from '@/components/layout/ProfileModal';
 
-export function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
+}
+
+export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   const pathname        = usePathname();
   const router          = useRouter();
   const { appState }    = useAppState();
@@ -18,15 +23,35 @@ export function Sidebar() {
   const rank            = getRank(appState.xp);
   const userName        = session?.user?.name ?? appState.name;
 
+  function navigate(path: string) {
+    router.push(path);
+    onMobileClose?.();
+  }
+
   return (
-    <div className="dash-sidebar" style={{
+    <aside
+      className={`dash-sidebar${mobileOpen ? ' dash-sidebar--open' : ''}`}
+      style={{
       width: 230, flexShrink: 0, background: '#FFFFFF',
       display: 'flex', flexDirection: 'column', height: '100vh',
       position: 'sticky', top: 0, zIndex: 10,
       borderRight: `1px solid ${T.border}`, boxShadow: '2px 0 12px rgba(0,0,0,0.04)',
-    }}>
+    }}
+    >
+      <div className="dash-sidebar-mobile-head">
+        <span style={{ fontWeight: 900, fontSize: 15, color: T.blue }}>Цэс</span>
+        <button
+          type="button"
+          className="dash-sidebar-close"
+          aria-label="Цэс хаах"
+          onClick={onMobileClose}
+        >
+          <Ic n="close" size={20} color={T.text} />
+        </button>
+      </div>
+
       {/* Logo */}
-      <div style={{ padding: '18px 16px 14px', borderBottom: `1px solid ${T.border}` }}>
+      <div className="dash-sidebar-logo" style={{ padding: '18px 16px 14px', borderBottom: `1px solid ${T.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <img src="/cyberphysic-logo.png" alt="CyberPhysics"
             style={{ height: 34, width: 'auto', objectFit: 'contain' }}
@@ -46,7 +71,7 @@ export function Sidebar() {
         {NAV_ITEMS.map(item => {
           const active = pathname === item.path || (item.path !== '/dashboard' && pathname.startsWith(item.path));
           return (
-            <button key={item.id} onClick={() => router.push(item.path)}
+            <button key={item.id} onClick={() => navigate(item.path)}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: 10,
                 padding: '9px 12px', borderRadius: 13, marginBottom: 3,
@@ -131,6 +156,6 @@ export function Sidebar() {
       </div>
 
       <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} displayName={userName} />
-    </div>
+    </aside>
   );
 }

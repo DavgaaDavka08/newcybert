@@ -1,6 +1,8 @@
 'use client';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { T } from '@/styles/tokens';
+import { Ic } from '@/components/ui';
 import { Sidebar } from './Sidebar';
 
 export { Sidebar } from './Sidebar';
@@ -9,9 +11,36 @@ export { Topbar, TopBar } from './Topbar';
 const BG_URL = '/475450911_537240926008065_5395618463015848016_n.jpg';
 
 export function Shell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileNavOpen]);
+
   return (
-    <div className="dash-shell" style={{ display: 'flex', minHeight: '100vh', background: T.bg }}>
-      <Sidebar />
+    <div className="dash-shell" style={{ display: 'flex', minHeight: '100vh', width: '100%', background: T.bg }}>
+      <button
+        type="button"
+        className={`dash-sidebar-overlay${mobileNavOpen ? ' dash-sidebar-overlay--visible' : ''}`}
+        aria-label="Цэс хаах"
+        onClick={() => setMobileNavOpen(false)}
+      />
+
+      <Sidebar
+        mobileOpen={mobileNavOpen}
+        onMobileClose={() => setMobileNavOpen(false)}
+      />
+
       <main
         className="dash-main"
         style={{
@@ -19,11 +48,25 @@ export function Shell({ children }: { children: React.ReactNode }) {
           flex: 1,
           overflowY: 'auto',
           minHeight: '100vh',
+          minWidth: 0,
+          width: '100%',
           padding: '24px 28px',
           backgroundColor: T.bg,
         }}
       >
-        {/* Photo: anchor to sky (top), soften so grass/JPEG noise does not read as "mud" */}
+        <header className="dash-mobile-header">
+          <button
+            type="button"
+            className="dash-menu-btn"
+            aria-label="Цэс нээх"
+            aria-expanded={mobileNavOpen}
+            onClick={() => setMobileNavOpen(true)}
+          >
+            <Ic n="menu" size={20} color={T.text} />
+          </button>
+          <span className="dash-mobile-header-title">CyberPhysics</span>
+        </header>
+
         <div
           aria-hidden
           style={{
@@ -58,7 +101,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             }}
           />
         </div>
-        <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>
+        <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: '100%' }}>{children}</div>
       </main>
     </div>
   );

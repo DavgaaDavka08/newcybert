@@ -1,8 +1,9 @@
 /* Global responsive utilities */
 
-/* Prevent horizontal scroll on mobile */
-html {
+html,
+body {
   overflow-x: hidden;
+  max-width: 100%;
 }
 
 img,
@@ -12,35 +13,193 @@ svg {
   height: auto;
 }
 
-/* Dashboard shell (student) */
+/* ── Dashboard shell ───────────────────────────────────────── */
+
+.dash-shell {
+  width: 100%;
+  max-width: 100vw;
+}
+
+.dash-mobile-header,
+.dash-sidebar-overlay,
+.dash-sidebar-mobile-head,
+.dash-sidebar-close {
+  display: none;
+}
+
+.dash-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+/* Tablet / mobile: drawer nav (NOT stacked column) */
 @media (max-width: 900px) {
-  .dash-shell {
-    flex-direction: column !important;
+  .dash-mobile-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: -8px 0 16px;
+    padding-bottom: 4px;
+  }
+
+  .dash-menu-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+  }
+
+  .dash-mobile-header-title {
+    font-weight: 900;
+    font-size: 16px;
+    color: #2563eb;
+    letter-spacing: -0.02em;
+  }
+
+  .dash-sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 199;
+    border: none;
+    padding: 0;
+    margin: 0;
+    background: rgba(15, 23, 42, 0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+    cursor: pointer;
+  }
+
+  .dash-sidebar-overlay--visible {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .dash-sidebar {
-    width: 100% !important;
-    min-width: 0 !important;
-    height: auto !important;
-    position: relative !important;
-    border-right: none !important;
+    position: fixed !important;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: min(280px, 88vw) !important;
+    height: 100dvh !important;
+    z-index: 200;
+    transform: translateX(-105%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12);
+  }
+
+  .dash-sidebar--open {
+    transform: translateX(0);
+  }
+
+  .dash-sidebar-mobile-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
     border-bottom: 1px solid #e2e8f0;
   }
 
+  .dash-sidebar-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: #f1f5f9;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+
   .dash-main {
-    min-height: 0 !important;
     width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    padding: 16px 16px 24px !important;
+  }
+
+  .dash-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dash-bottom-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dash-hero {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    padding: 20px 18px !important;
+    gap: 16px;
+  }
+
+  .dash-hero img {
+    height: 88px !important;
+    align-self: center;
+  }
+
+  .dash-topbar {
+    flex-wrap: wrap;
+    align-items: flex-start !important;
+  }
+
+  .dash-topbar-actions {
+    flex-wrap: wrap;
+    width: 100%;
   }
 }
 
-/* Admin course builder — stacks panels on tablet */
+@media (max-width: 640px) {
+  .dash-topbar-sub {
+    font-size: 12px !important;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .dash-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dash-topbar-titles > div:first-child {
+    font-size: 18px !important;
+  }
+
+  .dash-topbar-chip span {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dash-main {
+    padding: 12px 12px 20px !important;
+  }
+
+  .dash-hero > div:first-child > div:nth-child(2) {
+    font-size: 18px !important;
+  }
+}
+
+/* ── Admin ─────────────────────────────────────────────────── */
+
 @media (max-width: 1100px) {
   .admin-root .course-wizard-step .course-step-text span {
     display: none;
   }
 }
 
-/* Tables scroll horizontally on small screens */
 @media (max-width: 768px) {
   .admin-root .table-wrap,
   .table-scroll-wrap {
@@ -71,7 +230,8 @@ svg {
   }
 }
 
-/* Video / premium pages */
+/* ── Premium / media ───────────────────────────────────────── */
+
 @media (max-width: 640px) {
   .media-upload-tabs {
     flex-direction: column !important;
@@ -80,24 +240,9 @@ svg {
   .premium-grid-2 {
     grid-template-columns: 1fr !important;
   }
-}
 
-/* Game map — safe areas & node offsets */
-@media (max-width: 640px) {
   .game-map-scroll {
     padding: 32px 12px 80px !important;
-  }
-
-  .game-map-scroll [style*="paddingLeft: 72"],
-  .game-map-scroll [style*="paddingRight: 72"] {
-    padding-left: 24px !important;
-    padding-right: 24px !important;
-  }
-}
-
-@media (max-width: 480px) {
-  .dash-main {
-    padding: 16px 12px !important;
   }
 
   .premium-page-hero h1 {

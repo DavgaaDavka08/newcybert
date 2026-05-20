@@ -66,7 +66,7 @@ export function DashboardScreen({ onNav, state }: Props) {
   }, []);
 
   return (
-    <div>
+    <div className="dash-page">
       <Topbar
         title="Нүүр хуудас"
         sub={`Сайн уу, ${state.name} — ${new Date().toLocaleDateString("mn-MN", { weekday: "long", month: "long", day: "numeric" })}`}
@@ -75,6 +75,7 @@ export function DashboardScreen({ onNav, state }: Props) {
 
       {/* ── Hero banner ── */}
       <div
+        className="dash-hero"
         style={{
           background:
             "linear-gradient(120deg, #0D9488 0%, #2563EB 60%, #7C3AED 100%)",
@@ -177,14 +178,7 @@ export function DashboardScreen({ onNav, state }: Props) {
       </div>
 
       {/* ── Stat strip ── */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4,1fr)",
-          gap: 12,
-          marginBottom: 22,
-        }}
-      >
+      <div className="dash-stat-grid" style={{ marginBottom: 22 }}>
         {[
           {
             label: "Миний дэвшил",
@@ -282,7 +276,7 @@ export function DashboardScreen({ onNav, state }: Props) {
 
 
       {/* ── Bottom: level + leaderboard ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+      <div className="dash-bottom-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         {/* Level card */}
         <div
           style={{

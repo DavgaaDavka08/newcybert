@@ -40,6 +40,8 @@ export const ICON_PATHS: Record<string, string[]> = {
   send:        ['M22 2L11 13', 'M22 2L15 22 11 13 2 9l20-7z'],
   leaderboard: ['M8 6h13', 'M8 12h13', 'M8 18h13', 'M3 6h.01', 'M3 12h.01', 'M3 18h.01'],
   refresh:     ['M23 4v6h-6', 'M1 20v-6h6', 'M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15'],
+  menu:        ['M3 12h18', 'M3 6h18', 'M3 18h18'],
+  close:       ['M18 6L6 18', 'M6 6l12 12'],
 };
 
 interface IcProps { n: string; size?: number; color?: string; style?: React.CSSProperties; }

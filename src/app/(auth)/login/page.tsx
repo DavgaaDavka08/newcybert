@@ -3,8 +3,13 @@
 import "../auth.css";
 import { useState, useEffect, Suspense } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { PROVINCES, SCHOOL_GRADES } from "@/lib/mn-constants";
+import {
+  getSafeCallbackUrl,
+  mapAuthError,
+  waitForSession,
+} from "@/lib/auth-redirect";
 
 /* ─── Decorative shapes on the right bg ─── */
 type Shape = { type: string; x: number; y: number; size: number; color: string; rot?: number };
@@ -61,7 +66,6 @@ function GoogleIcon() {
    LOGIN FORM
 ════════════════════════════════════════════ */
 function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl: string }) {
-  const router = useRouter();
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
@@ -71,20 +75,30 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(""); setLoading(true);
-    const res = await signIn("credentials", { email, password, redirect: false });
-    setLoading(false);
-    if (res?.error) {
-      setError("И-мэйл эсвэл нууц үг буруу байна");
-      return;
-    }
-    // Check role after successful login
-    const { getSession } = await import("next-auth/react");
-    const sess = await getSession();
-    if (sess?.user?.role === "admin") {
-      router.push("/admin");
-    } else {
-      router.push(callbackUrl);
+    setError("");
+    setLoading(true);
+    try {
+      const res = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
+      if (res?.error) {
+        setError(mapAuthError(res.error));
+        setLoading(false);
+        return;
+      }
+      if (!res?.ok) {
+        setError("Нэвтрэлт амжилтгүй боллоо. Дахин оролдоно уу.");
+        setLoading(false);
+        return;
+      }
+      const sess = await waitForSession();
+      const dest = getSafeCallbackUrl(callbackUrl, sess?.user?.role);
+      window.location.href = dest;
+    } catch {
+      setError("Сүлжээний алдаа. Дахин оролдоно уу.");
+      setLoading(false);
     }
   }
 
@@ -93,7 +107,11 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
       {/* Google */}
       <button
         type="button"
-        onClick={() => signIn("google", { callbackUrl })}
+        onClick={() =>
+          signIn("google", {
+            callbackUrl: getSafeCallbackUrl(callbackUrl),
+          })
+        }
         style={{
           width: "100%", padding: "11px", borderRadius: 10, cursor: "pointer",
           border: "1.5px solid rgba(255,255,255,0.12)",
@@ -211,8 +229,15 @@ function RegisterTab({ onSwitch }: { onSwitch: () => void }) {
     setLoading(false);
     if (!res.ok) { setError(data.error); return; }
     setSuccess(data.message);
-    setTimeout(() => {
-      signIn("credentials", { email: form.email, password: form.password, callbackUrl: "/dashboard" });
+    setTimeout(async () => {
+      const res = await signIn("credentials", {
+        email: form.email,
+        password: form.password,
+        redirect: false,
+      });
+      if (res?.ok) {
+        window.location.href = "/dashboard";
+      }
     }, 1200);
   }
 
@@ -338,6 +363,7 @@ function AuthContent() {
   const [tab, setTab] = useState<"login" | "register">("login");
 
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
+  const authError = searchParams.get("error");
 
   useEffect(() => {
     if (searchParams.get("register") === "1") setTab("register");
@@ -438,6 +464,22 @@ function AuthContent() {
               </button>
             ))}
           </div>
+
+          {authError && (
+            <div
+              style={{
+                background: "rgba(239,68,68,0.1)",
+                border: "1px solid rgba(239,68,68,0.3)",
+                borderRadius: 8,
+                padding: "10px 12px",
+                marginBottom: 14,
+                color: "#FCA5A5",
+                fontSize: 13,
+              }}
+            >
+              ⚠ {mapAuthError(authError)}
+            </div>
+          )}
 
           {tab === "login"
             ? <LoginTab onSwitch={() => setTab("register")} callbackUrl={callbackUrl} />
