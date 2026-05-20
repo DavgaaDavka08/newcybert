@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { Category } from "@/models/Category";
+import { Question } from "@/models/Question";
 import { requireAdmin } from "@/lib/auth";
 
 export async function GET() {
@@ -39,7 +40,12 @@ export async function DELETE(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "id шаардлагатай" }, { status: 400 });
+
   await connectDB();
-  await Category.findByIdAndDelete(id);
+  await Promise.all([
+    Category.findByIdAndDelete(id),
+    Question.deleteMany({ categoryId: id }),
+  ]);
   return NextResponse.json({ success: true });
 }

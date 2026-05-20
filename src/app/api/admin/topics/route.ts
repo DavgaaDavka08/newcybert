@@ -6,8 +6,12 @@ import { TopicModel } from '@/models/TopicModel';
 
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !['admin', 'teacher'].includes((session.user as any).role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     await connectDB();
-    const topics = await TopicModel.find({ isActive: true }).sort({ order: 1 }).lean();
+    const topics = await TopicModel.find().sort({ order: 1 }).lean();
     return NextResponse.json({ topics });
   } catch {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
