@@ -1,16 +1,9 @@
 // src/lib/auth-options.ts
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { connectDB } from "./mongodb";
 import { User } from "@/models/User";
-
-/** Google OAuth profile fields used when auto-creating a user */
-interface GoogleNameProfile {
-  given_name?: string;
-  family_name?: string;
-}
 
 /** Mongoose user document fields used by streak logic */
 interface UserDocForStreak {
@@ -24,10 +17,6 @@ interface UserDocForStreak {
 if (!process.env.NEXTAUTH_URL?.trim() && process.env.VERCEL_URL) {
   process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
 }
-
-const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
-const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
-const googleConfigured = Boolean(googleClientId && googleClientSecret);
 
 const authSecret =
   process.env.NEXTAUTH_SECRET?.trim() ||
@@ -43,16 +32,6 @@ export const authOptions: NextAuthOptions = {
   },
 
   providers: [
-    ...(googleConfigured
-      ? [
-          GoogleProvider({
-            clientId: googleClientId!,
-            clientSecret: googleClientSecret!,
-          }),
-        ]
-      : []),
-
-    // ── Credentials (email + password) ───────────────
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -65,9 +44,9 @@ export const authOptions: NextAuthOptions = {
         }
 
         const email = credentials.email.toLowerCase().trim();
-        const password = credentials.password;
+        const password = credentials.password.trim();
 
-        // ── Hardcoded admin ──────────────────────────
+        // ── Hardcoded admin (Vercel: ADMIN_EMAIL, ADMIN_PASS) ──
         const adminEmail = (process.env.ADMIN_EMAIL ?? "admin@gmail.com").toLowerCase().trim();
         const adminPass  = (process.env.ADMIN_PASS ?? "TCB-757").trim();
 
@@ -123,46 +102,6 @@ export const authOptions: NextAuthOptions = {
   ],
 
   callbacks: {
-    async signIn({ user, account, profile }) {
-      // Google OAuth sign-in
-      if (account?.provider === "google") {
-        await connectDB();
-        const email = user.email!.toLowerCase();
-
-        let dbUser = await User.findOne({ email });
-        const gp = profile as GoogleNameProfile | undefined;
-
-        if (!dbUser) {
-          // Auto-create from Google
-          dbUser = await User.create({
-            firstName: gp?.given_name ?? user.name?.split(" ")[0] ?? "Google",
-            lastName: gp?.family_name ?? user.name?.split(" ")[1] ?? "User",
-            email,
-            googleId: account.providerAccountId,
-            avatar: user.image,
-            isVerified: true,
-            role: "student",
-          });
-        } else if (!dbUser.googleId) {
-          dbUser.googleId = account.providerAccountId;
-          await dbUser.save();
-        }
-
-        await updateStreak(dbUser);
-
-        user.id = dbUser._id.toString();
-        user.role = dbUser.role;
-        user.grade = typeof dbUser.grade === "number" ? dbUser.grade : undefined;
-        user.isPremium = dbUser.isPremium;
-        user.xp = dbUser.xp;
-        user.level = dbUser.level;
-        user.coins = dbUser.coins;
-        user.lives = dbUser.lives;
-        user.streak = dbUser.streak;
-      }
-      return true;
-    },
-
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
