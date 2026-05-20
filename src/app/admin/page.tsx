@@ -857,7 +857,7 @@ export default function AdminPage() {
                           </button>
                         </div>
                         <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>{c.name}</div>
-                        <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 14 }}>{c.totalLevels} level · Дараалал {c.order}</div>
+                        <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 14 }}>{c.totalLevels} level  Дараалал {c.order}</div>
                         <div style={{ display: "flex", gap: 6 }}>
                           <button className="btn sm" style={{ flex: 1 }} onClick={() => openEditCat(c)}>Засах</button>
                           <button className="btn sm danger" onClick={() => deleteCategory(c._id)}>Устгах</button>
