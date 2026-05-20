@@ -50,7 +50,8 @@ const lbl: React.CSSProperties = {
    LOGIN FORM
 ════════════════════════════════════════════ */
 function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl: string }) {
-  const [email, setEmail]       = useState("");
+  const isAdminLogin = callbackUrl.startsWith("/admin");
+  const [email, setEmail]       = useState(isAdminLogin ? "admin@gmail.com" : "");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
   const [loading, setLoading]   = useState(false);
@@ -70,8 +71,8 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
       });
       if (res?.error) {
         setError(
-          callbackUrl.startsWith("/admin")
-            ? "Admin имэйл эсвэл нууц үг буруу. Vercel дээрх ADMIN_EMAIL / ADMIN_PASS-тай яг ижил эсэхийг шалгана уу."
+          isAdminLogin
+            ? "И-мэйл эсвэл нууц үг буруу. Имэйл = ADMIN_EMAIL, нууц = ADMIN_PASS (имэйлийг нууц талбарт бүү оруул)."
             : mapAuthError(res.error),
         );
         setLoading(false);
@@ -82,8 +83,7 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
         setLoading(false);
         return;
       }
-      // Бүтэн ачаалалт — session cookie middleware-ээс өмнө уншигдана
-      window.location.assign(dest);
+      window.location.href = dest;
     } catch {
       setError("Сүлжээний алдаа. Дахин оролдоно уу.");
       setLoading(false);
@@ -92,20 +92,19 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
 
   return (
     <>
-      {callbackUrl.startsWith("/admin") && (
+      {isAdminLogin && (
         <div style={{
           background: "rgba(79,70,229,0.12)", border: "1px solid rgba(99,102,241,0.35)",
           borderRadius: 8, padding: "12px 14px", marginBottom: 14,
           color: "#C7D2FE", fontSize: 12, lineHeight: 1.6,
         }}>
-          <strong style={{ color: "#E0E7FF" }}>Admin нэвтрэх заавар</strong>
-          <ol style={{ margin: "8px 0 0", paddingLeft: 18 }}>
-            <li>Vercel → Environment Variables дээрх <strong>ADMIN_EMAIL</strong> имэйлийг оруулна</li>
-            <li><strong>ADMIN_PASS</strong> нууц үгийг оруулна (яг ижил, зайгүй)</li>
-            <li>Доорх <strong>И-мэйл + Нууц үг</strong> хэсгээр нэвтэрнэ</li>
-          </ol>
-          <div style={{ marginTop: 8, fontSize: 11, color: "#94A3B8" }}>
-            .env.local-тай ижил бол: имэйл ихэнд <code style={{ color: "#A5B4FC" }}>admin@gmail.com</code>
+          <strong style={{ fontSize: 14, color: "#E0E7FF" }}>Admin нэвтрэх</strong>
+          <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+            <div><span style={{ color: "#94A3B8" }}>И-мэйл:</span> <strong>admin@gmail.com</strong></div>
+            <div><span style={{ color: "#94A3B8" }}>Нууц үг:</span> <strong>TCB-757</strong></div>
+          </div>
+          <div style={{ marginTop: 10, fontSize: 11, color: "#FCA5A5", fontWeight: 600 }}>
+            ⚠ Нууц үг талбарт имэйл бүү оруул!
           </div>
         </div>
       )}
@@ -122,7 +121,7 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
         <div style={{ marginBottom: 12 }}>
           <label style={lbl}>И-МЭЙЛ</label>
           <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-            placeholder="example@mail.com" required style={inp} />
+            placeholder={isAdminLogin ? "admin@gmail.com" : "example@mail.com"} required style={inp} />
         </div>
 
         <div style={{ marginBottom: 14 }}>
@@ -130,7 +129,7 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
           <div style={{ position: "relative" }}>
             <input type={showPass ? "text" : "password"}
               value={password} onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••" required
+              placeholder={isAdminLogin ? "TCB-757 (ADMIN_PASS)" : "••••••••"} required
               style={{ ...inp, paddingRight: 40 }} />
             <button type="button" onClick={() => setShowPass(v => !v)} style={{
               position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",

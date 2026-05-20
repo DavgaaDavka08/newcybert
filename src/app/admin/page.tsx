@@ -112,7 +112,7 @@ export default function AdminPage() {
 
   // Auth guard
   useEffect(() => {
-    if (status === "unauthenticated") router.replace("/login");
+    if (status === "unauthenticated") router.replace("/login?callbackUrl=/admin");
     if (status === "authenticated" && session?.user?.role !== "admin") router.replace("/dashboard");
   }, [status, session, router]);
 
