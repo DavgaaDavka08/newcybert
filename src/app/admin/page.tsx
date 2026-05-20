@@ -116,6 +116,18 @@ export default function AdminPage() {
     if (status === "authenticated" && session?.user?.role !== "admin") router.replace("/dashboard");
   }, [status, session, router]);
 
+  // Block render until session is resolved
+  if (status === "loading") {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f172a" }}>
+        <div style={{ color: "#94a3b8", fontSize: 16 }}>Уншиж байна...</div>
+      </div>
+    );
+  }
+  if (status === "unauthenticated" || (session?.user as any)?.role !== "admin") {
+    return null;
+  }
+
   // ── Loaders ──────────────────────────────────────────────────
   const loadStats = useCallback(async () => {
     try {
@@ -190,8 +202,9 @@ export default function AdminPage() {
     } catch { /* silent */ }
   }, []);
 
-  // Tab data loading
+  // Tab data loading — only fires after early-return guards above pass (admin confirmed)
   useEffect(() => {
+    if (status !== "authenticated") return;
     if (tab === "overview") loadStats();
     if (tab === "users") loadUsers(1, userRoleFilter, userSearch);
     if (tab === "questions") { loadQuestions(1, qCatFilter, qDiffFilter, questionSearch); loadCategories(); }
