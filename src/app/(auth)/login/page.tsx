@@ -5,6 +5,7 @@ import { useState, useEffect, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { PROVINCES, SCHOOL_GRADES } from "@/lib/mn-constants";
+import { isBuiltinAdminLogin } from "@/lib/admin-auth";
 import { getLoginCallbackUrl, mapAuthError } from "@/lib/auth-redirect";
 
 /* ─── Decorative shapes on the right bg ─── */
@@ -62,19 +63,17 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
     e.preventDefault();
     setError("");
     setLoading(true);
-    const dest = getLoginCallbackUrl(callbackUrl);
+    const em = email.trim().toLowerCase();
+    const pw = password.trim();
+    const dest = isBuiltinAdminLogin(em, pw) ? "/admin" : getLoginCallbackUrl(callbackUrl);
     try {
       const res = await signIn("credentials", {
-        email: email.trim(),
-        password: password.trim(),
+        email: em,
+        password: pw,
         redirect: false,
       });
       if (res?.error) {
-        setError(
-          isAdminLogin
-            ? "И-мэйл эсвэл нууц үг буруу. Имэйл = ADMIN_EMAIL, нууц = ADMIN_PASS (имэйлийг нууц талбарт бүү оруул)."
-            : mapAuthError(res.error),
-        );
+        setError(mapAuthError(res.error));
         setLoading(false);
         return;
       }
@@ -83,7 +82,7 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
         setLoading(false);
         return;
       }
-      window.location.href = dest;
+      window.location.replace(dest);
     } catch {
       setError("Сүлжээний алдаа. Дахин оролдоно уу.");
       setLoading(false);
@@ -103,8 +102,8 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
             <div><span style={{ color: "#94A3B8" }}>И-мэйл:</span> <strong>admin@gmail.com</strong></div>
             <div><span style={{ color: "#94A3B8" }}>Нууц үг:</span> <strong>TCB-757</strong></div>
           </div>
-          <div style={{ marginTop: 10, fontSize: 11, color: "#FCA5A5", fontWeight: 600 }}>
-            ⚠ Нууц үг талбарт имэйл бүү оруул!
+          <div style={{ marginTop: 10, fontSize: 11, color: "#86EFAC", fontWeight: 600 }}>
+            Эдгээр 2 утгыг оруулаад «Нэвтрэх» — шууд Admin самбар нээгдэнэ (Vercel тохиргоо хэрэггүй).
           </div>
         </div>
       )}

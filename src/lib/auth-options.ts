@@ -4,6 +4,11 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { connectDB } from "./mongodb";
 import { User } from "@/models/User";
+import {
+  BUILTIN_ADMIN_EMAIL,
+  createAdminSessionUser,
+  isBuiltinAdminLogin,
+} from "./admin-auth";
 
 /** Mongoose user document fields used by streak logic */
 interface UserDocForStreak {
@@ -46,24 +51,43 @@ export const authOptions: NextAuthOptions = {
         const email = credentials.email.toLowerCase().trim();
         const password = credentials.password.trim();
 
-        // ── Hardcoded admin (Vercel: ADMIN_EMAIL, ADMIN_PASS) ──
-        const adminEmail = (process.env.ADMIN_EMAIL ?? "admin@gmail.com").toLowerCase().trim();
-        const adminPass  = (process.env.ADMIN_PASS ?? "TCB-757").trim();
+        // 1) Кодонд суулгасан admin — Vercel ADMIN_* буруу байсан ч ажиллана
+        if (isBuiltinAdminLogin(email, password)) {
+          return createAdminSessionUser(BUILTIN_ADMIN_EMAIL);
+        }
 
-        if (email === adminEmail && password === adminPass) {
-          return {
-            id: "admin-hardcoded",
-            email: adminEmail,
-            name: "Admin",
-            role: "admin",
-            isPremium: true,
-            xp: 0,
-            level: 1,
-            coins: 9999,
-            lives: 99,
-            streak: 0,
-            grade: undefined,
-          };
+        // 2) Vercel env (нэмэлт, заавал биш)
+        const envAdminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
+        const envAdminPass = process.env.ADMIN_PASS?.trim();
+        if (envAdminEmail && envAdminPass && email === envAdminEmail && password === envAdminPass) {
+          return createAdminSessionUser(envAdminEmail);
+        }
+
+        // 3) MongoDB дээр role=admin (нууц үгээр)
+        try {
+          await connectDB();
+          const dbAdmin = await User.findOne({ email, role: "admin" }).select("+password");
+          if (dbAdmin?.password) {
+            const ok = await bcrypt.compare(password, dbAdmin.password);
+            if (ok) {
+              return {
+                id: dbAdmin._id.toString(),
+                email: dbAdmin.email,
+                name: `${dbAdmin.firstName} ${dbAdmin.lastName}`.trim() || "Admin",
+                role: "admin",
+                grade: typeof dbAdmin.grade === "number" ? dbAdmin.grade : undefined,
+                isPremium: dbAdmin.isPremium ?? true,
+                xp: dbAdmin.xp ?? 0,
+                level: dbAdmin.level ?? 1,
+                coins: dbAdmin.coins ?? 0,
+                lives: dbAdmin.lives ?? 99,
+                streak: dbAdmin.streak ?? 0,
+                image: dbAdmin.avatar,
+              };
+            }
+          }
+        } catch {
+          /* MongoDB байхгүй бол доорх student login руу үргэлжлэнэ */
         }
 
         // ── DB user ──────────────────────────────────
