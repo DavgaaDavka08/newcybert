@@ -18,9 +18,11 @@ interface UserDocForStreak {
   save(): Promise<unknown>;
 }
 
-// Vercel: auto-set NEXTAUTH_URL when only VERCEL_URL is present
-if (!process.env.NEXTAUTH_URL?.trim() && process.env.VERCEL_URL) {
-  process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
+// NEXTAUTH_URL must match the production domain exactly.
+// VERCEL_URL is deployment-specific (changes per deploy) — do NOT use it.
+// Set NEXTAUTH_URL=https://newcybert.vercel.app in Vercel Environment Variables.
+if (!process.env.NEXTAUTH_URL?.trim()) {
+  process.env.NEXTAUTH_URL = "http://localhost:3000";
 }
 
 const authSecret =
