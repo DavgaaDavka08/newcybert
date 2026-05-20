@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import "./admin.css";
 import { ContentManager } from "@/components/admin/ContentManager";
 import { VideoLessonManager } from "@/components/admin/VideoLessonManager";
+import { AdminIcon, type AdminIconName } from "@/components/admin/AdminIcon";
 
 // ── Types ─────────────────────────────────────────────────────
 type Tab = "overview" | "content" | "live" | "users" | "questions" | "categories" | "exams" | "videos";
@@ -429,15 +430,28 @@ export default function AdminPage() {
     !examSearch || e.title.toLowerCase().includes(examSearch.toLowerCase())
   );
 
-  const NAV: { id: Tab; label: string; abbr: string }[] = [
-    { id: "overview",   label: "Тойм",              abbr: "Т" },
-    { id: "content",    label: "Тоглоомын агуулга", abbr: "А" },
-    { id: "live",       label: "Тэргүүлэгчид",      abbr: "Л" },
-    { id: "users",      label: "Хэрэглэгчид",       abbr: "Х" },
-    { id: "questions",  label: "Асуултын сан",      abbr: "?" },
-    { id: "categories", label: "Ангилал",           abbr: "К" },
-    { id: "exams",      label: "Шалгалтууд",        abbr: "Ш" },
-    { id: "videos",     label: "Видео хичээл",      abbr: "В" },
+  const NAV_GROUPS: { label: string; items: { id: Tab; label: string; icon: AdminIconName }[] }[] = [
+    {
+      label: "Ерөнхий",
+      items: [{ id: "overview", label: "Тойм", icon: "chart" }],
+    },
+    {
+      label: "Хичээл & тоглоом",
+      items: [
+        { id: "content", label: "Тоглоомын курс", icon: "layers" },
+        { id: "videos", label: "Видео & PDF", icon: "video" },
+        { id: "questions", label: "Асуултын сан", icon: "help" },
+        { id: "categories", label: "Ангилал", icon: "folder" },
+        { id: "exams", label: "Шалгалт", icon: "clipboard" },
+      ],
+    },
+    {
+      label: "Хэрэглэгчид",
+      items: [
+        { id: "users", label: "Бүртгэл", icon: "users" },
+        { id: "live", label: "Тэргүүлэгчид", icon: "trophy" },
+      ],
+    },
   ];
 
   if (status === "loading") return (
@@ -456,11 +470,16 @@ export default function AdminPage() {
             <div className="brand-sub">Удирдлагын самбар</div>
           </div>
           <nav className="nav">
-            {NAV.map(n => (
-              <button key={n.id} className={`nav-item${tab === n.id ? " active" : ""}`} onClick={() => setTab(n.id)}>
-                <span className="nav-abbr">{n.abbr}</span>
-                {n.label}
-              </button>
+            {NAV_GROUPS.map((group) => (
+              <div key={group.label} className="nav-section">
+                <div className="nav-section-label">{group.label}</div>
+                {group.items.map((n) => (
+                  <button key={n.id} className={`nav-item${tab === n.id ? " active" : ""}`} onClick={() => setTab(n.id)}>
+                    <span className="nav-icon"><AdminIcon name={n.icon} size={15} /></span>
+                    {n.label}
+                  </button>
+                ))}
+              </div>
             ))}
           </nav>
           <div className="user-area">
@@ -485,6 +504,25 @@ export default function AdminPage() {
                   <p className="page-sub">{new Date().toLocaleDateString("mn-MN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
                 </div>
                 <button className="btn" onClick={loadStats}>Шинэчлэх</button>
+              </div>
+
+              <div className="quick-cards">
+                <button type="button" className="quick-card" onClick={() => setTab("content")}>
+                  <strong className="quick-card-title"><AdminIcon name="layers" size={16} /> Тоглоомын курс</strong>
+                  <span>Сэдэв, хичээл, асуулт нэмэх — сурагчийн газрын зураг</span>
+                </button>
+                <button type="button" className="quick-card" onClick={() => setTab("videos")}>
+                  <strong className="quick-card-title"><AdminIcon name="video" size={16} /> Видео & PDF</strong>
+                  <span>Бичлэг, баримт бичиг байршуулах</span>
+                </button>
+                <button type="button" className="quick-card" onClick={() => setTab("exams")}>
+                  <strong className="quick-card-title"><AdminIcon name="clipboard" size={16} /> Шалгалт</strong>
+                  <span>Шалгалт үүсгэх, үр дүн харах</span>
+                </button>
+                <button type="button" className="quick-card" onClick={() => setTab("users")}>
+                  <strong className="quick-card-title"><AdminIcon name="users" size={16} /> Хэрэглэгчид</strong>
+                  <span>Бүртгэл, дүр, premium удирдах</span>
+                </button>
               </div>
 
               {!stats ? (
@@ -550,10 +588,19 @@ export default function AdminPage() {
           {tab === "content" && (
             <div>
               <div className="page-header">
-                <h1 className="page-title">Тоглоомын агуулга</h1>
-                <p className="page-sub">
-                  Сэдэв → дэд сэдэв (хичээл) → асуулт. Хадгалсны дараа сурагчийн «Давталт» дэлгэцэнд харагдана.
-                </p>
+                <h1 className="page-title">Тоглоомын курс</h1>
+                <p className="page-sub">Сурагчийн тоглоомын газрын зураг — 3 алхмаар хичээл үүсгэнэ</p>
+              </div>
+              <div className="help-banner">
+                <div className="help-banner-icon"><AdminIcon name="layers" size={22} /></div>
+                <div>
+                  <h3>Шинэ багшид — энэ дарааллаар хийгээрэй</h3>
+                  <p>
+                    <strong>1. Сэдэв</strong> (жишээ: Механик) → <strong>2. Хичээл</strong> (од бүр — нэг түвшин) →{" "}
+                    <strong>3. Агуулга</strong> (текст + хамгийн багадаа 1 асуулт, зөвлөмж 10). Дараа нь{" "}
+                    <strong>Хадгалах</strong> дарна.
+                  </p>
+                </div>
               </div>
               <ContentManager />
             </div>
@@ -578,7 +625,7 @@ export default function AdminPage() {
                     ) : lbPlayers.map((p, i) => (
                       <tr key={`${p.name}-${i}`}>
                         <td style={{ fontWeight: i < 3 ? 700 : 400, color: i === 0 ? "#F59E0B" : i === 1 ? "#94A3B8" : i === 2 ? "#B45309" : "#94A3B8" }}>
-                          {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
+                          {i + 1}
                         </td>
                         <td>
                           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -587,7 +634,7 @@ export default function AdminPage() {
                           </div>
                         </td>
                         <td style={{ fontWeight: 600, color: "#4F46E5", fontVariantNumeric: "tabular-nums" }}>{p.score.toLocaleString()} XP</td>
-                        <td style={{ color: p.streak > 7 ? "#F59E0B" : "#64748B" }}>{p.streak > 0 ? `🔥 ${p.streak} өдөр` : "—"}</td>
+                        <td style={{ color: p.streak > 7 ? "#F59E0B" : "#64748B" }}>{p.streak > 0 ? `${p.streak} өдөр streak` : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1014,7 +1061,7 @@ export default function AdminPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <div className="field" style={{ margin: 0 }}>
                   <label className="label">Дүрс тэмдэг</label>
-                  <input className="input" placeholder="⚡" value={catForm.icon} onChange={e => setCatForm(f => ({ ...f, icon: e.target.value }))} />
+                  <input className="input" placeholder="icon" value={catForm.icon} onChange={e => setCatForm(f => ({ ...f, icon: e.target.value }))} />
                 </div>
                 <div className="field" style={{ margin: 0 }}>
                   <label className="label">Өнгө</label>

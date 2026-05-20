@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { T } from "@/styles/tokens";
 import { Ic } from "@/components/ui/Icon";
+import { BackButton } from "@/components/ui/BackButton";
 
 interface VideoRow {
   _id: string;
@@ -145,25 +146,7 @@ export default function VideosPage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button
-            onClick={() => router.push("/dashboard")}
-            type="button"
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: T.muted,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 13,
-              fontFamily: "inherit",
-              padding: "6px 10px",
-              borderRadius: 8,
-            }}
-          >
-            <Ic n="chevLeft" size={16} /> Буцах
-          </button>
+          <BackButton href="/dashboard" label="Буцах" />
           <div style={{ width: 1, height: 20, background: T.border }} />
           <div style={{ fontWeight: 800, fontSize: 16, color: T.text, display: "flex", alignItems: "center", gap: 8 }}>
             <Ic n="video" size={18} color={T.blue} />
@@ -577,11 +560,18 @@ function PdfModal({
             <Ic n="xCircle" size={18} />
           </button>
         </div>
-        <iframe
-          src={video.url}
+        <object
+          data={`/api/videos/${video._id}/pdf`}
+          type="application/pdf"
           title={video.title}
-          style={{ flex: 1, width: "100%", border: "none" }}
-        />
+          style={{ flex: 1, width: "100%", border: "none", minHeight: 400 }}
+        >
+          <iframe
+            src={`/api/videos/${video._id}/pdf`}
+            title={video.title}
+            style={{ width: "100%", height: "100%", minHeight: 400, border: "none" }}
+          />
+        </object>
         <div
           style={{
             padding: "12px 16px",

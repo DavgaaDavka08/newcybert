@@ -2,9 +2,11 @@
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import { useAppState } from "@/lib/app-state-context";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { T } from "@/styles/tokens";
 import { Ic } from "@/components/ui/Icon";
+import { BackButton } from "@/components/ui/BackButton";
+import { useToast } from "@/components/ui/Toast";
 
 interface Option { id: string; text: string; }
 interface Question { id: string; question: string; options: Option[]; }
@@ -29,6 +31,7 @@ export default function TakeExamPage() {
   const [reward, setReward] = useState<{ xpEarned: number; coinsEarned: number } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { refreshStats } = useAppState();
+  const toast = useToast();
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
@@ -56,8 +59,10 @@ export default function TakeExamPage() {
 
         if (!aRes.ok) {
           if (aData.message?.includes("аль хэдийн")) {
-            setError("Та энэ шалгалтыг аль хэдийн өгсөн байна!");
-            setTimeout(() => router.push("/dashboard/exam"), 2000);
+            const msg = "Та энэ шалгалтыг аль хэдийн өгсөн байна!";
+            setError(msg);
+            toast.warning(msg, "Шалгалт");
+            setTimeout(() => router.push("/dashboard/exam"), 2200);
             return;
           }
           throw new Error(aData.error ?? "Attempt эхлүүлэхэд алдаа");
@@ -115,7 +120,7 @@ export default function TakeExamPage() {
         await refreshStats();
         setTimeout(() => router.push(`/dashboard/exam/result/${data.attemptId ?? attemptId}`), 1800);
       } else {
-        alert(data.error ?? "Алдаа гарлаа");
+        toast.error(data.error ?? "Алдаа гарлаа", "Шалгалт");
         setSubmitting(false);
       }
     } catch {
@@ -141,9 +146,7 @@ export default function TakeExamPage() {
       <div style={{ textAlign: "center", maxWidth: 380 }}>
         <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
         <div style={{ fontWeight: 800, fontSize: 18, color: T.red, marginBottom: 8 }}>{error}</div>
-        <button onClick={() => router.push("/dashboard/exam")} style={{ marginTop: 16, padding: "10px 24px", borderRadius: 10, background: "#4F46E5", color: "#fff", border: "none", cursor: "pointer", fontWeight: 700, fontFamily: "inherit" }}>
-          ← Буцах
-        </button>
+        <BackButton href="/dashboard/exam" label="Буцах" />
       </div>
     </div>
   );
@@ -151,136 +154,131 @@ export default function TakeExamPage() {
   if (!exam) return null;
   const q = exam.questions[currentQ];
 
+  const navBtnStyle = (isCurrent: boolean, isAnswered: boolean): React.CSSProperties => ({
+    height: 36, width: "100%", borderRadius: 8,
+    border: `2px solid ${isCurrent ? "#4F46E5" : isAnswered ? T.green : T.border}`,
+    background: isCurrent ? "#4F46E5" : isAnswered ? T.greenLight : "#fff",
+    color: isCurrent ? "#fff" : isAnswered ? T.green : T.textSub,
+    fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit", transition: "all 0.1s",
+  });
+
+  const pillStyle = (isCurrent: boolean, isAnswered: boolean): React.CSSProperties => ({
+    borderColor: isCurrent ? "#4F46E5" : isAnswered ? T.green : "#e2e8f0",
+    background: isCurrent ? "#4F46E5" : isAnswered ? T.greenLight : "#fff",
+    color: isCurrent ? "#fff" : isAnswered ? T.green : T.textSub,
+  });
+
   return (
-    <div style={{ minHeight: "100vh", background: "#f8f9fc", fontFamily: "Plus Jakarta Sans, sans-serif" }}>
-      {/* Sticky header */}
-      <div style={{ background: "#fff", borderBottom: `1px solid ${T.border}`, position: "sticky", top: 0, zIndex: 50, padding: "0 24px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: T.shadow }}>
-        <div>
-          <div style={{ fontWeight: 800, fontSize: 15, color: T.text }}>{exam.title}</div>
-          <div style={{ fontSize: 12, color: T.muted }}>{answered}/{exam.questions.length} асуулт хариулсан</div>
+    <div className="exam-page">
+      <header className="exam-header">
+        <BackButton href="/dashboard/exam" label="Буцах" />
+        <div className="exam-header-main">
+          <div className="exam-header-title">{exam.title}</div>
+          <div className="exam-header-sub">{answered}/{exam.questions.length} асуулт хариулсан</div>
         </div>
-        {/* Timer */}
-        <div style={{
-          display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 10,
-          border: `2px solid ${urgent ? T.red : "#4F46E5"}`,
-          background: urgent ? T.redLight : "#EEF2FF",
-          fontFamily: "monospace", fontSize: 22, fontWeight: 700,
-          color: urgent ? T.red : "#4F46E5",
-          transition: "all 0.3s",
-        }}>
+        <div className={`exam-timer ${urgent ? "exam-timer--urgent" : "exam-timer--ok"}`}>
           <Ic n="history" size={20} color={urgent ? T.red : "#4F46E5"} />
           {fmt(timeLeft)}
         </div>
-      </div>
+      </header>
 
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 20px", display: "grid", gridTemplateColumns: "240px 1fr", gap: 20, alignItems: "start" }}>
-        {/* Sidebar — question nav */}
-        <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 14, padding: 16, position: "sticky", top: 80 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: T.text, marginBottom: 14 }}>Асуултууд</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6, marginBottom: 16 }}>
-            {exam.questions.map((item, idx) => {
-              const isCurrent = currentQ === idx;
-              const isAnswered = !!answers[item.id];
-              return (
-                <button key={item.id} onClick={() => setCurrentQ(idx)} style={{
-                  height: 36, width: "100%", borderRadius: 8, border: `2px solid ${isCurrent ? "#4F46E5" : isAnswered ? T.green : T.border}`,
-                  background: isCurrent ? "#4F46E5" : isAnswered ? T.greenLight : "#fff",
-                  color: isCurrent ? "#fff" : isAnswered ? T.green : T.textSub,
-                  fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
-                  transition: "all 0.1s",
-                }}>
-                  {idx + 1}
-                </button>
-              );
-            })}
-          </div>
-          <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-              <span style={{ color: T.textSub }}>Хариулсан:</span>
-              <span style={{ fontWeight: 700, color: T.green }}>{answered}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-              <span style={{ color: T.textSub }}>Үлдсэн:</span>
-              <span style={{ fontWeight: 700, color: T.muted }}>{exam.questions.length - answered}</span>
-            </div>
-          </div>
+      <div className="exam-body">
+        <div className="exam-nav-pills" role="tablist" aria-label="Асуултууд">
+          {exam.questions.map((item, idx) => {
+            const isCurrent = currentQ === idx;
+            const isAnswered = !!answers[item.id];
+            return (
+              <button key={item.id} type="button" className="exam-nav-pill" style={pillStyle(isCurrent, isAnswered)} onClick={() => setCurrentQ(idx)} aria-current={isCurrent ? "step" : undefined}>
+                {idx + 1}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Question card */}
-        <div>
-          <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 14, padding: "24px 28px", boxShadow: T.shadow, marginBottom: 16 }}>
-            <div style={{ display: "inline-block", fontSize: 11, fontWeight: 700, color: "#4F46E5", background: "#EEF2FF", padding: "3px 10px", borderRadius: 99, border: "1px solid #C7D2FE", marginBottom: 18 }}>
-              Асуулт {currentQ + 1}/{exam.questions.length}
-            </div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: T.text, lineHeight: 1.6, marginBottom: 28 }}>
-              {q.question}
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {q.options.map((opt) => {
-                const selected = answers[q.id] === opt.id;
+        <div className="exam-layout">
+          <aside className="exam-sidebar">
+            <div style={{ fontWeight: 700, fontSize: 13, color: T.text, marginBottom: 14 }}>Асуултууд</div>
+            <div className="exam-nav-grid">
+              {exam.questions.map((item, idx) => {
+                const isCurrent = currentQ === idx;
+                const isAnswered = !!answers[item.id];
                 return (
-                  <button key={opt.id} onClick={() => saveAnswer(q.id, opt.id)} style={{
-                    padding: "14px 18px", borderRadius: 12,
-                    border: `2px solid ${selected ? "#4F46E5" : T.border}`,
-                    background: selected ? "#EEF2FF" : "#fff",
-                    textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: 14,
-                    fontFamily: "inherit", transition: "all 0.12s",
-                    boxShadow: selected ? "0 0 0 3px rgba(79,70,229,0.12)" : "none",
-                  }}
-                    onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = "#A5B4FC"; }}
-                    onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = T.border; }}
-                  >
-                    <div style={{
-                      width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
-                      background: selected ? "#4F46E5" : T.border,
-                      color: selected ? "#fff" : T.textSub,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontWeight: 800, fontSize: 13, transition: "all 0.12s",
-                    }}>
-                      {opt.id}
-                    </div>
-                    <span style={{ fontSize: 15, fontWeight: selected ? 700 : 500, color: selected ? "#3730A3" : T.text }}>
-                      {opt.text}
-                    </span>
+                  <button key={item.id} type="button" onClick={() => setCurrentQ(idx)} style={navBtnStyle(isCurrent, isAnswered)}>
+                    {idx + 1}
                   </button>
                 );
               })}
             </div>
-          </div>
+            <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                <span style={{ color: T.textSub }}>Хариулсан:</span>
+                <span style={{ fontWeight: 700, color: T.green }}>{answered}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                <span style={{ color: T.textSub }}>Үлдсэн:</span>
+                <span style={{ fontWeight: 700, color: T.muted }}>{exam.questions.length - answered}</span>
+              </div>
+            </div>
+          </aside>
 
-          {/* Nav buttons */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <button onClick={() => setCurrentQ(Math.max(0, currentQ - 1))} disabled={currentQ === 0} style={{
-              padding: "11px 22px", borderRadius: 10, border: `1.5px solid ${T.border}`, background: "#fff",
-              fontWeight: 700, fontSize: 14, cursor: currentQ === 0 ? "not-allowed" : "pointer", color: currentQ === 0 ? T.muted : T.textSub,
-              fontFamily: "inherit",
-            }}>
-              ← Өмнөх
-            </button>
+          <div>
+            <div className="exam-card">
+              <div style={{ display: "inline-block", fontSize: 11, fontWeight: 700, color: "#4F46E5", background: "#EEF2FF", padding: "3px 10px", borderRadius: 99, border: "1px solid #C7D2FE", marginBottom: 18 }}>
+                Асуулт {currentQ + 1}/{exam.questions.length}
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: T.text, lineHeight: 1.6, marginBottom: 28, wordBreak: "break-word" }}>
+                {q.question}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {q.options.map((opt) => {
+                  const selected = answers[q.id] === opt.id;
+                  return (
+                    <button key={opt.id} type="button" onClick={() => saveAnswer(q.id, opt.id)} style={{
+                      padding: "14px 18px", borderRadius: 12,
+                      border: `2px solid ${selected ? "#4F46E5" : T.border}`,
+                      background: selected ? "#EEF2FF" : "#fff",
+                      textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: 14,
+                      fontFamily: "inherit", transition: "all 0.12s", width: "100%",
+                      boxShadow: selected ? "0 0 0 3px rgba(79,70,229,0.12)" : "none",
+                    }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+                        background: selected ? "#4F46E5" : T.border,
+                        color: selected ? "#fff" : T.textSub,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontWeight: 800, fontSize: 13,
+                      }}>{opt.id}</div>
+                      <span style={{ fontSize: 15, fontWeight: selected ? 700 : 500, color: selected ? "#3730A3" : T.text, wordBreak: "break-word" }}>{opt.text}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-            {currentQ < exam.questions.length - 1 ? (
-              <button onClick={() => setCurrentQ(currentQ + 1)} style={{
-                padding: "11px 28px", borderRadius: 10, border: "none", background: "#4F46E5",
-                fontWeight: 800, fontSize: 14, cursor: "pointer", color: "#fff", fontFamily: "inherit",
-                boxShadow: "0 4px 14px rgba(79,70,229,0.35)",
-              }}>
-                Дараах →
-              </button>
-            ) : (
-              <button onClick={() => setShowConfirm(true)} style={{
-                padding: "11px 28px", borderRadius: 10, border: "none",
-                background: "linear-gradient(135deg, #16A34A, #15803D)",
-                fontWeight: 800, fontSize: 14, cursor: "pointer", color: "#fff", fontFamily: "inherit",
-                boxShadow: "0 4px 14px rgba(22,163,74,0.35)",
-              }}>
-                ✅ Дуусгах
-              </button>
-            )}
+            <div className="exam-actions">
+              <button type="button" onClick={() => setCurrentQ(Math.max(0, currentQ - 1))} disabled={currentQ === 0} style={{
+                padding: "11px 22px", borderRadius: 10, border: `1.5px solid ${T.border}`, background: "#fff",
+                fontWeight: 700, fontSize: 14, cursor: currentQ === 0 ? "not-allowed" : "pointer",
+                color: currentQ === 0 ? T.muted : T.textSub, fontFamily: "inherit", width: "100%", maxWidth: 200,
+              }}>← Өмнөх</button>
+              {currentQ < exam.questions.length - 1 ? (
+                <button type="button" onClick={() => setCurrentQ(currentQ + 1)} style={{
+                  padding: "11px 28px", borderRadius: 10, border: "none", background: "#4F46E5",
+                  fontWeight: 800, fontSize: 14, cursor: "pointer", color: "#fff", fontFamily: "inherit",
+                  boxShadow: "0 4px 14px rgba(79,70,229,0.35)", flex: 1, maxWidth: 280,
+                }}>Дараах →</button>
+              ) : (
+                <button type="button" onClick={() => setShowConfirm(true)} style={{
+                  padding: "11px 28px", borderRadius: 10, border: "none",
+                  background: "linear-gradient(135deg, #16A34A, #15803D)",
+                  fontWeight: 800, fontSize: 14, cursor: "pointer", color: "#fff", fontFamily: "inherit",
+                  boxShadow: "0 4px 14px rgba(22,163,74,0.35)", flex: 1, maxWidth: 280,
+                }}>✅ Дуусгах</button>
+              )}
+            </div>
           </div>
         </div>
       </div>
-
       {/* Submit confirm dialog */}
       {showConfirm && (
         <DialogOverlay onClose={() => setShowConfirm(false)}>

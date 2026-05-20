@@ -4,6 +4,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { T } from "@/styles/tokens";
 import { Ic } from "@/components/ui/Icon";
+import { BackButton } from "@/components/ui/BackButton";
 
 interface AnswerResult {
   questionId: string; questionText: string; questionIndex: number;
@@ -55,9 +56,7 @@ export default function ExamResultPage() {
     <div style={{ minHeight: "100vh", background: "#f8f9fc", fontFamily: "Plus Jakarta Sans, sans-serif" }}>
       {/* Header */}
       <div style={{ background: "#fff", borderBottom: `1px solid ${T.border}`, padding: "0 24px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
-        <button onClick={() => router.push("/dashboard/exam")} style={{ background: "none", border: "none", cursor: "pointer", color: T.muted, display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontFamily: "inherit" }}>
-          <Ic n="chevLeft" size={16} /> Шалгалтууд руу буцах
-        </button>
+        <BackButton href="/dashboard/exam" label="Шалгалтууд руу буцах" />
         <div style={{ fontWeight: 700, fontSize: 14, color: T.text }}>Үр дүн</div>
       </div>
 

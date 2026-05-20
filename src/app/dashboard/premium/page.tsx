@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { T } from "@/styles/tokens";
-import { Ic } from "@/components/ui/Icon";
+import { BackButton } from "@/components/ui/BackButton";
 
 const PLANS = [
   {
@@ -67,9 +67,7 @@ export default function PremiumPage() {
     <div style={{ minHeight: "100vh", background: T.bg, fontFamily: "Plus Jakarta Sans, sans-serif" }}>
       {/* Header */}
       <div style={{ background: "#fff", borderBottom: `1px solid ${T.border}`, padding: "0 28px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
-        <button onClick={() => router.push("/dashboard")} style={{ background: "none", border: "none", cursor: "pointer", color: T.muted, display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontFamily: "inherit" }}>
-          <Ic n="chevLeft" size={16} /> Буцах
-        </button>
+        <BackButton href="/dashboard" label="Буцах" />
         <div style={{ fontWeight: 800, fontSize: 15, color: T.text }}>⭐ Premium</div>
         {isPremium && (
           <span style={{ background: T.purpleLight, color: T.purple, padding: "4px 12px", borderRadius: 99, fontSize: 12, fontWeight: 700 }}>

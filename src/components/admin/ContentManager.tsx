@@ -1,6 +1,8 @@
 'use client';
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { T } from '@/styles/tokens';
+import { AdminIcon, TOPIC_ICON_GLYPHS, type AdminIconName } from '@/components/admin/AdminIcon';
 
 // ── Types ──────────────────────────────────────────────────────
 interface Topic {
@@ -30,25 +32,101 @@ interface Subtopic {
   questions: QuestionEmbed[];
 }
 
-const COLORS = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#F97316'];
-const ICONS  = ['⚡','🔥','💡','🧪','🌊','⚙️','🎯','📐','🔬','📊'];
+type MobileStep = 'topics' | 'lessons' | 'editor';
+
+const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#F97316'];
+const ICONS = [...TOPIC_ICON_GLYPHS];
+
+const WIZARD_STEPS = [
+  { id: 'topics' as const, num: 1, title: 'Сэдэв', hint: 'Тоглоомын бүлэг' },
+  { id: 'lessons' as const, num: 2, title: 'Хичээл', hint: 'Дэд сэдэв / түвшин' },
+  { id: 'editor' as const, num: 3, title: 'Агуулга', hint: 'Текст + 10 асуулт' },
+];
 
 function emptyQuestion(): QuestionEmbed {
-  return { question: '', options: ['','','',''], correctIndex: 0, explanation: '' };
+  return { question: '', options: ['', '', '', ''], correctIndex: 0, explanation: '' };
+}
+
+function questionFilled(q: QuestionEmbed) {
+  return Boolean(q.question.trim() && q.options.every((o) => o.trim()));
+}
+
+function listRowKeyActivate(e: React.KeyboardEvent, onActivate: () => void) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    onActivate();
+  }
+}
+
+/** Clickable row — div (not button) so action buttons can nest inside */
+function CourseListRow({
+  selected,
+  onActivate,
+  children,
+}: {
+  selected: boolean;
+  onActivate: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      className={`course-list-item${selected ? ' selected' : ''}`}
+      onClick={onActivate}
+      onKeyDown={(e) => listRowKeyActivate(e, onActivate)}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ── Shared UI ──────────────────────────────────────────────────
+function EmptyState({
+  icon,
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  icon: AdminIconName;
+  title: string;
+  description: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="course-empty">
+      <div className="course-empty-icon"><AdminIcon name={icon} size={36} /></div>
+      <h4>{title}</h4>
+      <p>{description}</p>
+      {actionLabel && onAction && (
+        <button type="button" className="course-panel-add" onClick={onAction}>
+          + {actionLabel}
+        </button>
+      )}
+    </div>
+  );
 }
 
 // ── TopicForm ──────────────────────────────────────────────────
-function TopicForm({ initial, accentColor, submitLabel, onSubmit, onCancel }: {
+function TopicForm({
+  initial,
+  accentColor,
+  submitLabel,
+  onSubmit,
+  onCancel,
+}: {
   initial?: Partial<Topic>;
   accentColor: string;
   submitLabel: string;
   onSubmit: (name: string, color: string, icon: string, desc: string) => Promise<void>;
   onCancel: () => void;
 }) {
-  const [name, setName]   = useState(initial?.name ?? '');
-  const [desc, setDesc]   = useState(initial?.description ?? '');
+  const [name, setName] = useState(initial?.name ?? '');
+  const [desc, setDesc] = useState(initial?.description ?? '');
   const [color, setColor] = useState(initial?.color ?? COLORS[0]);
-  const [icon, setIcon]   = useState(initial?.icon ?? ICONS[0]);
+  const [icon, setIcon] = useState(initial?.icon ?? ICONS[0]);
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit() {
@@ -59,82 +137,208 @@ function TopicForm({ initial, accentColor, submitLabel, onSubmit, onCancel }: {
   }
 
   return (
-    <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.border}`, background: '#F8FAFC' }}>
-      <input value={name} onChange={e => setName(e.target.value)} placeholder="Сэдвийн нэр" style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, marginBottom: 8, boxSizing: 'border-box', fontFamily: 'Plus Jakarta Sans, sans-serif' }} />
-      <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Тайлбар (заавал биш)" style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, marginBottom: 8, boxSizing: 'border-box', fontFamily: 'Plus Jakarta Sans, sans-serif' }} />
-      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
-        {COLORS.map(c => (
-          <div key={c} onClick={() => setColor(c)} style={{ width: 22, height: 22, borderRadius: '50%', background: c, cursor: 'pointer', border: color === c ? '2px solid #0f172a' : '2px solid transparent', transition: 'border 0.12s' }} />
+    <div className="course-inline-form">
+      <div className="field" style={{ marginBottom: 10 }}>
+        <label className="label">Сэдвийн нэр *</label>
+        <input
+          className="input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Жишээ: Механик, Цахилгаан"
+        />
+      </div>
+      <div className="field" style={{ marginBottom: 10 }}>
+        <label className="label">Тайлбар</label>
+        <input
+          className="input"
+          value={desc}
+          onChange={(e) => setDesc(e.target.value)}
+          placeholder="Сурагчид харагдах богино тайлбар"
+        />
+      </div>
+      <label className="label">Өнгө</label>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+        {COLORS.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => setColor(c)}
+            aria-label="Өнгө сонгох"
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: '50%',
+              background: c,
+              border: color === c ? '2px solid #0f172a' : '2px solid transparent',
+              cursor: 'pointer',
+            }}
+          />
         ))}
       </div>
-      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 10 }}>
-        {ICONS.map(ic => (
-          <button key={ic} onClick={() => setIcon(ic)} style={{ fontSize: 18, width: 32, height: 32, borderRadius: 6, border: icon === ic ? `2px solid ${accentColor}` : `1px solid ${T.border}`, background: icon === ic ? '#EFF6FF' : '#fff', cursor: 'pointer' }}>{ic}</button>
+      <label className="label">Дүрс</label>
+      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 12 }}>
+        {ICONS.map((ic) => (
+          <button
+            key={ic}
+            type="button"
+            onClick={() => setIcon(ic)}
+            style={{
+              fontSize: 18,
+              width: 34,
+              height: 34,
+              borderRadius: 8,
+              border: icon === ic ? `2px solid ${accentColor}` : '1px solid #e2e8f0',
+              background: icon === ic ? '#eff6ff' : '#fff',
+              cursor: 'pointer',
+            }}
+          >
+            {ic}
+          </button>
         ))}
       </div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <button onClick={handleSubmit} disabled={!name.trim() || saving} style={{ flex: 1, padding: '8px', borderRadius: 8, border: 'none', background: accentColor, color: '#fff', fontWeight: 700, fontSize: 12, cursor: name.trim() && !saving ? 'pointer' : 'not-allowed', opacity: name.trim() && !saving ? 1 : 0.6, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          type="button"
+          className="btn primary"
+          style={{ flex: 1 }}
+          onClick={handleSubmit}
+          disabled={!name.trim() || saving}
+        >
           {saving ? 'Хадгалж…' : submitLabel}
         </button>
-        <button onClick={onCancel} style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Болих</button>
+        <button type="button" className="btn" onClick={onCancel}>
+          Болих
+        </button>
       </div>
     </div>
   );
 }
 
 // ── TopicPanel ─────────────────────────────────────────────────
-function TopicPanel({ topics, selected, onSelect, onAdd, onEdit, onDelete, loading }: {
-  topics: Topic[]; selected: Topic | null;
+function TopicPanel({
+  topics,
+  selected,
+  onSelect,
+  onAdd,
+  onEdit,
+  onDelete,
+  loading,
+  isActive = true,
+}: {
+  topics: Topic[];
+  selected: Topic | null;
   onSelect: (t: Topic) => void;
   onAdd: (name: string, color: string, icon: string, desc: string) => Promise<void>;
   onEdit: (id: string, name: string, color: string, icon: string, desc: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   loading: boolean;
+  isActive?: boolean;
 }) {
-  const [showAdd, setShowAdd]   = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   return (
-    <div style={{ width: 260, flexShrink: 0, borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '16px 16px 12px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontWeight: 800, fontSize: 14, color: T.text }}>Сэдвүүд</span>
-        <button onClick={() => { setShowAdd(v => !v); setEditingId(null); }} style={{ fontSize: 20, background: 'none', border: 'none', cursor: 'pointer', color: T.blue, lineHeight: 1 }}>+</button>
+    <div className={`course-panel course-panel--topics${isActive ? ' is-active' : ''}`}>
+      <div className="course-panel-head">
+        <div className="course-panel-head-top">
+          <div>
+            <div className="course-panel-step">Алхам 1</div>
+            <div className="course-panel-title">Сэдэв (бүлэг)</div>
+            <div className="course-panel-hint">
+              Тоглоомын газрын зураг дээрх том бүлэг — жишээ нь «Механик»
+            </div>
+          </div>
+          <button
+            type="button"
+            className="course-panel-add"
+            onClick={() => {
+              setShowAdd(true);
+              setEditingId(null);
+            }}
+          >
+            + Шинэ
+          </button>
+        </div>
       </div>
 
       {showAdd && (
         <TopicForm
           accentColor={T.blue}
-          submitLabel="Нэмэх"
-          onSubmit={async (n, c, i, d) => { await onAdd(n, c, i, d); setShowAdd(false); }}
+          submitLabel="Сэдэв нэмэх"
+          onSubmit={async (n, c, i, d) => {
+            await onAdd(n, c, i, d);
+            setShowAdd(false);
+          }}
           onCancel={() => setShowAdd(false)}
         />
       )}
 
-      <div style={{ flex: 1, overflowY: 'auto' }}>
-        {loading && <div style={{ padding: 20, textAlign: 'center', color: T.muted, fontSize: 13 }}>Ачаалж байна…</div>}
-        {!loading && topics.length === 0 && (
-          <div style={{ padding: 24, textAlign: 'center', color: T.muted, fontSize: 13 }}>
-            Сэдэв байхгүй байна.<br />+ товчоор нэмнэ үү.
+      <div className="course-panel-scroll">
+        {loading && (
+          <div className="course-empty">
+            <p>Ачаалж байна…</p>
           </div>
         )}
-        {topics.map(t => (
+        {!loading && topics.length === 0 && !showAdd && (
+          <EmptyState
+            icon="map"
+            title="Эхлээд нэг сэдэв үүсгэнэ үү"
+            description="Сэдэв нь тоглоомын газрын зураг дээрх том бүлэг юм. Дараа нь түүний доор хичээлүүд нэмнэ."
+            actionLabel="Шинэ сэдэв"
+            onAction={() => setShowAdd(true)}
+          />
+        )}
+        {topics.map((t) => (
           <div key={t._id}>
-            <div onClick={() => { onSelect(t); setEditingId(null); }}
-              style={{ padding: '12px 14px', cursor: 'pointer', borderBottom: editingId === t._id ? 'none' : `1px solid ${T.border}`, background: selected?._id === t._id ? '#EFF6FF' : '#fff', display: 'flex', alignItems: 'center', gap: 10, transition: 'background 0.12s' }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: t.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>{t.icon}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</div>
-                {t.description && <div style={{ fontSize: 11, color: T.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description}</div>}
+            <CourseListRow
+              selected={selected?._id === t._id}
+              onActivate={() => {
+                onSelect(t);
+                setEditingId(null);
+              }}
+            >
+              <div className="course-item-icon" style={{ background: `${t.color}22`, border: `1px solid ${t.color}44`, fontSize: 16, fontWeight: 700, fontFamily: 'Georgia, serif' }}>
+                {t.icon}
               </div>
-              <button onClick={e => { e.stopPropagation(); setEditingId(id => id === t._id ? null : t._id); setShowAdd(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 14, padding: '4px', flexShrink: 0, lineHeight: 1 }} title="Засах">✎</button>
-              <button onClick={e => { e.stopPropagation(); onDelete(t._id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', fontSize: 16, padding: '4px', flexShrink: 0, opacity: 0.7, lineHeight: 1 }} title="Устгах">×</button>
-            </div>
+              <div className="course-item-body">
+                <div className="course-item-name">{t.name}</div>
+                {t.description && <div className="course-item-meta">{t.description}</div>}
+              </div>
+              <div className="course-list-actions">
+                <button
+                  type="button"
+                  className="course-icon-btn"
+                  title="Засах"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingId((id) => (id === t._id ? null : t._id));
+                    setShowAdd(false);
+                  }}
+                >
+                  ✎
+                </button>
+                <button
+                  type="button"
+                  className="course-icon-btn danger"
+                  title="Устгах"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(t._id);
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            </CourseListRow>
             {editingId === t._id && (
               <TopicForm
                 initial={t}
                 accentColor={t.color}
                 submitLabel="Хадгалах"
-                onSubmit={async (n, c, i, d) => { await onEdit(t._id, n, c, i, d); setEditingId(null); }}
+                onSubmit={async (n, c, i, d) => {
+                  await onEdit(t._id, n, c, i, d);
+                  setEditingId(null);
+                }}
                 onCancel={() => setEditingId(null)}
               />
             )}
@@ -146,7 +350,16 @@ function TopicPanel({ topics, selected, onSelect, onAdd, onEdit, onDelete, loadi
 }
 
 // ── SubtopicPanel ──────────────────────────────────────────────
-function SubtopicPanel({ topic, subtopics, selected, onSelect, onAdd, onDelete, loading }: {
+function SubtopicPanel({
+  topic,
+  subtopics,
+  selected,
+  onSelect,
+  onAdd,
+  onDelete,
+  loading,
+  isActive = true,
+}: {
   topic: Topic | null;
   subtopics: Subtopic[];
   selected: Subtopic | null;
@@ -154,138 +367,244 @@ function SubtopicPanel({ topic, subtopics, selected, onSelect, onAdd, onDelete, 
   onAdd: (name: string, desc: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   loading: boolean;
+  isActive?: boolean;
 }) {
   const [showForm, setShowForm] = useState(false);
-  const [name, setName]         = useState('');
-  const [desc, setDesc]         = useState('');
-  const [saving, setSaving]     = useState(false);
+  const [name, setName] = useState('');
+  const [desc, setDesc] = useState('');
+  const [saving, setSaving] = useState(false);
 
   async function handleAdd() {
     if (!name.trim()) return;
     setSaving(true);
     await onAdd(name.trim(), desc.trim());
-    setName(''); setDesc('');
+    setName('');
+    setDesc('');
     setShowForm(false);
     setSaving(false);
   }
 
   if (!topic) {
     return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.muted, fontSize: 13, borderRight: `1px solid ${T.border}` }}>
-        ← Сэдэв сонгоно уу
+      <div className={`course-panel course-panel--lessons${isActive ? ' is-active' : ''}`}>
+        <div className="course-editor-placeholder">
+          <div className="course-empty-icon" style={{ marginBottom: 12 }}><AdminIcon name="chevron-left" size={40} /></div>
+          <h4 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 700, color: '#0f172a' }}>Эхлээд зүүн талаас сэдэв сонгоно уу</h4>
+          <p style={{ margin: 0, fontSize: 13, maxWidth: 280, lineHeight: 1.5 }}>
+            Сэдэв сонгосны дараа энэ хэсэгт тухайн бүлгийн хичээлүүд (дэд сэдвүүд) харагдана.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ width: 260, flexShrink: 0, borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '16px 16px 12px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ fontWeight: 800, fontSize: 14, color: T.text, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topic.name}</span>
-          <span style={{ fontSize: 11, color: T.muted }}>Дэд сэдвүүд · {subtopics.length}</span>
+    <div className={`course-panel course-panel--lessons${isActive ? ' is-active' : ''}`}>
+      <div className="course-panel-head">
+        <div className="course-panel-head-top">
+          <div>
+            <div className="course-panel-step">Алхам 2</div>
+            <div className="course-panel-title">Хичээл (дэд сэдэв)</div>
+            <div className="course-panel-hint">
+              Тоглоомын од бүр — нэг түвшин. Сурагч эндээс «Эхлэх» дарна.
+            </div>
+          </div>
+          <button type="button" className="course-panel-add" style={{ background: topic.color }} onClick={() => setShowForm(true)}>
+            + Хичээл
+          </button>
         </div>
-        <button onClick={() => setShowForm(v => !v)} style={{ fontSize: 20, background: 'none', border: 'none', cursor: 'pointer', color: topic.color, lineHeight: 1, flexShrink: 0 }}>+</button>
+        <div className="course-progress-bar" title={`${subtopics.length} хичээл`}>
+          <div className="course-progress-fill" style={{ width: `${Math.min(100, subtopics.length * 10)}%` }} />
+        </div>
       </div>
 
       {showForm && (
-        <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.border}`, background: '#F8FAFC' }}>
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="Дэд сэдвийн нэр" style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, marginBottom: 8, boxSizing: 'border-box', fontFamily: 'Plus Jakarta Sans, sans-serif' }} />
-          <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Богино тайлбар" style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, marginBottom: 8, boxSizing: 'border-box', fontFamily: 'Plus Jakarta Sans, sans-serif' }} />
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={handleAdd} disabled={!name.trim() || saving} style={{ flex: 1, padding: '8px', borderRadius: 8, border: 'none', background: topic.color, color: '#fff', fontWeight: 700, fontSize: 12, cursor: name.trim() && !saving ? 'pointer' : 'not-allowed', opacity: name.trim() && !saving ? 1 : 0.6, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
-              {saving ? 'Хадгалж…' : 'Нэмэх'}
+        <div className="course-inline-form">
+          <div className="field" style={{ marginBottom: 10 }}>
+            <label className="label">Хичээлийн нэр *</label>
+            <input
+              className="input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Жишээ: Ньютоны хууль"
+            />
+          </div>
+          <div className="field" style={{ marginBottom: 12 }}>
+            <label className="label">Богино тайлбар</label>
+            <input
+              className="input"
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              placeholder="Сурагчид харагдах товч тайлбар"
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              className="btn primary"
+              style={{ flex: 1, background: topic.color, borderColor: topic.color }}
+              onClick={handleAdd}
+              disabled={!name.trim() || saving}
+            >
+              {saving ? 'Хадгалж…' : 'Хичээл нэмэх'}
             </button>
-            <button onClick={() => setShowForm(false)} style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Болих</button>
+            <button type="button" className="btn" onClick={() => setShowForm(false)}>
+              Болих
+            </button>
           </div>
         </div>
       )}
 
-      <div style={{ flex: 1, overflowY: 'auto' }}>
-        {loading && <div style={{ padding: 20, textAlign: 'center', color: T.muted, fontSize: 13 }}>Ачаалж байна…</div>}
-        {!loading && subtopics.length === 0 && (
-          <div style={{ padding: 24, textAlign: 'center', color: T.muted, fontSize: 13 }}>
-            Дэд сэдэв байхгүй байна.<br />+ товчоор нэмнэ үү.
+      <div className="course-panel-scroll">
+        {loading && (
+          <div className="course-empty">
+            <p>Ачаалж байна…</p>
           </div>
         )}
-        {subtopics.map((s, idx) => (
-          <div key={s._id} onClick={() => onSelect(s)}
-            style={{ padding: '12px 14px', cursor: 'pointer', borderBottom: `1px solid ${T.border}`, background: selected?._id === s._id ? '#F0FDF4' : '#fff', display: 'flex', alignItems: 'center', gap: 10, transition: 'background 0.12s' }}>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: `${topic.color}22`, border: `1px solid ${topic.color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: topic.color, flexShrink: 0 }}>{idx + 1}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
-              <div style={{ fontSize: 11, color: T.muted, marginTop: 1 }}>{s.questions.length}/10 асуулт</div>
-            </div>
-            <button
-              onClick={e => { e.stopPropagation(); onSelect(s); }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 14, padding: '4px', flexShrink: 0, lineHeight: 1 }}
-              title="Засах">✎</button>
-            <button onClick={e => { e.stopPropagation(); onDelete(s._id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', fontSize: 16, padding: '4px', flexShrink: 0, opacity: 0.7, lineHeight: 1 }} title="Устгах">×</button>
-          </div>
-        ))}
+        {!loading && subtopics.length === 0 && !showForm && (
+          <EmptyState
+            icon="node"
+            title={`«${topic.name}»-д хичээл нэмнэ үү`}
+            description="Нэг хичээл = тоглоомын нэг од. Дараа нь 10 асуулт бөглөнө."
+            actionLabel="Шинэ хичээл"
+            onAction={() => setShowForm(true)}
+          />
+        )}
+        {subtopics.map((s, idx) => {
+          const filled = s.questions.filter(questionFilled).length;
+          const ready = filled >= 1;
+          return (
+            <CourseListRow
+              key={s._id}
+              selected={selected?._id === s._id}
+              onActivate={() => onSelect(s)}
+            >
+              <div
+                className="course-item-icon"
+                style={{
+                  background: `${topic.color}18`,
+                  border: `1px solid ${topic.color}55`,
+                  fontSize: 13,
+                  fontWeight: 800,
+                  color: topic.color,
+                }}
+              >
+                {idx + 1}
+              </div>
+              <div className="course-item-body">
+                <div className="course-item-name">{s.name}</div>
+                <div className="course-item-meta">
+                  {ready ? (
+                    <span style={{ color: filled === 10 ? '#16a34a' : '#ca8a04' }}>
+                      {filled}/10 асуулт {filled === 10 ? '✓' : ''}
+                    </span>
+                  ) : (
+                    <span style={{ color: '#dc2626' }}>Асуулт оруулаагүй</span>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="course-icon-btn danger"
+                title="Устгах"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(s._id);
+                }}
+              >
+                ×
+              </button>
+            </CourseListRow>
+          );
+        })}
       </div>
     </div>
   );
 }
 
 // ── QuestionEditor ─────────────────────────────────────────────
-function QuestionEditor({ idx, q, onChange }: {
+function QuestionEditor({
+  idx,
+  q,
+  onChange,
+}: {
   idx: number;
   q: QuestionEmbed;
   onChange: (updated: QuestionEmbed) => void;
 }) {
   const [open, setOpen] = useState(idx === 0);
-  const filled = q.question.trim() && q.options.every(o => o.trim());
+  const filled = questionFilled(q);
 
   return (
-    <div style={{ border: `1px solid ${filled ? '#BBF7D0' : T.border}`, borderRadius: 12, marginBottom: 8, overflow: 'hidden' }}>
-      <div onClick={() => setOpen(v => !v)} style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', background: filled ? '#F0FDF4' : '#FAFAFA' }}>
-        <div style={{ width: 24, height: 24, borderRadius: 6, background: filled ? '#22C55E' : '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: filled ? '#fff' : '#64748B', flexShrink: 0 }}>{idx + 1}</div>
-        <div style={{ flex: 1, fontSize: 13, fontWeight: filled ? 600 : 400, color: filled ? T.text : T.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {q.question.trim() || 'Асуулт оруулаагүй'}
+    <div className={`course-question-card${filled ? ' filled' : ''}`}>
+      <button type="button" className="course-question-head" style={{ width: '100%', border: 'none', textAlign: 'left' }} onClick={() => setOpen((v) => !v)}>
+        <div
+          style={{
+            width: 26,
+            height: 26,
+            borderRadius: 7,
+            background: filled ? '#22c55e' : '#e2e8f0',
+            color: filled ? '#fff' : '#64748b',
+            fontSize: 11,
+            fontWeight: 800,
+            display: 'grid',
+            placeItems: 'center',
+            flexShrink: 0,
+          }}
+        >
+          {idx + 1}
         </div>
-        <div style={{ fontSize: 12, color: T.muted }}>{open ? '▲' : '▼'}</div>
-      </div>
+        <div style={{ flex: 1, fontSize: 13, fontWeight: filled ? 600 : 400, color: filled ? '#0f172a' : '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {q.question.trim() || `${idx + 1}-р асуулт — дарж бөглөнө үү`}
+        </div>
+        <span style={{ fontSize: 12, color: '#94a3b8' }}>{open ? '▲' : '▼'}</span>
+      </button>
       {open && (
-        <div style={{ padding: '12px 14px', borderTop: `1px solid ${T.border}`, background: '#fff' }}>
+        <div style={{ padding: '14px 16px', borderTop: '1px solid #e2e8f0', background: '#fff' }}>
+          <label className="label">Асуулт *</label>
           <textarea
-            value={q.question}
-            onChange={e => onChange({ ...q, question: e.target.value })}
-            placeholder={`${idx + 1}-р асуулт`}
+            className="textarea"
             rows={2}
-            style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'Plus Jakarta Sans, sans-serif', marginBottom: 10 }}
+            value={q.question}
+            onChange={(e) => onChange({ ...q, question: e.target.value })}
+            placeholder="Асуултын текст"
+            style={{ marginBottom: 12 }}
           />
-          <div style={{ fontSize: 11, fontWeight: 700, color: T.muted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Хариултууд</div>
+          <label className="label">Зөв хариулт (радио сонгоно)</label>
           {q.options.map((opt, oi) => (
-            <div key={oi} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <div key={oi} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <input
                 type="radio"
                 name={`correct-${idx}`}
                 checked={q.correctIndex === oi}
                 onChange={() => onChange({ ...q, correctIndex: oi })}
-                style={{ flexShrink: 0, accentColor: '#22C55E' }}
+                style={{ accentColor: '#22c55e' }}
               />
-              <div style={{ width: 20, height: 20, borderRadius: 5, background: q.correctIndex === oi ? '#22C55E' : '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: q.correctIndex === oi ? '#fff' : '#64748B', flexShrink: 0 }}>
-                {String.fromCharCode(65 + oi)}
-              </div>
+              <span style={{ width: 22, fontSize: 11, fontWeight: 800, color: '#64748b' }}>{String.fromCharCode(65 + oi)}</span>
               <input
+                className="input"
                 value={opt}
-                onChange={e => {
+                onChange={(e) => {
                   const newOpts = [...q.options];
                   newOpts[oi] = e.target.value;
                   onChange({ ...q, options: newOpts });
                 }}
                 placeholder={`${String.fromCharCode(65 + oi)} хариулт`}
-                style={{ flex: 1, padding: '6px 10px', borderRadius: 7, border: `1px solid ${q.correctIndex === oi ? '#86EFAC' : T.border}`, fontSize: 13, fontFamily: 'Plus Jakarta Sans, sans-serif', background: q.correctIndex === oi ? '#F0FDF4' : '#fff' }}
+                style={{
+                  flex: 1,
+                  borderColor: q.correctIndex === oi ? '#86efac' : undefined,
+                  background: q.correctIndex === oi ? '#f0fdf4' : undefined,
+                }}
               />
             </div>
           ))}
-          <div style={{ marginTop: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: T.muted, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Тайлбар (заавал биш)</div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label className="label">Тайлбар (заавал биш)</label>
             <input
+              className="input"
               value={q.explanation}
-              onChange={e => onChange({ ...q, explanation: e.target.value })}
+              onChange={(e) => onChange({ ...q, explanation: e.target.value })}
               placeholder="Зөв хариултын тайлбар"
-              style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, boxSizing: 'border-box', fontFamily: 'Plus Jakarta Sans, sans-serif' }}
             />
           </div>
         </div>
@@ -295,17 +614,25 @@ function QuestionEditor({ idx, q, onChange }: {
 }
 
 // ── ContentEditorPanel ─────────────────────────────────────────
-function ContentEditorPanel({ subtopic, topicColor, onSave }: {
+function ContentEditorPanel({
+  subtopic,
+  topic,
+  onSave,
+  isActive = true,
+}: {
   subtopic: Subtopic | null;
-  topicColor: string;
+  topic: Topic | null;
   onSave: (updated: Partial<Subtopic>) => Promise<void>;
+  isActive?: boolean;
 }) {
-  const [name, setName]           = useState('');
-  const [desc, setDesc]           = useState('');
-  const [content, setContent]     = useState('');
+  const [name, setName] = useState('');
+  const [desc, setDesc] = useState('');
+  const [content, setContent] = useState('');
   const [questions, setQuestions] = useState<QuestionEmbed[]>([]);
-  const [saving, setSaving]       = useState(false);
-  const [saved, setSaved]         = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const topicColor = topic?.color ?? T.blue;
 
   useEffect(() => {
     if (!subtopic) return;
@@ -320,68 +647,97 @@ function ContentEditorPanel({ subtopic, topicColor, onSave }: {
   async function handleSave() {
     if (!subtopic) return;
     setSaving(true);
-    const filledQs = questions.filter(q => q.question.trim() && q.options.every(o => o.trim()));
+    const filledQs = questions.filter(questionFilled);
     await onSave({ name, description: desc, content, questions: filledQs });
     setSaving(false);
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setTimeout(() => setSaved(false), 2500);
   }
 
-  if (!subtopic) {
+  if (!subtopic || !topic) {
     return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.muted, fontSize: 13 }}>
-        ← Дэд сэдэв сонгоно уу
+      <div className={`course-panel course-panel--editor${isActive ? ' is-active' : ''}`}>
+        <div className="course-editor-placeholder">
+          <div className="course-empty-icon" style={{ marginBottom: 12 }}><AdminIcon name="book" size={40} /></div>
+          <h4 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 700, color: '#0f172a' }}>Хичээл сонгоод агуулга бөглөнө үү</h4>
+          <p style={{ margin: 0, fontSize: 13, maxWidth: 320, lineHeight: 1.55 }}>
+            <strong>1.</strong> Сэдэв үүсгэх → <strong>2.</strong> Хичээл нэмэх → <strong>3.</strong> Тайлбар текст + 10 асуулт оруулах → <strong>Хадгалах</strong>
+          </p>
+        </div>
       </div>
     );
   }
 
-  const filledCount = questions.filter(q => q.question.trim() && q.options.every(o => o.trim())).length;
+  const filledCount = questions.filter(questionFilled).length;
+  const progressPct = (filledCount / 10) * 100;
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* Header */}
-      <div style={{ padding: '14px 20px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
+    <div className={`course-panel course-panel--editor${isActive ? ' is-active' : ''}`}>
+      <div className="course-save-bar">
         <div>
-          <div style={{ fontWeight: 800, fontSize: 15, color: T.text }}>{subtopic.name}</div>
-          <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{filledCount}/10 асуулт бөглөгдсөн</div>
+          <div className="course-panel-step">Алхам 3</div>
+          <div style={{ fontWeight: 800, fontSize: 15, color: '#0f172a' }}>{subtopic.name}</div>
+          <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+            {filledCount}/10 асуулт · {topic.icon} {topic.name}
+          </div>
+          <div className="course-progress-bar" style={{ maxWidth: 200, marginTop: 8 }}>
+            <div className="course-progress-fill" style={{ width: `${progressPct}%` }} />
+          </div>
         </div>
-        <button onClick={handleSave} disabled={saving} style={{ padding: '10px 24px', borderRadius: 10, border: 'none', background: saved ? '#22C55E' : topicColor, color: '#fff', fontWeight: 800, fontSize: 13, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, fontFamily: 'Plus Jakarta Sans, sans-serif', transition: 'background 0.2s', minWidth: 100 }}>
+        <button
+          type="button"
+          className="btn primary"
+          onClick={handleSave}
+          disabled={saving}
+          style={{
+            minWidth: 120,
+            background: saved ? '#22c55e' : topicColor,
+            borderColor: saved ? '#22c55e' : topicColor,
+          }}
+        >
           {saving ? 'Хадгалж…' : saved ? '✓ Хадгалсан' : 'Хадгалах'}
         </button>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
-        {/* Basic info */}
-        <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 14, padding: '16px', marginBottom: 16 }}>
-          <div style={{ fontWeight: 800, fontSize: 13, color: T.text, marginBottom: 12 }}>Үндсэн мэдээлэл</div>
-          <div style={{ marginBottom: 10 }}>
-            <label style={{ fontSize: 12, fontWeight: 700, color: T.muted, display: 'block', marginBottom: 5 }}>Нэр</label>
-            <input value={name} onChange={e => setName(e.target.value)} style={{ width: '100%', padding: '9px 12px', borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 14, boxSizing: 'border-box', fontFamily: 'Plus Jakarta Sans, sans-serif' }} />
+      <div className="course-panel-scroll" style={{ padding: '16px 20px' }}>
+        <div className="card" style={{ padding: 16, marginBottom: 16 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 12px' }}>Үндсэн мэдээлэл</h3>
+          <div className="field">
+            <label className="label">Хичээлийн нэр</label>
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
-          <div style={{ marginBottom: 10 }}>
-            <label style={{ fontSize: 12, fontWeight: 700, color: T.muted, display: 'block', marginBottom: 5 }}>Богино тайлбар</label>
-            <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Дэд сэдвийн богино тайлбар" style={{ width: '100%', padding: '9px 12px', borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 13, boxSizing: 'border-box', fontFamily: 'Plus Jakarta Sans, sans-serif' }} />
+          <div className="field">
+            <label className="label">Богино тайлбар</label>
+            <input className="input" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Жагсаалтад харагдана" />
           </div>
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: T.muted, display: 'block', marginBottom: 5 }}>Агуулга / Тайлбар текст</label>
-            <textarea value={content} onChange={e => setContent(e.target.value)} rows={4} placeholder="Энэ дэд сэдвийн талаарх тайлбар, томьёо, жишээ…" style={{ width: '100%', padding: '9px 12px', borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'Plus Jakarta Sans, sans-serif' }} />
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label className="label">Сурах агуулга (текст)</label>
+            <textarea
+              className="textarea"
+              rows={4}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Томьёо, тайлбар, жишээ — сурагч эхлэхээс өмнө уншина"
+            />
           </div>
         </div>
 
-        {/* Questions */}
-        <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 14, padding: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <div style={{ fontWeight: 800, fontSize: 13, color: T.text }}>10 Асуулт</div>
-            <div style={{ fontSize: 12, color: filledCount === 10 ? '#22C55E' : T.muted, fontWeight: 700 }}>
-              {filledCount === 10 ? '✓ Бүгд бөглөгдсөн' : `${10 - filledCount} асуулт хоосон`}
-            </div>
+        <div className="card" style={{ padding: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>10 асуулт (тоглоом)</h3>
+            <span style={{ fontSize: 12, fontWeight: 700, color: filledCount === 10 ? '#16a34a' : '#64748b' }}>
+              {filledCount === 10 ? '✓ Бэлэн' : `${10 - filledCount} хоосон`}
+            </span>
           </div>
+          <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 14px', lineHeight: 1.5 }}>
+            Хамгийн багадаа <strong>1 асуулт</strong> бөглөх ёстой. Сурагч «Эхлэх» дархад эдгээр асуулт гарна.
+          </p>
           {questions.map((q, i) => (
             <QuestionEditor
               key={i}
               idx={i}
               q={q}
-              onChange={updated => {
+              onChange={(updated) => {
                 const newQs = [...questions];
                 newQs[i] = updated;
                 setQuestions(newQs);
@@ -394,19 +750,82 @@ function ContentEditorPanel({ subtopic, topicColor, onSave }: {
   );
 }
 
+// ── Course wizard bar ──────────────────────────────────────────
+function CourseWizardBar({
+  activeStep,
+  hasTopic,
+  hasLesson,
+  onStepClick,
+}: {
+  activeStep: MobileStep;
+  hasTopic: boolean;
+  hasLesson: boolean;
+  onStepClick: (step: MobileStep) => void;
+}) {
+  const done = {
+    topics: hasTopic,
+    lessons: hasLesson,
+    editor: hasLesson,
+  };
+
+  return (
+    <div className="course-wizard">
+      <div className="course-wizard-steps">
+        {WIZARD_STEPS.map((step, i) => {
+          const isActive = activeStep === step.id;
+          const isDone =
+            step.id === 'topics' ? done.topics : step.id === 'lessons' ? done.lessons : done.editor && hasLesson;
+          const canClick = step.id === 'topics' || (step.id === 'lessons' && hasTopic) || (step.id === 'editor' && hasLesson);
+
+          return (
+            <React.Fragment key={step.id}>
+              {i > 0 && <div className={`course-wizard-connector${isDone ? ' done' : ''}`} />}
+              <button
+                type="button"
+                className={`course-wizard-step${isActive ? ' active' : ''}${isDone ? ' done' : ''}`}
+                disabled={!canClick}
+                onClick={() => canClick && onStepClick(step.id)}
+              >
+                <span className="course-step-num">{isDone && !isActive ? '✓' : step.num}</span>
+                <span className="course-step-text">
+                  <strong>{step.title}</strong>
+                  <span>{step.hint}</span>
+                </span>
+              </button>
+            </React.Fragment>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── ContentManager (main) ──────────────────────────────────────
 export function ContentManager() {
-  const [topics, setTopics]           = useState<Topic[]>([]);
-  const [subtopics, setSubtopics]     = useState<Subtopic[]>([]);
-  const [selTopic, setSelTopic]       = useState<Topic | null>(null);
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [subtopics, setSubtopics] = useState<Subtopic[]>([]);
+  const [selTopic, setSelTopic] = useState<Topic | null>(null);
   const [selSubtopic, setSelSubtopic] = useState<Subtopic | null>(null);
-  const [topicsLoading, setTopicsLoading]       = useState(true);
+  const [topicsLoading, setTopicsLoading] = useState(true);
   const [subtopicsLoading, setSubtopicsLoading] = useState(false);
+  const [mobileStep, setMobileStep] = useState<MobileStep>('topics');
+  const [isNarrow, setIsNarrow] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1100px)');
+    const update = () => setIsNarrow(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
 
   useEffect(() => {
     fetch('/api/admin/topics')
-      .then(r => r.json())
-      .then(d => { setTopics(d.topics ?? []); setTopicsLoading(false); })
+      .then((r) => r.json())
+      .then((d) => {
+        setTopics(d.topics ?? []);
+        setTopicsLoading(false);
+      })
       .catch(() => setTopicsLoading(false));
   }, []);
 
@@ -422,89 +841,178 @@ export function ContentManager() {
   }, []);
 
   async function handleAddTopic(name: string, color: string, icon: string, desc: string) {
-    const r = await fetch('/api/admin/topics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, color, icon, description: desc }) });
-    if (!r.ok) { alert('Сэдэв нэмэхэд алдаа гарлаа'); return; }
+    const r = await fetch('/api/admin/topics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, color, icon, description: desc }),
+    });
+    if (!r.ok) {
+      alert('Сэдэв нэмэхэд алдаа гарлаа');
+      return;
+    }
     const d = await r.json();
-    if (d.topic) setTopics(prev => [...prev, d.topic]);
+    if (d.topic) {
+      setTopics((prev) => [...prev, d.topic]);
+      setSelTopic(d.topic);
+      await loadSubtopics(d.topic._id);
+      if (isNarrow) setMobileStep('lessons');
+    }
   }
 
   async function handleEditTopic(id: string, name: string, color: string, icon: string, desc: string) {
-    const r = await fetch(`/api/admin/topics/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, color, icon, description: desc }) });
+    const r = await fetch(`/api/admin/topics/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, color, icon, description: desc }),
+    });
     const d = await r.json();
     if (d.topic) {
-      setTopics(prev => prev.map(t => t._id === id ? { ...t, ...d.topic } : t));
-      if (selTopic?._id === id) setSelTopic(prev => prev ? { ...prev, ...d.topic } : prev);
+      setTopics((prev) => prev.map((t) => (t._id === id ? { ...t, ...d.topic } : t)));
+      if (selTopic?._id === id) setSelTopic((prev) => (prev ? { ...prev, ...d.topic } : prev));
     }
   }
 
   async function handleDeleteTopic(id: string) {
-    if (!confirm('Сэдэв болон доорх бүх дэд сэдвийг устгах уу?')) return;
+    if (!confirm('Сэдэв болон доорх бүх хичээлийг устгах уу?')) return;
     await fetch(`/api/admin/topics/${id}`, { method: 'DELETE' });
-    setTopics(prev => prev.filter(t => t._id !== id));
-    if (selTopic?._id === id) { setSelTopic(null); setSubtopics([]); setSelSubtopic(null); }
+    setTopics((prev) => prev.filter((t) => t._id !== id));
+    if (selTopic?._id === id) {
+      setSelTopic(null);
+      setSubtopics([]);
+      setSelSubtopic(null);
+      setMobileStep('topics');
+    }
   }
 
   async function handleSelectTopic(t: Topic) {
     setSelTopic(t);
     setSelSubtopic(null);
     await loadSubtopics(t._id);
+    if (isNarrow) setMobileStep('lessons');
   }
 
   async function handleAddSubtopic(name: string, desc: string) {
     if (!selTopic) return;
-    const r = await fetch('/api/admin/subtopics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topicId: selTopic._id, name, description: desc, questions: [] }) });
+    const r = await fetch('/api/admin/subtopics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topicId: selTopic._id, name, description: desc, questions: [] }),
+    });
     const d = await r.json();
     if (d.subtopic) {
       const newSt = { ...d.subtopic, questions: d.subtopic.questions ?? [] };
-      setSubtopics(prev => [...prev, newSt]);
+      setSubtopics((prev) => [...prev, newSt]);
       setSelSubtopic(newSt);
+      if (isNarrow) setMobileStep('editor');
     }
   }
 
+  function handleSelectSubtopic(s: Subtopic) {
+    setSelSubtopic(s);
+    if (isNarrow) setMobileStep('editor');
+  }
+
   async function handleDeleteSubtopic(id: string) {
-    if (!confirm('Дэд сэдэв болон асуултуудыг устгах уу?')) return;
+    if (!confirm('Хичээл болон асуултуудыг устгах уу?')) return;
     await fetch(`/api/admin/subtopics/${id}`, { method: 'DELETE' });
-    setSubtopics(prev => prev.filter(s => s._id !== id));
-    if (selSubtopic?._id === id) setSelSubtopic(null);
+    setSubtopics((prev) => prev.filter((s) => s._id !== id));
+    if (selSubtopic?._id === id) {
+      setSelSubtopic(null);
+      if (isNarrow) setMobileStep('lessons');
+    }
   }
 
   async function handleSaveSubtopic(updated: Partial<Subtopic>) {
     if (!selSubtopic) return;
-    const r = await fetch(`/api/admin/subtopics/${selSubtopic._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated) });
-    if (!r.ok) { alert('Хадгалах үед алдаа гарлаа'); return; }
+    const r = await fetch(`/api/admin/subtopics/${selSubtopic._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    });
+    if (!r.ok) {
+      alert('Хадгалах үед алдаа гарлаа');
+      return;
+    }
     const d = await r.json();
     if (d.subtopic) {
       const merged = { ...selSubtopic, ...d.subtopic, questions: d.subtopic.questions ?? [] };
-      setSubtopics(prev => prev.map(s => s._id === selSubtopic._id ? merged : s));
+      setSubtopics((prev) => prev.map((s) => (s._id === selSubtopic._id ? merged : s)));
       setSelSubtopic(merged);
     }
   }
 
+  const activeStep: MobileStep = !selTopic ? 'topics' : !selSubtopic ? 'lessons' : 'editor';
+  const displayStep = isNarrow ? mobileStep : activeStep;
+
   return (
-    <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${T.border}`, overflow: 'hidden', display: 'flex', height: 'calc(100vh - 200px)', minHeight: 500, boxShadow: T.shadow }}>
-      <TopicPanel
-        topics={topics}
-        selected={selTopic}
-        onSelect={handleSelectTopic}
-        onAdd={handleAddTopic}
-        onEdit={handleEditTopic}
-        onDelete={handleDeleteTopic}
-        loading={topicsLoading}
+    <div className="course-builder">
+      <CourseWizardBar
+        activeStep={displayStep}
+        hasTopic={Boolean(selTopic)}
+        hasLesson={Boolean(selSubtopic)}
+        onStepClick={setMobileStep}
       />
-      <SubtopicPanel
-        topic={selTopic}
-        subtopics={subtopics}
-        selected={selSubtopic}
-        onSelect={setSelSubtopic}
-        onAdd={handleAddSubtopic}
-        onDelete={handleDeleteSubtopic}
-        loading={subtopicsLoading}
-      />
-      <ContentEditorPanel
-        subtopic={selSubtopic}
-        topicColor={selTopic?.color ?? T.blue}
-        onSave={handleSaveSubtopic}
-      />
+
+      {selTopic && (
+        <div className="course-breadcrumb" style={{ padding: '0 20px 12px', background: '#fafbff', borderBottom: '1px solid #e2e8f0' }}>
+          <button type="button" onClick={() => { setSelTopic(null); setSelSubtopic(null); setMobileStep('topics'); }}>
+            Бүх сэдэв
+          </button>
+          <span className="sep">›</span>
+          <button
+            type="button"
+            onClick={() => { setSelSubtopic(null); setMobileStep('lessons'); }}
+            style={{ fontWeight: selSubtopic ? 500 : 700, color: selSubtopic ? undefined : '#0f172a' }}
+          >
+            {selTopic.icon} {selTopic.name}
+          </button>
+          {selSubtopic && (
+            <>
+              <span className="sep">›</span>
+              <span style={{ fontWeight: 700, color: '#0f172a' }}>{selSubtopic.name}</span>
+            </>
+          )}
+        </div>
+      )}
+
+      {isNarrow && displayStep !== 'topics' && (
+        <button
+          type="button"
+          className="course-mobile-back"
+          onClick={() => setMobileStep(displayStep === 'editor' ? 'lessons' : 'topics')}
+        >
+          ← Буцах
+        </button>
+      )}
+
+      <div className={`course-body${isNarrow ? ' is-mobile-step' : ''}`}>
+        <TopicPanel
+          topics={topics}
+          selected={selTopic}
+          onSelect={handleSelectTopic}
+          onAdd={handleAddTopic}
+          onEdit={handleEditTopic}
+          onDelete={handleDeleteTopic}
+          loading={topicsLoading}
+          isActive={!isNarrow || displayStep === 'topics'}
+        />
+        <SubtopicPanel
+          topic={selTopic}
+          subtopics={subtopics}
+          selected={selSubtopic}
+          onSelect={handleSelectSubtopic}
+          onAdd={handleAddSubtopic}
+          onDelete={handleDeleteSubtopic}
+          loading={subtopicsLoading}
+          isActive={!isNarrow || displayStep === 'lessons'}
+        />
+        <ContentEditorPanel
+          subtopic={selSubtopic}
+          topic={selTopic}
+          onSave={handleSaveSubtopic}
+          isActive={!isNarrow || displayStep === 'editor'}
+        />
+      </div>
     </div>
   );
 }

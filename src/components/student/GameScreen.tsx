@@ -10,6 +10,7 @@ import {
   type GameQuestion, type GameTopic,
 } from '@/lib/game-data';
 import { useAppState } from '@/lib/app-state-context';
+import { useToast } from '@/components/ui/Toast';
 import type { AppState, Screen } from '@/types';
 
 const PASS_RATIO = 0.6;
@@ -86,6 +87,7 @@ function NoLivesOverlay({ refillAt, coins, refillCoins, livesCount, onRefillCoin
 
 export function GameScreen({ onNav, state, setState }: Props) {
   const { refreshStats } = useAppState();
+  const toast = useToast();
   const [topicIdx, setTopicIdx]     = useState(0);
   const [phase, setPhase]           = useState<'map' | 'quiz' | 'result'>('map');
   const [selectedLv, setSelectedLv] = useState<{ topic: GameTopic; level: number; subtopicId?: string } | null>(null);
@@ -165,7 +167,10 @@ export function GameScreen({ onNav, state, setState }: Props) {
         correct: q.correct,
         exp: q.exp,
       }));
-      if (!qs.length) return; // no questions yet
+      if (!qs.length) {
+        toast.warning('Энэ хичээлд асуулт байхгүй байна. Админ хэсэгт асуулт нэмнэ үү.', 'Хичээл');
+        return;
+      }
       // Build a synthetic GameTopic for this subtopic context
       const v2topics = getTopicsV2();
       const v2topic = v2topics.find(t => t.name === topicName) ?? v2topics[0];

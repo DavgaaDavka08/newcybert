@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
 import type { GameQuestion } from '@/lib/game-data';
+import { BackButton } from '@/components/ui/BackButton';
 
 function HeartIcon({ filled }: { filled: boolean }) {
   return (
@@ -61,10 +62,8 @@ export function GameQuizPhase({ questions, topicName, topicColor, level, lives, 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: '#1c2333', display: 'flex', flexDirection: 'column', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
       {/* Top bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', padding: 4, flexShrink: 0 }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-        </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0, flexWrap: 'wrap' }}>
+        <BackButton onClick={onBack} label="Буцах" variant="dark" />
         <div style={{ flex: 1, height: 14, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
           <div style={{ height: '100%', borderRadius: 99, background: feedback ? (isCorrect ? '#58CC02' : '#FF4B4B') : topicColor, width: `${progress}%`, transition: 'width 0.4s ease, background 0.3s', boxShadow: `0 0 10px ${topicColor}88` }} />
         </div>
@@ -74,13 +73,13 @@ export function GameQuizPhase({ questions, topicName, topicColor, level, lives, 
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '32px 24px 16px', maxWidth: 680, margin: '0 auto', width: '100%' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 16px 16px', maxWidth: 680, margin: '0 auto', width: '100%' }}>
         <div style={{ marginBottom: 28 }}>
           <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: topicColor, background: topicColor + '18', padding: '5px 12px', borderRadius: 99, border: `1px solid ${topicColor}33` }}>
             {topicName} · LEVEL {level}
           </span>
         </div>
-        <div style={{ fontWeight: 700, fontSize: 22, color: '#fff', lineHeight: 1.6, marginBottom: 36, letterSpacing: '-0.01em' }}>{qObj.q}</div>
+        <div style={{ fontWeight: 700, fontSize: 'clamp(17px, 4.5vw, 22px)', color: '#fff', lineHeight: 1.6, marginBottom: 28, letterSpacing: '-0.01em', wordBreak: 'break-word' }}>{qObj.q}</div>
         <div style={{ display: 'grid', gap: 12 }}>
           {qObj.opts.map((opt, i) => (
             <button key={i} onClick={() => !feedback && onSelect(i)}
@@ -100,17 +99,15 @@ export function GameQuizPhase({ questions, topicName, topicColor, level, lives, 
       {/* Bottom action */}
       {!feedback ? (
         <div style={{ flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.07)', padding: '16px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-          <button onClick={onBack} style={{ padding: '14px 28px', borderRadius: 14, border: '2px solid rgba(255,255,255,0.15)', background: 'transparent', fontWeight: 800, fontSize: 15, color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontFamily: 'Plus Jakarta Sans, sans-serif', letterSpacing: 0.5 }}>
-            АЛГАСАХ
-          </button>
-          <button onClick={onCheck} disabled={!checkReady} style={{ padding: '14px 48px', borderRadius: 14, border: 'none', fontWeight: 900, fontSize: 15, cursor: checkReady ? 'pointer' : 'not-allowed', fontFamily: 'Plus Jakarta Sans, sans-serif', background: checkReady ? topicColor : 'rgba(255,255,255,0.08)', color: checkReady ? '#fff' : 'rgba(255,255,255,0.25)', boxShadow: checkReady ? `0 6px 20px ${topicColor}55` : 'none', transition: 'all 0.15s', letterSpacing: 0.8 }}>
+          <BackButton onClick={onBack} label="Буцах" variant="dark" />
+          <button onClick={onCheck} disabled={!checkReady} style={{ padding: '14px 32px', borderRadius: 14, border: 'none', fontWeight: 900, fontSize: 15, cursor: checkReady ? 'pointer' : 'not-allowed', fontFamily: 'Plus Jakarta Sans, sans-serif', background: checkReady ? topicColor : 'rgba(255,255,255,0.08)', color: checkReady ? '#fff' : 'rgba(255,255,255,0.25)', boxShadow: checkReady ? `0 6px 20px ${topicColor}55` : 'none', transition: 'all 0.15s', letterSpacing: 0.8, flex: 1, minWidth: 140 }}>
             ШАЛГАХ
           </button>
         </div>
       ) : (
-        <div style={{ flexShrink: 0, background: isCorrect ? 'rgba(88,204,2,0.12)' : 'rgba(255,75,75,0.12)', borderTop: `2px solid ${isCorrect ? '#58CC02' : '#FF4B4B'}`, padding: '20px 28px' }}>
+        <div style={{ flexShrink: 0, background: isCorrect ? 'rgba(88,204,2,0.12)' : 'rgba(255,75,75,0.12)', borderTop: `2px solid ${isCorrect ? '#58CC02' : '#FF4B4B'}`, padding: '16px' }}>
           <div style={{ maxWidth: 680, margin: '0 auto' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                   {isCorrect

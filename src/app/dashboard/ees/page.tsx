@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { T } from "@/styles/tokens";
-import { Ic } from "@/components/ui/Icon";
+import { BackButton } from "@/components/ui/BackButton";
 import { EesPracticeView } from "@/components/ees/EesPracticeView";
 
 export default function EesPracticePage() {
@@ -50,25 +50,7 @@ export default function EesPracticePage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button
-            type="button"
-            onClick={() => router.push("/dashboard")}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: T.muted,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 13,
-              fontFamily: "inherit",
-              padding: "6px 10px",
-              borderRadius: 8,
-            }}
-          >
-            <Ic n="chevLeft" size={16} /> Буцах
-          </button>
+          <BackButton href="/dashboard" label="Буцах" />
           <div style={{ width: 1, height: 20, background: T.border }} />
           <div style={{ fontWeight: 800, fontSize: 15, color: T.text }}>2025 ЕЭШ сорил</div>
         </div>

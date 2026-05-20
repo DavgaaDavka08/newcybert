@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       name: body.name,
       description: body.description ?? '',
       color: body.color ?? '#3B82F6',
-      icon: body.icon ?? '⚡',
+      icon: body.icon ?? 'Φ',
       order: count,
     });
     return NextResponse.json({ topic });

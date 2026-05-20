@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { T } from "@/styles/tokens";
 import { Ic } from "@/components/ui/Icon";
+import { BackButton } from "@/components/ui/BackButton";
 
 interface Exam {
   _id: string; title: string; description?: string;
@@ -40,12 +41,7 @@ export default function ExamListPage() {
       {/* Header */}
       <div style={{ background: "#fff", borderBottom: `1px solid ${T.border}`, padding: "0 28px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => router.push("/dashboard")} style={{ background: "none", border: "none", cursor: "pointer", color: T.muted, display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontFamily: "inherit", padding: "6px 10px", borderRadius: 8, transition: "background .15s" }}
-            onMouseEnter={e => (e.currentTarget.style.background = T.sidebarHover)}
-            onMouseLeave={e => (e.currentTarget.style.background = "none")}
-          >
-            <Ic n="chevLeft" size={16} /> Буцах
-          </button>
+          <BackButton href="/dashboard" label="Буцах" />
           <div style={{ width: 1, height: 20, background: T.border }} />
           <div style={{ fontWeight: 800, fontSize: 16, color: T.text }}>Шалгалтууд</div>
         </div>

@@ -561,6 +561,655 @@
   color: #fff;
 }
 
+/* ── Nav groups ───────────────────────────────────────────── */
+.admin-root .nav-section {
+  margin-bottom: 14px;
+}
+
+.admin-root .nav-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0 10px 6px;
+}
+
+.admin-root .nav-item .nav-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.admin-root .nav-item.active .nav-icon {
+  background: #4f46e5;
+  color: #fff;
+}
+
+/* ── Quick actions / help ─────────────────────────────────── */
+.admin-root .help-banner {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 16px 18px;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 100%);
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+}
+
+.admin-root .help-banner-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #4f46e5;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.admin-root .help-banner h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 4px;
+}
+
+.admin-root .help-banner p {
+  font-size: 13px;
+  color: #475569;
+  margin: 0;
+  line-height: 1.55;
+}
+
+.admin-root .quick-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.admin-root .quick-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.admin-root .quick-card:hover {
+  border-color: #a5b4fc;
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.08);
+}
+
+.admin-root .quick-card strong,
+.admin-root .quick-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-root .quick-card span {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+/* ── Course builder (game content) ────────────────────────── */
+.admin-root .course-builder {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  min-height: 520px;
+  height: calc(100vh - 280px);
+  max-height: 900px;
+}
+
+.admin-root .course-wizard {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fafbff;
+  flex-shrink: 0;
+}
+
+.admin-root .course-wizard-steps {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+}
+
+.admin-root .course-wizard-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 140px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #64748b;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.admin-root .course-wizard-step:hover:not(:disabled) {
+  background: #fff;
+  border-color: #e2e8f0;
+}
+
+.admin-root .course-wizard-step:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.admin-root .course-wizard-step.active {
+  background: #fff;
+  border-color: #c7d2fe;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.08);
+  color: #0f172a;
+}
+
+.admin-root .course-wizard-step.done .course-step-num {
+  background: #22c55e;
+  color: #fff;
+}
+
+.admin-root .course-step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.admin-root .course-wizard-step.active .course-step-num {
+  background: #4f46e5;
+  color: #fff;
+}
+
+.admin-root .course-step-text strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: inherit;
+}
+
+.admin-root .course-step-text span {
+  display: block;
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 1px;
+}
+
+.admin-root .course-wizard-connector {
+  width: 24px;
+  height: 2px;
+  background: #e2e8f0;
+  flex-shrink: 0;
+  margin: 0 4px;
+}
+
+.admin-root .course-wizard-connector.done {
+  background: #86efac;
+}
+
+.admin-root .course-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.admin-root .course-breadcrumb button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #4f46e5;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.admin-root .course-breadcrumb button:hover {
+  text-decoration: underline;
+}
+
+.admin-root .course-breadcrumb .sep {
+  color: #cbd5e1;
+}
+
+.admin-root .course-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.admin-root .course-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  border-right: 1px solid #e2e8f0;
+}
+
+.admin-root .course-panel:last-child {
+  border-right: 0;
+}
+
+.admin-root .course-panel--topics {
+  width: 280px;
+  flex-shrink: 0;
+}
+
+.admin-root .course-panel--lessons {
+  width: 280px;
+  flex-shrink: 0;
+}
+
+.admin-root .course-panel--editor {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-root .course-panel-head {
+  padding: 14px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.admin-root .course-panel-head-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-root .course-panel-step {
+  font-size: 10px;
+  font-weight: 700;
+  color: #4f46e5;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.admin-root .course-panel-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.admin-root .course-panel-hint {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+  line-height: 1.45;
+}
+
+.admin-root .course-panel-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  background: #4f46e5;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.admin-root .course-panel-add:hover {
+  background: #4338ca;
+}
+
+.admin-root .course-panel-add.secondary {
+  background: #fff;
+  color: #4f46e5;
+  border: 1px solid #c7d2fe;
+}
+
+.admin-root .course-panel-add.secondary:hover {
+  background: #eef2ff;
+}
+
+.admin-root .course-panel-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.admin-root .course-empty {
+  padding: 32px 20px;
+  text-align: center;
+}
+
+.admin-root .course-empty-icon {
+  margin-bottom: 12px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-root .course-empty h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 6px;
+}
+
+.admin-root .course-empty p {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.admin-root .course-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+  transition: background 0.12s;
+  text-align: left;
+  width: 100%;
+  background: #fff;
+  border-left: 3px solid transparent;
+}
+
+.admin-root .course-list-item:hover {
+  background: #f8fafc;
+}
+
+.admin-root .course-list-item:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: -2px;
+}
+
+.admin-root .course-list-item.selected {
+  background: #eff6ff;
+  border-left-color: #4f46e5;
+}
+
+.admin-root .course-list-item .course-item-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.admin-root .course-list-item .course-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-root .course-list-item .course-item-name {
+  font-weight: 700;
+  font-size: 13px;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-root .course-list-item .course-item-meta {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.admin-root .course-list-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.admin-root .course-icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 14px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.admin-root .course-icon-btn:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.admin-root .course-icon-btn.danger:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.admin-root .course-inline-form {
+  padding: 14px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.admin-root .course-editor-placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  text-align: center;
+  color: #64748b;
+  min-height: 280px;
+}
+
+.admin-root .course-editor-placeholder .course-empty-icon {
+  margin-bottom: 16px;
+  color: #cbd5e1;
+}
+
+.admin-root .course-progress-bar {
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 99px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.admin-root .course-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4f46e5, #22c55e);
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+
+.admin-root .course-save-bar {
+  padding: 12px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  background: #fff;
+}
+
+.admin-root .course-question-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.admin-root .course-question-card.filled {
+  border-color: #bbf7d0;
+}
+
+.admin-root .course-question-head {
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  background: #fafafa;
+}
+
+.admin-root .course-question-card.filled .course-question-head {
+  background: #f0fdf4;
+}
+
+.admin-root .course-mobile-back {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4f46e5;
+  width: 100%;
+  text-align: left;
+}
+
+.admin-root .media-upload-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.admin-root .media-upload-tab {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 2px solid #e2e8f0;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.admin-root .media-upload-tab.active {
+  border-color: #4f46e5;
+  background: #eef2ff;
+}
+
+.admin-root .media-upload-tab strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.admin-root .media-upload-tab span {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.admin-root .alert-box {
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  margin-bottom: 14px;
+  line-height: 1.45;
+}
+
+.admin-root .alert-box.error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.admin-root .alert-box.success {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #bbf7d0;
+}
+
+@media (max-width: 1100px) {
+  .admin-root .course-builder {
+    height: auto;
+    max-height: none;
+  }
+
+  .admin-root .course-body {
+    flex-direction: column;
+  }
+
+  .admin-root .course-panel--topics,
+  .admin-root .course-panel--lessons,
+  .admin-root .course-panel--editor {
+    width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid #e2e8f0;
+    max-height: none;
+  }
+
+  .admin-root .course-body.is-mobile-step .course-panel {
+    display: none;
+  }
+
+  .admin-root .course-body.is-mobile-step .course-panel.is-active {
+    display: flex;
+    border-bottom: 0;
+  }
+
+  .admin-root .course-mobile-back {
+    display: flex;
+  }
+
+  .admin-root .course-wizard-connector {
+    display: none;
+  }
+
+  .admin-root .course-wizard-step {
+    min-width: 0;
+    flex: 1 1 30%;
+  }
+}
+
 @media (max-width: 1024px) {
   .admin-root .shell {
     grid-template-columns: 1fr;

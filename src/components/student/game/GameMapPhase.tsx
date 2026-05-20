@@ -158,7 +158,7 @@ function LessonNode({ index, type, nodeStatus, starCount, topicColor, topicState
         <div style={{ position: 'absolute', top: -22, left: '50%', transform: 'translateX(-50%)', fontSize: 9, fontWeight: 900, letterSpacing: '0.10em', padding: '3px 10px', borderRadius: 99, background: badge.bg, color: badge.color, whiteSpace: 'nowrap', zIndex: 3, opacity: nodeStatus === 'locked' ? 0.5 : 1 }}>{label}</div>
       )}
       {nodeStatus === 'current' && (
-        <div style={{ position: 'absolute', top: -44, left: '50%', transform: 'translateX(-50%)', background: '#fff', color: '#0b1424', fontSize: 11, fontWeight: 900, padding: '8px 16px', borderRadius: 14, letterSpacing: '0.08em', boxShadow: '0 8px 24px rgba(0,0,0,.4)', zIndex: 6, whiteSpace: 'nowrap' }}>
+        <div style={{ position: 'absolute', top: -44, left: '50%', transform: 'translateX(-50%)', background: '#fff', color: '#0b1424', fontSize: 11, fontWeight: 900, padding: '8px 16px', borderRadius: 14, letterSpacing: '0.08em', boxShadow: '0 8px 24px rgba(0,0,0,.4)', zIndex: 6, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
           ЭХЛЭХ
           <div style={{ position: 'absolute', left: '50%', bottom: -7, transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderTop: '8px solid #fff' }} />
         </div>
@@ -375,6 +375,8 @@ function SubtopicNode({ sub, index, topicColor, subtopicStars, prevDone, onSelec
     circleShadow = 'none';
   }
 
+  const activate = () => { if (!isLock) onSelect(); };
+
   return (
     <>
       {index > 0 && (
@@ -383,43 +385,49 @@ function SubtopicNode({ sub, index, topicColor, subtopicStars, prevDone, onSelec
         </div>
       )}
       <div style={{ position: 'relative', width: '100%', display: 'flex', ...OFFSET_STYLES[offset] }}>
-        {nodeStatus === 'current' && (
-          <>
-            <div style={{ position: 'absolute', width: size + 24, height: size + 24, top: -12, left: '50%', transform: 'translateX(-50%)', borderRadius: '50%', border: `3px solid ${topicColor}`, opacity: 0.55, animation: 'cp-pulse 2.2s ease-in-out infinite', pointerEvents: 'none' }} />
-            <div style={{ position: 'absolute', width: size + 48, height: size + 48, top: -24, left: '50%', transform: 'translateX(-50%)', borderRadius: '50%', border: `2px solid ${topicColor}`, opacity: 0.35, animation: 'cp-pulse 2.2s ease-in-out infinite 0.5s', pointerEvents: 'none' }} />
-          </>
-        )}
-        {nodeStatus === 'current' && (
-          <div style={{ position: 'absolute', top: -44, left: '50%', transform: 'translateX(-50%)', background: '#fff', color: '#0b1424', fontSize: 11, fontWeight: 900, padding: '8px 16px', borderRadius: 14, letterSpacing: '0.08em', boxShadow: '0 8px 24px rgba(0,0,0,.4)', zIndex: 6, whiteSpace: 'nowrap' }}>
-            ЭХЛЭХ
-            <div style={{ position: 'absolute', left: '50%', bottom: -7, transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderTop: '8px solid #fff' }} />
-          </div>
-        )}
         <div
-          onClick={!isLock ? onSelect : undefined}
+          role="button"
+          tabIndex={isLock ? -1 : 0}
+          aria-disabled={isLock}
+          onClick={activate}
+          onKeyDown={e => { if (!isLock && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); activate(); } }}
           onMouseEnter={() => !isLock && setHov(true)}
           onMouseLeave={() => setHov(false)}
-          style={{ width: size, height: size, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isLock ? 'default' : 'pointer', background: circleBg, border: circleBorder, boxShadow: circleShadow, transition: 'transform 0.18s cubic-bezier(.34,1.56,.64,1)', transform: hov && !isLock ? 'scale(1.08) translateY(-3px)' : 'scale(1)' }}
+          style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: nodeStatus === 'current' ? 52 : 0, cursor: isLock ? 'default' : 'pointer', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
         >
-          {nodeStatus === 'done' && <svg width={size*0.43} height={size*0.43} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
-          {nodeStatus === 'current' && <svg width={size*0.44} height={size*0.44} viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" fill="#fff" /></svg>}
-          {nodeStatus === 'locked' && <svg width={size*0.37} height={size*0.37} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>}
-        </div>
-        {nodeStatus === 'done' && (
-          <div style={{ position: 'absolute', bottom: -28, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 4 }}>
-            {[0,1,2].map(si => <svg key={si} width={13} height={13} viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" fill={si < starCount ? '#fcd34d' : 'transparent'} stroke={si < starCount ? '#f59e0b' : 'rgba(255,255,255,.22)'} strokeWidth="1.5" /></svg>)}
-          </div>
-        )}
-        {hov && !isLock && (
-          <div style={{ position: 'absolute', bottom: size + (nodeStatus === 'done' ? 46 : 16), left: '50%', transform: 'translateX(-50%)', background: `linear-gradient(135deg, ${topicColor}, ${topicColor}dd)`, borderRadius: 18, padding: '14px 20px', minWidth: 190, zIndex: 20, boxShadow: `0 12px 40px ${topicColor}66`, pointerEvents: 'none' }}>
-            <div style={{ position: 'absolute', bottom: -7, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderTop: `8px solid ${topicColor}` }} />
-            <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 10 }}>{sub.name}</div>
-            {sub.description && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', marginBottom: 10 }}>{sub.description}</div>}
-            <div style={{ background: 'rgba(255,255,255,.2)', border: '2px solid rgba(255,255,255,.5)', borderRadius: 12, padding: '10px 14px', textAlign: 'center', fontWeight: 900, fontSize: 15, color: '#fff' }}>
+          {nodeStatus === 'current' && (
+            <>
+              <div style={{ position: 'absolute', width: size + 24, height: size + 24, top: 40, left: '50%', transform: 'translateX(-50%)', borderRadius: '50%', border: `3px solid ${topicColor}`, opacity: 0.55, animation: 'cp-pulse 2.2s ease-in-out infinite', pointerEvents: 'none' }} />
+              <div style={{ position: 'absolute', width: size + 48, height: size + 48, top: 28, left: '50%', transform: 'translateX(-50%)', borderRadius: '50%', border: `2px solid ${topicColor}`, opacity: 0.35, animation: 'cp-pulse 2.2s ease-in-out infinite 0.5s', pointerEvents: 'none' }} />
+            </>
+          )}
+          {nodeStatus === 'current' && (
+            <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', background: '#fff', color: '#0b1424', fontSize: 11, fontWeight: 900, padding: '8px 16px', borderRadius: 14, letterSpacing: '0.08em', boxShadow: '0 8px 24px rgba(0,0,0,.4)', zIndex: 6, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
               ЭХЛЭХ
+              <div style={{ position: 'absolute', left: '50%', bottom: -7, transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderTop: '8px solid #fff' }} />
             </div>
+          )}
+          <div style={{ width: size, height: size, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: circleBg, border: circleBorder, boxShadow: circleShadow, transition: 'transform 0.18s cubic-bezier(.34,1.56,.64,1)', transform: hov && !isLock ? 'scale(1.08) translateY(-3px)' : 'scale(1)' }}>
+            {nodeStatus === 'done' && <svg width={size*0.43} height={size*0.43} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
+            {nodeStatus === 'current' && <svg width={size*0.44} height={size*0.44} viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" fill="#fff" /></svg>}
+            {nodeStatus === 'locked' && <svg width={size*0.37} height={size*0.37} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>}
           </div>
-        )}
+          {nodeStatus === 'done' && (
+            <div style={{ display: 'flex', gap: 4, marginTop: 10 }}>
+              {[0,1,2].map(si => <svg key={si} width={13} height={13} viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" fill={si < starCount ? '#fcd34d' : 'transparent'} stroke={si < starCount ? '#f59e0b' : 'rgba(255,255,255,.22)'} strokeWidth="1.5" /></svg>)}
+            </div>
+          )}
+          {hov && !isLock && (
+            <div style={{ position: 'absolute', bottom: size + (nodeStatus === 'done' ? 46 : 16), left: '50%', transform: 'translateX(-50%)', background: `linear-gradient(135deg, ${topicColor}, ${topicColor}dd)`, borderRadius: 18, padding: '14px 20px', minWidth: 190, zIndex: 20, boxShadow: `0 12px 40px ${topicColor}66`, pointerEvents: 'none' }}>
+              <div style={{ position: 'absolute', bottom: -7, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderTop: `8px solid ${topicColor}` }} />
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 10 }}>{sub.name}</div>
+              {sub.description && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', marginBottom: 10 }}>{sub.description}</div>}
+              <div style={{ background: 'rgba(255,255,255,.2)', border: '2px solid rgba(255,255,255,.5)', borderRadius: 12, padding: '10px 14px', textAlign: 'center', fontWeight: 900, fontSize: 15, color: '#fff' }}>
+                ЭХЛЭХ
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </>
   );

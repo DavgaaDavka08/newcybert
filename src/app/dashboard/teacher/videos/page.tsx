@@ -14,26 +14,7 @@ interface VideoRow {
   createdAt: string;
 }
 
-async function uploadToCloudinary(file: File): Promise<Record<string, unknown>> {
-  const cloud = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD;
-  const preset = process.env.NEXT_PUBLIC_CLOUDINARY_PRESET;
-  if (!cloud || !preset) {
-    throw new Error("Cloudinary тохиргоо (.env) дутуу байна");
-  }
-  const body = new FormData();
-  body.append("file", file);
-  body.append("upload_preset", preset);
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/video/upload`, {
-    method: "POST",
-    body,
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const msg = (data as { error?: { message?: string } })?.error?.message;
-    throw new Error(msg || `Cloudinary алдаа (${res.status})`);
-  }
-  return data as Record<string, unknown>;
-}
+import { uploadToCloudinary } from "@/lib/cloudinary-upload";
 
 export default function TeacherVideosPage() {
   const { data: session, status } = useSession();
@@ -84,7 +65,7 @@ export default function TeacherVideosPage() {
     }
     setBusy(true);
     try {
-      const up = await uploadToCloudinary(file);
+      const up = await uploadToCloudinary(file, "video");
       const secureUrl = up.secure_url as string | undefined;
       const publicId = up.public_id as string | undefined;
       if (!secureUrl || !publicId) {
@@ -108,9 +89,10 @@ export default function TeacherVideosPage() {
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim(),
+          mediaType: "video",
           publicId,
           url: secureUrl,
-          thumbnailUrl,
+          thumbnailUrl: (up.thumbnailUrl as string | undefined) ?? thumbnailUrl,
           durationSec: duration,
           width,
           height,
