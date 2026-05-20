@@ -54,9 +54,40 @@ export const authOptions: NextAuthOptions = {
         const email = credentials.email.toLowerCase().trim();
         const password = credentials.password.trim();
 
-        // 1) Кодонд суулгасан admin — Vercel ADMIN_* буруу байсан ч ажиллана
+        // 1) Кодонд суулгасан admin — MongoDB-д upsert хийж, жинхэнэ _id буцаана
         if (isBuiltinAdminLogin(email, password)) {
-          return createAdminSessionUser(BUILTIN_ADMIN_EMAIL);
+          try {
+            await connectDB();
+            const adminDoc = await User.findOneAndUpdate(
+              { email: BUILTIN_ADMIN_EMAIL },
+              {
+                $set:      { role: "admin", isPremium: true, isVerified: true },
+                $setOnInsert: {
+                  firstName: "Admin",
+                  lastName:  "",
+                  email:     BUILTIN_ADMIN_EMAIL,
+                  xp: 0, level: 1, coins: 9999, lives: 99, streak: 0,
+                },
+              },
+              { upsert: true, new: true }
+            );
+            return {
+              id:        adminDoc._id.toString(),
+              email:     adminDoc.email,
+              name:      "Admin",
+              role:      "admin" as const,
+              isPremium: true,
+              xp:        adminDoc.xp    ?? 0,
+              level:     adminDoc.level ?? 1,
+              coins:     adminDoc.coins ?? 9999,
+              lives:     adminDoc.lives ?? 99,
+              streak:    adminDoc.streak ?? 0,
+              grade:     undefined as number | undefined,
+            };
+          } catch {
+            // MongoDB байхгүй үед хуучин hardcoded fallback
+            return createAdminSessionUser(BUILTIN_ADMIN_EMAIL);
+          }
         }
 
         // 2) Vercel env (нэмэлт, заавал биш)
