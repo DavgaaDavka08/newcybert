@@ -5,8 +5,7 @@ import { useState, useEffect, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { PROVINCES, SCHOOL_GRADES } from "@/lib/mn-constants";
-import { isBuiltinAdminLogin } from "@/lib/admin-auth";
-import { getLoginCallbackUrl, mapAuthError } from "@/lib/auth-redirect";
+import { getSafeCallbackUrl, mapAuthError, waitForSession } from "@/lib/auth-redirect";
 
 /* ─── Decorative shapes on the right bg ─── */
 type Shape = { type: string; x: number; y: number; size: number; color: string; rot?: number };
@@ -51,8 +50,7 @@ const lbl: React.CSSProperties = {
    LOGIN FORM
 ════════════════════════════════════════════ */
 function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl: string }) {
-  const isAdminLogin = callbackUrl.startsWith("/admin");
-  const [email, setEmail]       = useState(isAdminLogin ? "admin@gmail.com" : "");
+  const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
   const [loading, setLoading]   = useState(false);
@@ -65,7 +63,6 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
     setLoading(true);
     const em = email.trim().toLowerCase();
     const pw = password.trim();
-    const dest = isBuiltinAdminLogin(em, pw) ? "/admin" : getLoginCallbackUrl(callbackUrl);
     try {
       const res = await signIn("credentials", {
         email: em,
@@ -82,7 +79,19 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
         setLoading(false);
         return;
       }
-      window.location.replace(dest);
+
+      const session = await waitForSession(15, 200);
+      if (!session?.user) {
+        await signIn("credentials", {
+          email: em,
+          password: pw,
+          callbackUrl: getSafeCallbackUrl(callbackUrl),
+          redirect: true,
+        });
+        return;
+      }
+
+      window.location.href = getSafeCallbackUrl(callbackUrl, session.user.role);
     } catch {
       setError("Сүлжээний алдаа. Дахин оролдоно уу.");
       setLoading(false);
@@ -91,22 +100,6 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
 
   return (
     <>
-      {isAdminLogin && (
-        <div style={{
-          background: "rgba(79,70,229,0.12)", border: "1px solid rgba(99,102,241,0.35)",
-          borderRadius: 8, padding: "12px 14px", marginBottom: 14,
-          color: "#C7D2FE", fontSize: 12, lineHeight: 1.6,
-        }}>
-          <strong style={{ fontSize: 14, color: "#E0E7FF" }}>Admin нэвтрэх</strong>
-          <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
-            <div><span style={{ color: "#94A3B8" }}>И-мэйл:</span> <strong>admin@gmail.com</strong></div>
-            <div><span style={{ color: "#94A3B8" }}>Нууц үг:</span> <strong>TCB-757</strong></div>
-          </div>
-          <div style={{ marginTop: 10, fontSize: 11, color: "#86EFAC", fontWeight: 600 }}>
-            Эдгээр 2 утгыг оруулаад «Нэвтрэх» — шууд Admin самбар нээгдэнэ (Vercel тохиргоо хэрэггүй).
-          </div>
-        </div>
-      )}
 
       {error && (
         <div style={{
@@ -120,7 +113,7 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
         <div style={{ marginBottom: 12 }}>
           <label style={lbl}>И-МЭЙЛ</label>
           <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-            placeholder={isAdminLogin ? "admin@gmail.com" : "example@mail.com"} required style={inp} />
+            placeholder="example@mail.com" required style={inp} autoComplete="email" />
         </div>
 
         <div style={{ marginBottom: 14 }}>
@@ -128,7 +121,7 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
           <div style={{ position: "relative" }}>
             <input type={showPass ? "text" : "password"}
               value={password} onChange={e => setPassword(e.target.value)}
-              placeholder={isAdminLogin ? "TCB-757 (ADMIN_PASS)" : "••••••••"} required
+              placeholder="••••••••" required autoComplete="current-password"
               style={{ ...inp, paddingRight: 40 }} />
             <button type="button" onClick={() => setShowPass(v => !v)} style={{
               position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
@@ -172,9 +165,6 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
         </button>
       </p>
 
-      <p style={{ textAlign: "center", marginTop: 6, fontSize: 12 }}>
-        <a href="/login" style={{ color: "#475569", textDecoration: "none" }}>🔐 Admin нэвтрэх</a>
-      </p>
     </>
   );
 }

@@ -28,8 +28,9 @@ const authSecret =
   process.env.JWT_SECRET?.trim();
 
 export const authOptions: NextAuthOptions = {
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
   secret: authSecret,
+  useSecureCookies: process.env.NODE_ENV === "production",
 
   pages: {
     signIn: "/login",
@@ -44,6 +45,9 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Нууц үг", type: "password" },
       },
       async authorize(credentials) {
+        if (!authSecret) {
+          throw new Error("Configuration");
+        }
         if (!credentials?.email || !credentials?.password) {
           throw new Error("И-мэйл болон нууц үг оруулна уу");
         }
