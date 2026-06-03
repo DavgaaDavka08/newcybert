@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { T } from "@/styles/tokens";
 import { Ic } from "@/components/ui/Icon";
+import { Loading } from "@/components/ui/Loading";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface VideoRow {
   _id: string;
@@ -17,6 +19,7 @@ interface VideoRow {
 import { uploadToCloudinary } from "@/lib/cloudinary-upload";
 
 export default function TeacherVideosPage() {
+  const { confirm } = useConfirm();
   const { data: session, status } = useSession();
   const router = useRouter();
   const role = session?.user?.role;
@@ -114,27 +117,19 @@ export default function TeacherVideosPage() {
   }
 
   async function onDelete(id: string) {
-    if (!confirm("Энэ бичлэгийн бүртгэлийг устгах уу? (Cloudinary файл өөрөөр үлдэнэ)")) return;
+    const ok = await confirm({
+      title: "Бичлэг устгах",
+      description: "Энэ бичлэгийн бүртгэлийг устгах уу? (Cloudinary файл өөрөөр үлдэнэ)",
+      confirmLabel: "Устгах",
+      destructive: true,
+    });
+    if (!ok) return;
     const r = await fetch(`/api/videos/${id}`, { method: "DELETE" });
     if (r.ok) loadMine();
   }
 
   if (status === "loading") {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: T.bg,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: T.muted,
-          fontFamily: "Plus Jakarta Sans, sans-serif",
-        }}
-      >
-        Ачаалж байна...
-      </div>
-    );
+    return <Loading fullScreen background={T.bg} message="Ачаалж байна…" />;
   }
 
   if (status !== "authenticated") return null;
@@ -309,7 +304,7 @@ export default function TeacherVideosPage() {
 
         <div style={{ fontWeight: 800, fontSize: 15, color: T.text, marginBottom: 12 }}>Миний бичлэгүүд</div>
         {loadingList ? (
-          <div style={{ color: T.muted, fontSize: 13 }}>Ачаалж байна...</div>
+          <Loading size={72} message="Ачаалж байна…" />
         ) : mine.length === 0 ? (
           <div style={{ color: T.muted, fontSize: 13 }}>Одоогоор бичлэг алга.</div>
         ) : (

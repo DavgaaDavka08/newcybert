@@ -7,11 +7,13 @@ import { ContentManager } from "@/components/admin/ContentManager";
 import { VideoLessonManager } from "@/components/admin/VideoLessonManager";
 import { SeedPhysicsPanel } from "@/components/admin/SeedPhysicsPanel";
 import { AdminIcon, type AdminIconName } from "@/components/admin/AdminIcon";
+import { Loading } from "@/components/ui/Loading";
+import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 // ── Types ─────────────────────────────────────────────────────
-type Tab = "overview" | "content" | "live" | "users" | "questions" | "categories" | "exams" | "videos";
+type Tab = "overview" | "content" | "live" | "users" | "exams" | "videos";
 
-interface Toast { id: number; msg: string; type: "ok" | "err"; }
 interface Stats {
   totalUsers: number; premiumUsers: number; todayActive: number;
   totalRevenue: number; newUsersLast7: number;
@@ -21,16 +23,6 @@ interface Stats {
 interface User {
   _id: string; firstName: string; lastName: string; email: string;
   role: string; isPremium: boolean; xp: number; coins: number; streak: number; createdAt: string;
-}
-interface QuestionDoc {
-  _id: string; question: string; difficulty: string; level: number;
-  xpReward: number; coinReward: number;
-  options: string[]; correctIndex: number; explanation: string;
-  categoryId: { _id: string; name: string; icon: string } | null;
-}
-interface Category {
-  _id: string; name: string; icon: string; color: string;
-  totalLevels: number; isActive: boolean; order: number;
 }
 interface PayRow {
   _id: string; userId: { firstName?: string; lastName?: string; email?: string } | string;
@@ -43,13 +35,10 @@ interface AttemptRow { _id: string; studentId?: { firstName?: string; lastName?:
 interface LbEntry { name: string; initials: string; score: number; streak: number; }
 
 // ── Defaults ──────────────────────────────────────────────────
-const EMPTY_Q = { categoryId: "", level: 1, question: "", options: ["", "", "", ""], correctIndex: 0, explanation: "", difficulty: "medium", xpReward: 10, coinReward: 5 };
-const EMPTY_CAT = { name: "", icon: "", color: "#4F46E5", totalLevels: 5, order: 0, isActive: true };
 const EMPTY_EXAM = { title: "", description: "", duration: 60, questions: [{ id: "1", question: "", options: [{ id: "A", text: "" }, { id: "B", text: "" }, { id: "C", text: "" }, { id: "D", text: "" }], correctAnswer: "A" }] };
 const PAGE_SIZE = 20;
 
 // ── Helpers ───────────────────────────────────────────────────
-let _tid = 0;
 function uid() { return Math.random().toString(36).slice(2); }
 function fmtDate(s: string) { return new Date(s).toLocaleDateString("mn-MN", { year: "numeric", month: "short", day: "numeric" }); }
 function initials2(a?: string, b?: string) { return `${a?.[0] ?? ""}${b?.[0] ?? ""}`.toUpperCase() || "?"; }
@@ -65,13 +54,11 @@ export default function AdminPage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
   const [contentKey, setContentKey] = useState(0);
-
-  // Toast
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastApi = useToast();
+  const { confirm } = useConfirm();
   function toast(msg: string, type: "ok" | "err" = "ok") {
-    const id = ++_tid;
-    setToasts(t => [...t, { id, msg, type }]);
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3500);
+    if (type === "err") toastApi.error(msg);
+    else toastApi.success(msg);
   }
 
   // Data
@@ -79,10 +66,6 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [userTotal, setUserTotal] = useState(0);
   const [userPage, setUserPage] = useState(1);
-  const [questions, setQuestions] = useState<QuestionDoc[]>([]);
-  const [qTotal, setQTotal] = useState(0);
-  const [qPage, setQPage] = useState(1);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [exams, setExams] = useState<ExamItem[]>([]);
   const [lbPlayers, setLbPlayers] = useState<LbEntry[]>([]);
   const [examAttempts, setExamAttempts] = useState<AttemptRow[]>([]);
@@ -90,23 +73,14 @@ export default function AdminPage() {
 
   // UI
   const [userSearch, setUserSearch] = useState("");
-  const [questionSearch, setQuestionSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("all");
-  const [qCatFilter, setQCatFilter] = useState("all");
-  const [qDiffFilter, setQDiffFilter] = useState("all");
   const [examSearch, setExamSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [togglingUsers, setTogglingUsers] = useState<Set<string>>(new Set());
 
   // Modals
-  const [qModal, setQModal] = useState(false);
-  const [catModal, setCatModal] = useState(false);
   const [examModal, setExamModal] = useState(false);
-  const [qForm, setQForm] = useState({ ...EMPTY_Q });
-  const [catForm, setCatForm] = useState({ ...EMPTY_CAT });
   const [examForm, setExamForm] = useState({ ...EMPTY_EXAM });
-  const [editingQ, setEditingQ] = useState<QuestionDoc | null>(null);
-  const [editingCat, setEditingCat] = useState<Category | null>(null);
   const [editingExam, setEditingExam] = useState<ExamItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -141,31 +115,6 @@ export default function AdminPage() {
     setLoading(false);
   }, []);
 
-  const loadQuestions = useCallback(async (page = 1, cat = "all", diff = "all", q = "") => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
-      if (cat !== "all") params.set("categoryId", cat);
-      if (diff !== "all") params.set("difficulty", diff);
-      if (q) params.set("search", q);
-      const r = await fetch(`/api/admin/questions?${params}`);
-      if (r.ok) {
-        const d = await r.json();
-        setQuestions(d.questions ?? []);
-        setQTotal(d.total ?? 0);
-        setQPage(page);
-      }
-    } catch { /* silent */ }
-    setLoading(false);
-  }, []);
-
-  const loadCategories = useCallback(async () => {
-    try {
-      const r = await fetch("/api/admin/categories");
-      if (r.ok) { const d = await r.json(); setCategories(d.categories ?? []); }
-    } catch { /* silent */ }
-  }, []);
-
   const loadExams = useCallback(async () => {
     setLoading(true);
     try {
@@ -194,136 +143,16 @@ export default function AdminPage() {
     if (status !== "authenticated" || session?.user?.role !== "admin") return;
     if (tab === "overview") loadStats();
     if (tab === "users") loadUsers(1, userRoleFilter, userSearch);
-    if (tab === "questions") { loadQuestions(1, qCatFilter, qDiffFilter, questionSearch); loadCategories(); }
-    if (tab === "categories") loadCategories();
     if (tab === "exams") loadExams();
     if (tab === "live") loadLeaderboard();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
   if (status === "loading") {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f172a" }}>
-        <div style={{ color: "#94a3b8", fontSize: 16 }}>Уншиж байна...</div>
-      </div>
-    );
+    return <Loading fullScreen background="#f8fafc" message="Уншиж байна…" />;
   }
   if (status === "unauthenticated" || session?.user?.role !== "admin") {
     return null;
-  }
-
-  // ── Question CRUD ─────────────────────────────────────────────
-  async function saveQuestion() {
-    if (!qForm.categoryId) { toast("Ангилал сонгоно уу", "err"); return; }
-    if (!qForm.question.trim()) { toast("Асуулт оруулна уу", "err"); return; }
-    if (qForm.options.some(o => !o.trim())) { toast("4 хариультыг бүгдийг бөглөнө үү", "err"); return; }
-    setSubmitting(true);
-    try {
-      if (editingQ) {
-        const r = await fetch("/api/admin/questions", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editingQ._id, ...qForm }) });
-        if (!r.ok) throw new Error();
-        toast("Асуулт шинэчлэгдлээ");
-      } else {
-        const r = await fetch("/api/admin/questions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(qForm) });
-        if (!r.ok) throw new Error();
-        toast("Асуулт нэмэгдлээ");
-      }
-      closeQModal();
-      loadQuestions(qPage, qCatFilter, qDiffFilter, questionSearch);
-    } catch {
-      toast("Хадгалах үед алдаа гарлаа", "err");
-    }
-    setSubmitting(false);
-  }
-
-  async function deleteQuestion(id: string) {
-    if (!confirm("Энэ асуултыг устгах уу?")) return;
-    try {
-      const r = await fetch(`/api/admin/questions?id=${id}`, { method: "DELETE" });
-      if (!r.ok) throw new Error();
-      toast("Асуулт устгагдлаа");
-      loadQuestions(qPage, qCatFilter, qDiffFilter, questionSearch);
-    } catch {
-      toast("Устгах үед алдаа гарлаа", "err");
-    }
-  }
-
-  function openEditQ(q: QuestionDoc) {
-    setEditingQ(q);
-    setQForm({
-      categoryId: q.categoryId?._id ?? "",
-      level: q.level, question: q.question,
-      options: q.options?.length === 4 ? q.options : ["", "", "", ""],
-      correctIndex: q.correctIndex ?? 0,
-      explanation: q.explanation ?? "",
-      difficulty: q.difficulty, xpReward: q.xpReward,
-      coinReward: q.coinReward ?? 5,
-    });
-    setQModal(true);
-  }
-
-  function closeQModal() {
-    setQModal(false); setEditingQ(null); setQForm({ ...EMPTY_Q });
-  }
-
-  // ── Category CRUD ─────────────────────────────────────────────
-  async function saveCategory() {
-    if (!catForm.name.trim()) { toast("Нэр оруулна уу", "err"); return; }
-    setSubmitting(true);
-    try {
-      if (editingCat) {
-        const r = await fetch("/api/admin/categories", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editingCat._id, ...catForm }) });
-        if (!r.ok) throw new Error();
-        toast("Ангилал шинэчлэгдлээ");
-      } else {
-        const r = await fetch("/api/admin/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(catForm) });
-        if (!r.ok) throw new Error();
-        toast("Ангилал нэмэгдлээ");
-      }
-      closeCatModal();
-      loadCategories();
-    } catch {
-      toast("Хадгалах үед алдаа гарлаа", "err");
-    }
-    setSubmitting(false);
-  }
-
-  async function deleteCategory(id: string) {
-    if (!confirm("Ангилал устгахад холбоотой бүх асуулт устгагдана. Үргэлжлүүлэх үү?")) return;
-    try {
-      const r = await fetch(`/api/admin/categories?id=${id}`, { method: "DELETE" });
-      if (!r.ok) throw new Error();
-      toast("Ангилал устгагдлаа");
-      loadCategories();
-      if (qCatFilter === id) setQCatFilter("all");
-    } catch {
-      toast("Устгах үед алдаа гарлаа", "err");
-    }
-  }
-
-  function openEditCat(c: Category) {
-    setEditingCat(c);
-    setCatForm({ name: c.name, icon: c.icon ?? "", color: c.color ?? "#4F46E5", totalLevels: c.totalLevels, order: c.order, isActive: c.isActive ?? true });
-    setCatModal(true);
-  }
-
-  function closeCatModal() {
-    setCatModal(false); setEditingCat(null); setCatForm({ ...EMPTY_CAT });
-  }
-
-  async function toggleCategoryActive(c: Category) {
-    try {
-      const r = await fetch("/api/admin/categories", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: c._id, isActive: !c.isActive }),
-      });
-      if (!r.ok) throw new Error();
-      toast(c.isActive ? "Ангилал идэвхгүй боллоо" : "Ангилал идэвхжлээ");
-      loadCategories();
-    } catch {
-      toast("Алдаа гарлаа", "err");
-    }
   }
 
   // ── Exam CRUD ─────────────────────────────────────────────────
@@ -349,7 +178,13 @@ export default function AdminPage() {
   }
 
   async function deleteExam(id: string) {
-    if (!confirm("Шалгалтыг устгах уу?")) return;
+    const ok = await confirm({
+      title: "Шалгалт устгах",
+      description: "Шалгалтыг устгах уу? Энэ үйлдлийг буцаах боломжгүй.",
+      confirmLabel: "Устгах",
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       const r = await fetch(`/api/exam/exams/${id}`, { method: "DELETE" });
       if (!r.ok) throw new Error();
@@ -427,7 +262,13 @@ export default function AdminPage() {
   }
 
   async function deleteUser(id: string) {
-    if (!confirm("Хэрэглэгчийг устгах уу? Энэ үйлдлийг буцаах боломжгүй.")) return;
+    const ok = await confirm({
+      title: "Хэрэглэгч устгах",
+      description: "Хэрэглэгчийг устгах уу? Энэ үйлдлийг буцаах боломжгүй.",
+      confirmLabel: "Устгах",
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       const r = await fetch(`/api/admin/users?userId=${id}`, { method: "DELETE" });
       if (!r.ok) throw new Error();
@@ -451,10 +292,8 @@ export default function AdminPage() {
     {
       label: "Хичээл & тоглоом",
       items: [
-        { id: "content", label: "Тоглоомын курс", icon: "layers" },
+        { id: "content", label: "Physic map", icon: "layers" },
         { id: "videos", label: "Видео & PDF", icon: "video" },
-        { id: "questions", label: "Асуултын сан", icon: "help" },
-        { id: "categories", label: "Ангилал", icon: "folder" },
         { id: "exams", label: "Шалгалт", icon: "clipboard" },
       ],
     },
@@ -515,7 +354,7 @@ export default function AdminPage() {
 
               <div className="quick-cards">
                 <button type="button" className="quick-card" onClick={() => setTab("content")}>
-                  <strong className="quick-card-title"><AdminIcon name="layers" size={16} /> Тоглоомын курс</strong>
+                  <strong className="quick-card-title"><AdminIcon name="layers" size={16} /> Physic map</strong>
                   <span>Сэдэв, хичээл, асуулт нэмэх — сурагчийн газрын зураг</span>
                 </button>
                 <button type="button" className="quick-card" onClick={() => setTab("videos")}>
@@ -533,7 +372,9 @@ export default function AdminPage() {
               </div>
 
               {!stats ? (
-                <div style={{ textAlign: "center", padding: "60px 0", color: "#94A3B8" }}>Ачаалж байна…</div>
+                <div style={{ display: "flex", justifyContent: "center", padding: "48px 0" }}>
+                  <Loading size={88} message="Ачаалж байна…" />
+                </div>
               ) : (
                 <>
                   <div className="stat-grid">
@@ -593,19 +434,22 @@ export default function AdminPage() {
 
           {/* ═══ GAME CONTENT ═══════════════════════════ */}
           {tab === "content" && (
-            <div>
-              <div className="page-header">
-                <h1 className="page-title">Тоглоомын курс</h1>
-                <p className="page-sub">Сурагчийн тоглоомын газрын зураг — 3 алхмаар хичээл үүсгэнэ</p>
-              </div>
-              <div className="help-banner">
-                <div className="help-banner-icon"><AdminIcon name="layers" size={22} /></div>
+            <div className="physic-map-page">
+              <div className="page-header physic-map-header">
                 <div>
-                  <h3>Шинэ багшид — энэ дарааллаар хийгээрэй</h3>
+                  <p className="physic-map-eyebrow">Physics LMS</p>
+                  <h1 className="page-title">Physic map</h1>
+                  <p className="page-sub">Сэдэв → хичээл → агуулга — сурагчийн тоглоомын газрын зураг</p>
+                </div>
+              </div>
+              <div className="help-banner help-banner--physics">
+                <div className="help-banner-icon"><AdminIcon name="atom" size={20} strokeWidth={1.5} /></div>
+                <div>
+                  <h3>Багшийн ажлын дараалал</h3>
                   <p>
-                    <strong>1. Сэдэв</strong> (жишээ: Механик) → <strong>2. Хичээл</strong> (од бүр — нэг түвшин) →{" "}
-                    <strong>3. Агуулга</strong> (текст + хамгийн багадаа 1 асуулт, зөвлөмж 10). Дараа нь{" "}
-                    <strong>Хадгалах</strong> дарна.
+                    <strong>1. Сэдэв</strong> (жишээ: Механик) → <strong>2. Хичээл</strong> (нэг түвшин) →{" "}
+                    <strong>3. Агуулга</strong> (текст + хамгийн багадаа 1 асуулт). Дараа нь{" "}
+                    <strong>Хадгалах</strong>.
                   </p>
                 </div>
               </div>
@@ -641,7 +485,7 @@ export default function AdminPage() {
                             <div style={{ fontWeight: 500 }}>{p.name}</div>
                           </div>
                         </td>
-                        <td style={{ fontWeight: 600, color: "#4F46E5", fontVariantNumeric: "tabular-nums" }}>{p.score.toLocaleString()} XP</td>
+                        <td className="text-brand" style={{ fontVariantNumeric: "tabular-nums" }}>{p.score.toLocaleString()} XP</td>
                         <td style={{ color: p.streak > 7 ? "#F59E0B" : "#64748B" }}>{p.streak > 0 ? `${p.streak} өдөр streak` : "—"}</td>
                       </tr>
                     ))}
@@ -692,7 +536,11 @@ export default function AdminPage() {
                   </thead>
                   <tbody>
                     {loading ? (
-                      <tr className="loading-row"><td colSpan={7}>Ачаалж байна…</td></tr>
+                      <tr className="loading-row">
+                        <td colSpan={7} style={{ padding: "32px 0" }}>
+                          <Loading size={72} message="Ачаалж байна…" />
+                        </td>
+                      </tr>
                     ) : users.length === 0 ? (
                       <tr><td colSpan={7} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>Хэрэглэгч олдсонгүй</td></tr>
                     ) : users.map(u => (
@@ -715,7 +563,7 @@ export default function AdminPage() {
                             <option value="admin">Admin</option>
                           </select>
                         </td>
-                        <td style={{ fontWeight: 600, color: "#4F46E5", fontVariantNumeric: "tabular-nums" }}>
+                        <td className="text-brand" style={{ fontVariantNumeric: "tabular-nums" }}>
                           {u.role === "student" ? (u.xp ?? 0).toLocaleString() : "—"}
                         </td>
                         <td style={{ color: (u.streak ?? 0) > 7 ? "#F59E0B" : "#64748B" }}>
@@ -749,131 +597,6 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ═══ QUESTIONS ══════════════════════════════ */}
-          {tab === "questions" && (
-            <div>
-              <div className="page-header">
-                <h1 className="page-title">Асуултын сан</h1>
-                <p className="page-sub">Нийт {qTotal} асуулт хадгалагдсан</p>
-              </div>
-              <div className="toolbar">
-                <select className="select" style={{ width: 160 }} value={qCatFilter}
-                  onChange={e => { setQCatFilter(e.target.value); loadQuestions(1, e.target.value, qDiffFilter, questionSearch); }}>
-                  <option value="all">Бүх ангилал</option>
-                  {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                </select>
-                <select className="select" style={{ width: 120 }} value={qDiffFilter}
-                  onChange={e => { setQDiffFilter(e.target.value); loadQuestions(1, qCatFilter, e.target.value, questionSearch); }}>
-                  <option value="all">Бүх түвшин</option>
-                  <option value="easy">Хялбар</option>
-                  <option value="medium">Дунд</option>
-                  <option value="hard">Хэцүү</option>
-                </select>
-                <div className="search-wrap" style={{ width: 220 }}>
-                  <span style={{ color: "#94A3B8" }}>⌕</span>
-                  <input placeholder="Асуулт хайх…" value={questionSearch}
-                    onChange={e => setQuestionSearch(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter") loadQuestions(1, qCatFilter, qDiffFilter, (e.target as HTMLInputElement).value); }}
-                  />
-                </div>
-                <button className="btn" onClick={() => loadQuestions(1, qCatFilter, qDiffFilter, questionSearch)}>Хайх</button>
-                <div className="spacer" />
-                <button className="btn primary" onClick={() => { setEditingQ(null); setQForm({ ...EMPTY_Q }); setQModal(true); }}>+ Асуулт нэмэх</button>
-              </div>
-              <div className="table-wrap">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Асуулт</th>
-                      <th style={{ width: 140 }}>Ангилал</th>
-                      <th style={{ width: 60 }}>Lvl</th>
-                      <th style={{ width: 90 }}>Хүнд</th>
-                      <th style={{ width: 60 }}>XP</th>
-                      <th style={{ width: 100, textAlign: "right" }}>Үйлдэл</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading ? (
-                      <tr className="loading-row"><td colSpan={6}>Ачаалж байна…</td></tr>
-                    ) : questions.length === 0 ? (
-                      <tr><td colSpan={6} style={{ textAlign: "center", padding: 32, color: "#94A3B8" }}>Асуулт олдсонгүй</td></tr>
-                    ) : questions.map(q => (
-                      <tr key={q._id}>
-                        <td style={{ maxWidth: 360 }}>
-                          <div style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.question}</div>
-                        </td>
-                        <td style={{ color: "#64748B" }}>{q.categoryId?.name ?? "—"}</td>
-                        <td style={{ color: "#94A3B8", fontVariantNumeric: "tabular-nums" }}>{q.level}</td>
-                        <td>
-                          <span className={`badge ${q.difficulty === "easy" ? "green" : q.difficulty === "hard" ? "red" : "amber"}`}>
-                            {q.difficulty === "easy" ? "Хялбар" : q.difficulty === "hard" ? "Хэцүү" : "Дунд"}
-                          </span>
-                        </td>
-                        <td style={{ color: "#4F46E5", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>+{q.xpReward}</td>
-                        <td style={{ textAlign: "right" }}>
-                          <div className="row-actions" style={{ justifyContent: "flex-end" }}>
-                            <button className="btn sm" onClick={() => openEditQ(q)}>Засах</button>
-                            <button className="btn sm danger" onClick={() => deleteQuestion(q._id)}>Устгах</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="pager">
-                  <span>{questions.length ? `${(qPage - 1) * PAGE_SIZE + 1}–${Math.min(qPage * PAGE_SIZE, qTotal)} / ${qTotal}` : "0"}</span>
-                  <div className="spacer" />
-                  <button className="btn sm" disabled={qPage <= 1} onClick={() => loadQuestions(qPage - 1, qCatFilter, qDiffFilter, questionSearch)}>‹ Өмнөх</button>
-                  <button className="btn sm" disabled={qPage * PAGE_SIZE >= qTotal} onClick={() => loadQuestions(qPage + 1, qCatFilter, qDiffFilter, questionSearch)}>Дараах ›</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ═══ CATEGORIES ═════════════════════════════ */}
-          {tab === "categories" && (
-            <div>
-              <div className="page-header" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-                <div>
-                  <h1 className="page-title">Ангилал</h1>
-                  <p className="page-sub">{categories.length} ангилал бүртгэлтэй</p>
-                </div>
-                <button className="btn primary" onClick={() => { setEditingCat(null); setCatForm({ ...EMPTY_CAT }); setCatModal(true); }}>+ Ангилал нэмэх</button>
-              </div>
-              {categories.length === 0 ? (
-                <div className="card"><div className="empty"><div className="empty-title">Ангилал байхгүй байна</div><div className="empty-sub">Дээрх товчоор анхны ангилалаа нэмнэ үү</div></div></div>
-              ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
-                  {categories.map(c => (
-                    <div key={c._id} className="card">
-                      <div style={{ padding: "16px 18px" }}>
-                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
-                          <div style={{ width: 40, height: 40, borderRadius: 10, background: `${c.color}18`, color: c.color, display: "grid", placeItems: "center", fontSize: 18, fontWeight: 700 }}>
-                            {c.icon?.trim() || c.name?.[0]?.toUpperCase() || "?"}
-                          </div>
-                          <button
-                            type="button"
-                            className={`badge ${c.isActive ? "green dot" : "gray"}`}
-                            style={{ cursor: "pointer", border: "none" }}
-                            onClick={() => toggleCategoryActive(c)}
-                            title="Идэвхжүүлэх / идэвхгүй болгох"
-                          >
-                            {c.isActive ? "Идэвхтэй" : "Идэвхгүй"}
-                          </button>
-                        </div>
-                        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>{c.name}</div>
-                        <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 14 }}>{c.totalLevels} level  Дараалал {c.order}</div>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button className="btn sm" style={{ flex: 1 }} onClick={() => openEditCat(c)}>Засах</button>
-                          <button className="btn sm danger" onClick={() => deleteCategory(c._id)}>Устгах</button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* ═══ EXAMS ══════════════════════════════════ */}
           {tab === "exams" && (
@@ -917,7 +640,7 @@ export default function AdminPage() {
                                 <div style={{ fontWeight: 600 }}>{exam.title}</div>
                                 {exam.description && <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>{exam.description}</div>}
                               </td>
-                              <td style={{ color: "#4F46E5", fontWeight: 600 }}>{exam.questions?.length ?? 0}</td>
+                              <td className="text-brand">{exam.questions?.length ?? 0}</td>
                               <td style={{ color: "#64748B" }}>{exam.duration}мин</td>
                               <td style={{ fontSize: 12, color: "#94A3B8" }}>{fmtDate(exam.createdAt)}</td>
                               <td style={{ textAlign: "right" }}>
@@ -965,7 +688,7 @@ export default function AdminPage() {
                                       </div>
                                     </div>
                                   </td>
-                                  <td style={{ fontWeight: 600, color: "#4F46E5", fontVariantNumeric: "tabular-nums" }}>{a.score}/{a.totalQuestions}</td>
+                                  <td className="text-brand" style={{ fontVariantNumeric: "tabular-nums" }}>{a.score}/{a.totalQuestions}</td>
                                   <td><span className={`badge ${pct >= 75 ? "green" : pct >= 50 ? "amber" : "red"}`}>{pct}%</span></td>
                                   <td style={{ fontSize: 12, color: "#94A3B8" }}>{a.finishedAt ? fmtDate(a.finishedAt) : "—"}</td>
                                 </tr>
@@ -986,121 +709,6 @@ export default function AdminPage() {
         </main>
       </div>
 
-      {/* ── QUESTION MODAL ─────────────────────────── */}
-      {qModal && (
-        <div className="overlay" onClick={closeQModal}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-head">
-              <h2>{editingQ ? "Асуулт засах" : "Шинэ асуулт нэмэх"}</h2>
-              <button className="close-btn" onClick={closeQModal}>×</button>
-            </div>
-            <div className="modal-body">
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 90px 130px", gap: 10, marginBottom: 14 }}>
-                <div className="field" style={{ margin: 0 }}>
-                  <label className="label">Ангилал *</label>
-                  <select className="select" value={qForm.categoryId} onChange={e => setQForm(f => ({ ...f, categoryId: e.target.value }))}>
-                    <option value="">— Сонгох —</option>
-                    {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div className="field" style={{ margin: 0 }}>
-                  <label className="label">Level</label>
-                  <input type="number" className="input" value={qForm.level} min={1} onChange={e => setQForm(f => ({ ...f, level: +e.target.value }))} />
-                </div>
-                <div className="field" style={{ margin: 0 }}>
-                  <label className="label">Хүндвэрлэл</label>
-                  <select className="select" value={qForm.difficulty} onChange={e => setQForm(f => ({ ...f, difficulty: e.target.value }))}>
-                    <option value="easy">Хялбар</option>
-                    <option value="medium">Дунд</option>
-                    <option value="hard">Хэцүү</option>
-                  </select>
-                </div>
-              </div>
-              <div className="field">
-                <label className="label">Асуулт *</label>
-                <textarea className="textarea" rows={3} placeholder="Асуултаа оруулна уу" value={qForm.question} onChange={e => setQForm(f => ({ ...f, question: e.target.value }))} />
-              </div>
-              <div className="field">
-                <label className="label">Хариултууд — зөв хариулт сонгоно уу *</label>
-                {qForm.options.map((o, i) => (
-                  <label key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                    <input type="radio" name="correct" checked={qForm.correctIndex === i} onChange={() => setQForm(f => ({ ...f, correctIndex: i }))} style={{ accentColor: "#4F46E5", width: 15, height: 15, flexShrink: 0 }} />
-                    <span style={{ width: 22, height: 22, borderRadius: 5, background: qForm.correctIndex === i ? "#4F46E5" : "#F1F5F9", color: qForm.correctIndex === i ? "#fff" : "#64748B", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{"ABCD"[i]}</span>
-                    <input className="input" placeholder={`Хариулт ${"ABCD"[i]}`} value={o} onChange={e => setQForm(f => ({ ...f, options: f.options.map((v, k) => k === i ? e.target.value : v) }))} style={{ borderColor: qForm.correctIndex === i ? "#6366F1" : "#E2E8F0" }} />
-                  </label>
-                ))}
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 90px 90px", gap: 10 }}>
-                <div className="field" style={{ margin: 0 }}>
-                  <label className="label">Тайлбар</label>
-                  <input className="input" placeholder="Зөв хариултын тайлбар" value={qForm.explanation} onChange={e => setQForm(f => ({ ...f, explanation: e.target.value }))} />
-                </div>
-                <div className="field" style={{ margin: 0 }}>
-                  <label className="label">XP</label>
-                  <input type="number" className="input" value={qForm.xpReward} min={0} onChange={e => setQForm(f => ({ ...f, xpReward: +e.target.value }))} />
-                </div>
-                <div className="field" style={{ margin: 0 }}>
-                  <label className="label">Coin</label>
-                  <input type="number" className="input" value={qForm.coinReward} min={0} onChange={e => setQForm(f => ({ ...f, coinReward: +e.target.value }))} />
-                </div>
-              </div>
-            </div>
-            <div className="modal-foot">
-              <button className="btn" onClick={closeQModal}>Болих</button>
-              <button className="btn primary" disabled={submitting} onClick={saveQuestion}>{submitting ? "Хадгалж байна…" : editingQ ? "Хадгалах" : "Нэмэх"}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── CATEGORY MODAL ─────────────────────────── */}
-      {catModal && (
-        <div className="overlay" onClick={closeCatModal}>
-          <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-head">
-              <h2>{editingCat ? "Ангилал засах" : "Шинэ ангилал нэмэх"}</h2>
-              <button className="close-btn" onClick={closeCatModal}>×</button>
-            </div>
-            <div className="modal-body">
-              <div className="field">
-                <label className="label">Нэр *</label>
-                <input className="input" placeholder="Жишээ: Цахилгаан" value={catForm.name} onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))} />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <div className="field" style={{ margin: 0 }}>
-                  <label className="label">Дүрс тэмдэг</label>
-                  <input className="input" placeholder="icon" value={catForm.icon} onChange={e => setCatForm(f => ({ ...f, icon: e.target.value }))} />
-                </div>
-                <div className="field" style={{ margin: 0 }}>
-                  <label className="label">Өнгө</label>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input type="color" value={catForm.color} onChange={e => setCatForm(f => ({ ...f, color: e.target.value }))} style={{ width: 36, height: 36, padding: 2, border: "1px solid #E2E8F0", borderRadius: 7, cursor: "pointer" }} />
-                    <input className="input" value={catForm.color} onChange={e => setCatForm(f => ({ ...f, color: e.target.value }))} />
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
-                <div className="field" style={{ margin: 0 }}>
-                  <label className="label">Нийт level</label>
-                  <input type="number" className="input" value={catForm.totalLevels} min={1} onChange={e => setCatForm(f => ({ ...f, totalLevels: +e.target.value }))} />
-                </div>
-                <div className="field" style={{ margin: 0 }}>
-                  <label className="label">Дараалал</label>
-                  <input type="number" className="input" value={catForm.order} min={0} onChange={e => setCatForm(f => ({ ...f, order: +e.target.value }))} />
-                </div>
-              </div>
-              <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, fontSize: 13, color: "#374151", cursor: "pointer" }}>
-                <input type="checkbox" checked={catForm.isActive} onChange={e => setCatForm(f => ({ ...f, isActive: e.target.checked }))} style={{ accentColor: "#4F46E5", width: 16, height: 16 }} />
-                Идэвхтэй ангилал (тоглоомд харагдана)
-              </label>
-            </div>
-            <div className="modal-foot">
-              <button className="btn" onClick={closeCatModal}>Болих</button>
-              <button className="btn primary" disabled={submitting || !catForm.name.trim()} onClick={saveCategory}>{submitting ? "Хадгалж байна…" : editingCat ? "Хадгалах" : "Нэмэх"}</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── EXAM MODAL ──────────────────────────────── */}
       {examModal && (
@@ -1142,8 +750,8 @@ export default function AdminPage() {
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                       {q.options.map(opt => (
                         <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <input type="radio" name={`correct-${q.id}`} checked={q.correctAnswer === opt.id} onChange={() => updateExamQ(q.id, "correctAnswer", opt.id)} style={{ accentColor: "#4F46E5", width: 14, height: 14, flexShrink: 0 }} />
-                          <span style={{ width: 22, height: 22, borderRadius: 5, background: q.correctAnswer === opt.id ? "#4F46E5" : "#E2E8F0", color: q.correctAnswer === opt.id ? "#fff" : "#64748B", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{opt.id}</span>
+                          <input type="radio" name={`correct-${q.id}`} checked={q.correctAnswer === opt.id} onChange={() => updateExamQ(q.id, "correctAnswer", opt.id)} className="admin-radio" />
+                          <span className={`exam-opt-label${q.correctAnswer === opt.id ? " selected" : ""}`}>{opt.id}</span>
                           <input className="input" placeholder={`Хариулт ${opt.id}`} value={opt.text} onChange={e => updateExamOpt(q.id, opt.id, e.target.value)} style={{ borderColor: q.correctAnswer === opt.id ? "#6366F1" : "#E2E8F0" }} />
                         </label>
                       ))}
@@ -1160,12 +768,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── TOASTS ──────────────────────────────────── */}
-      <div className="admin-toast-wrap">
-        {toasts.map(t => (
-          <div key={t.id} className={`admin-toast ${t.type}`}>{t.msg}</div>
-        ))}
-      </div>
     </div>
   );
 }

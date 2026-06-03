@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { T } from "@/styles/tokens";
 import { BackButton } from "@/components/ui/BackButton";
 import { EesPracticeView } from "@/components/ees/EesPracticeView";
+import { Loading } from "@/components/ui/Loading";
 
 export default function EesPracticePage() {
   const { data: session, status } = useSession();
@@ -16,21 +17,7 @@ export default function EesPracticePage() {
   }, [status, router]);
 
   if (status === "loading") {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: T.bg,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: T.muted,
-          fontFamily: '"Plus Jakarta Sans", sans-serif',
-        }}
-      >
-        Ачаалж байна...
-      </div>
-    );
+    return <Loading fullScreen background={T.bg} message="Ачаалж байна…" />;
   }
 
   return (

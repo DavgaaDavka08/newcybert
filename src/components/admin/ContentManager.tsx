@@ -3,6 +3,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { T } from '@/styles/tokens';
 import { AdminIcon, TOPIC_ICON_GLYPHS, type AdminIconName } from '@/components/admin/AdminIcon';
+import { Loading } from '@/components/ui/Loading';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 // ── Types ──────────────────────────────────────────────────────
 interface Topic {
@@ -138,7 +141,7 @@ function TopicForm({
 
   return (
     <div className="course-inline-form">
-      <div className="field" style={{ marginBottom: 10 }}>
+      <div className="field field-compact">
         <label className="label">Сэдвийн нэр *</label>
         <input
           className="input"
@@ -147,7 +150,7 @@ function TopicForm({
           placeholder="Жишээ: Механик, Цахилгаан"
         />
       </div>
-      <div className="field" style={{ marginBottom: 10 }}>
+      <div className="field field-compact">
         <label className="label">Тайлбар</label>
         <input
           className="input"
@@ -157,7 +160,7 @@ function TopicForm({
         />
       </div>
       <label className="label">Өнгө</label>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
         {COLORS.map((c) => (
           <button
             key={c}
@@ -176,7 +179,7 @@ function TopicForm({
         ))}
       </div>
       <label className="label">Дүрс</label>
-      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
         {ICONS.map((ic) => (
           <button
             key={ic}
@@ -276,7 +279,7 @@ function TopicPanel({
       <div className="course-panel-scroll">
         {loading && (
           <div className="course-empty">
-            <p>Ачаалж байна…</p>
+            <Loading size={80} message="Ачаалж байна…" />
           </div>
         )}
         {!loading && topics.length === 0 && !showAdd && (
@@ -458,7 +461,7 @@ function SubtopicPanel({
       <div className="course-panel-scroll">
         {loading && (
           <div className="course-empty">
-            <p>Ачаалж байна…</p>
+            <Loading size={80} message="Ачаалж байна…" />
           </div>
         )}
         {!loading && subtopics.length === 0 && !showForm && (
@@ -802,6 +805,8 @@ function CourseWizardBar({
 
 // ── ContentManager (main) ──────────────────────────────────────
 export function ContentManager() {
+  const toast = useToast();
+  const { confirm } = useConfirm();
   const [topics, setTopics] = useState<Topic[]>([]);
   const [subtopics, setSubtopics] = useState<Subtopic[]>([]);
   const [selTopic, setSelTopic] = useState<Topic | null>(null);
@@ -847,7 +852,7 @@ export function ContentManager() {
       body: JSON.stringify({ name, color, icon, description: desc }),
     });
     if (!r.ok) {
-      alert('Сэдэв нэмэхэд алдаа гарлаа');
+      toast.error('Сэдэв нэмэхэд алдаа гарлаа');
       return;
     }
     const d = await r.json();
@@ -873,7 +878,13 @@ export function ContentManager() {
   }
 
   async function handleDeleteTopic(id: string) {
-    if (!confirm('Сэдэв болон доорх бүх хичээлийг устгах уу?')) return;
+    const ok = await confirm({
+      title: 'Сэдэв устгах',
+      description: 'Сэдэв болон доорх бүх хичээлийг устгах уу?',
+      confirmLabel: 'Устгах',
+      destructive: true,
+    });
+    if (!ok) return;
     await fetch(`/api/admin/topics/${id}`, { method: 'DELETE' });
     setTopics((prev) => prev.filter((t) => t._id !== id));
     if (selTopic?._id === id) {
@@ -913,7 +924,13 @@ export function ContentManager() {
   }
 
   async function handleDeleteSubtopic(id: string) {
-    if (!confirm('Хичээл болон асуултуудыг устгах уу?')) return;
+    const ok = await confirm({
+      title: 'Хичээл устгах',
+      description: 'Хичээл болон асуултуудыг устгах уу?',
+      confirmLabel: 'Устгах',
+      destructive: true,
+    });
+    if (!ok) return;
     await fetch(`/api/admin/subtopics/${id}`, { method: 'DELETE' });
     setSubtopics((prev) => prev.filter((s) => s._id !== id));
     if (selSubtopic?._id === id) {
@@ -930,7 +947,7 @@ export function ContentManager() {
       body: JSON.stringify(updated),
     });
     if (!r.ok) {
-      alert('Хадгалах үед алдаа гарлаа');
+      toast.error('Хадгалах үед алдаа гарлаа');
       return;
     }
     const d = await r.json();

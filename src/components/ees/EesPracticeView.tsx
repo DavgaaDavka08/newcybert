@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSession } from "next-auth/react";
 import { T } from "@/styles/tokens";
 import { Ic } from "@/components/ui/Icon";
+import { Loading } from "@/components/ui/Loading";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   buildEesQuestions,
   EES_META,
@@ -35,6 +37,7 @@ function MiniCopy() {
 }
 
 export function EesPracticeView() {
+  const { confirm } = useConfirm();
   const { data: session, update: updateSession } = useSession();
   const questions = useMemo(() => buildEesQuestions(), []);
   const tabLabels = useMemo(() => getQuestionTabLabels(questions), [questions]);
@@ -163,8 +166,14 @@ export function EesPracticeView() {
     pushToast("Сорил эхэллээ. Амжилт хүсье!");
   };
 
-  const resetProgress = () => {
-    if (!confirm("Бүх хариулт, дуртай болон явцыг цэвэрлэх үү?")) return;
+  const resetProgress = async () => {
+    const ok = await confirm({
+      title: "Явц цэвэрлэх",
+      description: "Бүх хариулт, дуртай болон явцыг цэвэрлэх үү?",
+      confirmLabel: "Цэвэрлэх",
+      destructive: true,
+    });
+    if (!ok) return;
     setAnswers({});
     setFavorites(new Set());
     setSolutionsUnlocked(new Set());
@@ -239,8 +248,8 @@ export function EesPracticeView() {
 
   if (!hydrated) {
     return (
-      <div style={{ ...gridBg, minHeight: 200, display: "flex", alignItems: "center", justifyContent: "center", color: T.muted, fontSize: 14 }}>
-        Ачаалж байна…
+      <div style={{ ...gridBg, minHeight: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Loading size={80} message="Ачаалж байна…" />
       </div>
     );
   }

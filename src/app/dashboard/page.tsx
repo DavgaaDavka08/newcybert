@@ -3,6 +3,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { MainApp } from "@/components/layout/MainApp";
+import { Loading } from "@/components/ui/Loading";
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
@@ -13,15 +14,9 @@ export default function DashboardPage() {
     if (status === "authenticated" && session?.user?.role === "admin") router.replace("/admin");
   }, [status, session, router]);
 
-  if (status === "loading") return (
-    <div style={{
-      minHeight: "100vh", background: "#F0F4F8",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      color: "#94A3B8", fontFamily: "Plus Jakarta Sans, sans-serif",
-    }}>
-      Ачаалж байна...
-    </div>
-  );
+  if (status === "loading") {
+    return <Loading fullScreen background="#F0F4F8" message="Ачаалж байна…" />;
+  }
 
   if (status !== "authenticated") return null;
 

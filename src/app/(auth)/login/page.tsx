@@ -4,8 +4,11 @@ import "../auth.css";
 import { useState, useEffect, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { PROVINCES, SCHOOL_GRADES } from "@/lib/mn-constants";
 import { getSafeCallbackUrl, mapAuthError, waitForSession } from "@/lib/auth-redirect";
+import { Ic } from "@/components/ui/Icon";
+import { Loading } from "@/components/ui/Loading";
 
 /* ─── Decorative shapes on the right bg ─── */
 type Shape = { type: string; x: number; y: number; size: number; color: string; rot?: number };
@@ -33,18 +36,6 @@ function StarSvg({ size, color }: { size: number; color: string }) {
     </svg>
   );
 }
-
-/* ─── input / label shared styles ─── */
-const inp: React.CSSProperties = {
-  width: "100%", padding: "11px 14px", borderRadius: 10,
-  border: "1.5px solid rgba(255,255,255,0.1)",
-  background: "rgba(255,255,255,0.04)", color: "#E2E8F0",
-  fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box",
-};
-const lbl: React.CSSProperties = {
-  fontSize: 12, color: "#94A3B8", fontWeight: 700,
-  marginBottom: 5, display: "block", letterSpacing: 0.3,
-};
 
 /* ════════════════════════════════════════════
    LOGIN FORM
@@ -101,67 +92,67 @@ function LoginTab({ onSwitch, callbackUrl }: { onSwitch: () => void; callbackUrl
   return (
     <>
 
-      {error && (
-        <div style={{
-          background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
-          borderRadius: 8, padding: "10px 12px", marginBottom: 14,
-          color: "#FCA5A5", fontSize: 13,
-        }}>⚠ {error}</div>
-      )}
+      {error && <div className="auth-alert auth-alert--error" role="alert">{error}</div>}
 
       <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: 12 }}>
-          <label style={lbl}>И-МЭЙЛ</label>
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-            placeholder="example@mail.com" required style={inp} autoComplete="email" />
+        <div className="auth-field">
+          <label className="auth-label" htmlFor="login-email">И-мэйл</label>
+          <input
+            id="login-email"
+            type="email"
+            className="auth-input"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="name@school.edu.mn"
+            required
+            autoComplete="email"
+          />
         </div>
 
-        <div style={{ marginBottom: 14 }}>
-          <label style={lbl}>НУУЦ ҮГ</label>
-          <div style={{ position: "relative" }}>
-            <input type={showPass ? "text" : "password"}
-              value={password} onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••" required autoComplete="current-password"
-              style={{ ...inp, paddingRight: 40 }} />
-            <button type="button" onClick={() => setShowPass(v => !v)} style={{
-              position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
-              background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 15,
-            }}>
-              {showPass ? "🙈" : "👁"}
+        <div className="auth-field">
+          <label className="auth-label" htmlFor="login-password">Нууц үг</label>
+          <div className="auth-input-wrap">
+            <input
+              id="login-password"
+              type={showPass ? "text" : "password"}
+              className="auth-input"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+              autoComplete="current-password"
+            />
+            <button
+              type="button"
+              className="auth-password-toggle"
+              onClick={() => setShowPass(v => !v)}
+              aria-label={showPass ? "Нууц үгийг нуух" : "Нууц үгийг харуулах"}
+              tabIndex={-1}
+            >
+              <Ic n={showPass ? "eyeOff" : "eye"} size={18} />
             </button>
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: 13, color: "#64748B" }}>
-            <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)}
-              style={{ accentColor: "#4361EE" }} />
+        <div className="auth-row-between">
+          <label className="auth-checkbox">
+            <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} />
             Намайг санах
           </label>
-          <a href="/forgot-password" style={{ fontSize: 12, color: "#4361EE", textDecoration: "none", fontWeight: 700 }}>
+          <Link href="/forgot-password" className="auth-link">
             Нууц үг мартсан?
-          </a>
+          </Link>
         </div>
 
-        <button type="submit" disabled={loading} style={{
-          width: "100%", padding: "12px", borderRadius: 10, border: "none",
-          background: loading ? "#2d52c4" : "#4361EE",
-          color: "#fff", fontWeight: 800, fontSize: 15,
-          cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit",
-          boxShadow: "0 4px 18px rgba(67,97,238,0.35)",
-          transition: "background .2s",
-        }}>
-          {loading ? "Нэвтэрч байна..." : "Нэвтрэх"}
+        <button type="submit" className="auth-btn-primary" disabled={loading}>
+          {loading ? "Нэвтэрч байна…" : "Нэвтрэх"}
         </button>
       </form>
 
-      <p style={{ textAlign: "center", marginTop: 14, fontSize: 13, color: "#64748B" }}>
+      <p className="auth-footer-text">
         Бүртгэл байхгүй юу?{" "}
-        <button onClick={onSwitch} style={{
-          color: "#4361EE", fontWeight: 700, background: "none",
-          border: "none", cursor: "pointer", fontSize: 13, fontFamily: "inherit",
-        }}>
-          Бүртгүүлэх →
+        <button type="button" className="auth-btn-text" onClick={onSwitch}>
+          Бүртгүүлэх
         </button>
       </p>
 
@@ -212,112 +203,84 @@ function RegisterTab({ onSwitch }: { onSwitch: () => void }) {
 
   return (
     <>
-      {error && (
-        <div style={{
-          background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
-          borderRadius: 8, padding: "10px 12px", marginBottom: 14, color: "#FCA5A5", fontSize: 13,
-        }}>⚠ {error}</div>
-      )}
-      {success && (
-        <div style={{
-          background: "rgba(94,206,186,0.1)", border: "1px solid rgba(94,206,186,0.3)",
-          borderRadius: 8, padding: "10px 12px", marginBottom: 14, color: "#5ECEBA", fontSize: 13,
-        }}>✅ {success}</div>
-      )}
+      {error && <div className="auth-alert auth-alert--error" role="alert">{error}</div>}
+      {success && <div className="auth-alert auth-alert--success" role="status">{success}</div>}
 
       <form onSubmit={handleSubmit}>
-        <div className="auth-register-grid" style={{ marginBottom: 10 }}>
-          <div>
-            <label style={lbl}>ОВОГ</label>
-            <input value={form.lastName} onChange={e => upd("lastName", e.target.value)}
-              placeholder="Дорж" required style={inp} />
+        <div className="auth-register-grid">
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="reg-lastname">Овог</label>
+            <input id="reg-lastname" className="auth-input" value={form.lastName}
+              onChange={e => upd("lastName", e.target.value)} placeholder="Дорж" required />
           </div>
-          <div>
-            <label style={lbl}>НЭР</label>
-            <input value={form.firstName} onChange={e => upd("firstName", e.target.value)}
-              placeholder="Болд" required style={inp} />
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="reg-firstname">Нэр</label>
+            <input id="reg-firstname" className="auth-input" value={form.firstName}
+              onChange={e => upd("firstName", e.target.value)} placeholder="Болд" required />
           </div>
         </div>
 
-        <div style={{ marginBottom: 10 }}>
-          <label style={lbl}>И-МЭЙЛ</label>
-          <input type="email" value={form.email} onChange={e => upd("email", e.target.value)}
-            placeholder="example@mail.com" required style={inp} />
+        <div className="auth-field">
+          <label className="auth-label" htmlFor="reg-email">И-мэйл</label>
+          <input id="reg-email" type="email" className="auth-input" value={form.email}
+            onChange={e => upd("email", e.target.value)} placeholder="name@school.edu.mn" required />
         </div>
 
-        <div style={{ marginBottom: 10 }}>
-          <label style={lbl}>НУУЦ ҮГ</label>
-          <div style={{ position: "relative" }}>
-            <input type={showPass ? "text" : "password"}
+        <div className="auth-field">
+          <label className="auth-label" htmlFor="reg-password">Нууц үг</label>
+          <div className="auth-input-wrap">
+            <input id="reg-password" type={showPass ? "text" : "password"} className="auth-input"
               value={form.password} onChange={e => upd("password", e.target.value)}
-              placeholder="••••• (6+ тэмдэгт)" required
-              style={{ ...inp, paddingRight: 40 }} />
-            <button type="button" onClick={() => setShowPass(v => !v)} style={{
-              position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
-              background: "none", border: "none", color: "#475569", cursor: "pointer",
-            }}>
-              {showPass ? "🙈" : "👁"}
+              placeholder="•••••• (6+ тэмдэгт)" required minLength={6} />
+            <button type="button" className="auth-password-toggle" onClick={() => setShowPass(v => !v)}
+              aria-label={showPass ? "Нууц үгийг нуух" : "Нууц үгийг харуулах"} tabIndex={-1}>
+              <Ic n={showPass ? "eyeOff" : "eye"} size={18} />
             </button>
           </div>
         </div>
 
-        <div className="auth-register-grid" style={{ marginBottom: 10 }}>
-          <div>
-            <label style={lbl}>УТАСНЫ ДУГААР</label>
-            <input value={form.phone} onChange={e => upd("phone", e.target.value)}
-              placeholder="9900XXXX" style={inp} />
+        <div className="auth-register-grid">
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="reg-phone">Утас</label>
+            <input id="reg-phone" className="auth-input" value={form.phone}
+              onChange={e => upd("phone", e.target.value)} placeholder="9900XXXX" />
           </div>
-          <div>
-            <label style={lbl}>АЙМАГ / НИЙСЛЭЛ</label>
-            <select value={form.province} onChange={e => upd("province", e.target.value)}
-              style={{ ...inp, cursor: "pointer" }}>
-              <option value="">-- Сонгох --</option>
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="reg-province">Аймаг / нийслэл</label>
+            <select id="reg-province" className="auth-select" value={form.province}
+              onChange={e => upd("province", e.target.value)}>
+              <option value="">Сонгох</option>
               {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
         </div>
 
-        <div style={{ marginBottom: 10 }}>
-          <label style={lbl}>СУРГУУЛЬ</label>
-          <input value={form.school} onChange={e => upd("school", e.target.value)}
-            placeholder="Сургуулийн нэр" style={inp} />
+        <div className="auth-field">
+          <label className="auth-label" htmlFor="reg-school">Сургууль</label>
+          <input id="reg-school" className="auth-input" value={form.school}
+            onChange={e => upd("school", e.target.value)} placeholder="Сургуулийн нэр" />
         </div>
 
-        <div style={{ marginBottom: 12 }}>
-          <label style={lbl}>АНГИ</label>
-          <select
-            value={form.grade}
-            onChange={e => upd("grade", e.target.value)}
-            required
-            style={{ ...inp, cursor: "pointer" }}
-          >
-            <option value="">-- Сонгох --</option>
+        <div className="auth-field">
+          <label className="auth-label" htmlFor="reg-grade">Анги</label>
+          <select id="reg-grade" className="auth-select" value={form.grade}
+            onChange={e => upd("grade", e.target.value)} required>
+            <option value="">Сонгох</option>
             {SCHOOL_GRADES.map((g) => (
-              <option key={g} value={g}>
-                {g}-р анги
-              </option>
+              <option key={g} value={g}>{g}-р анги</option>
             ))}
           </select>
         </div>
 
-        <button type="submit" disabled={loading} style={{
-          width: "100%", padding: "12px", borderRadius: 10, border: "none",
-          background: loading ? "#2d52c4" : "#4361EE",
-          color: "#fff", fontWeight: 800, fontSize: 15,
-          cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit",
-          boxShadow: "0 4px 18px rgba(67,97,238,0.35)",
-        }}>
-          {loading ? "Бүртгэж байна..." : "Бүртгүүлэх →"}
+        <button type="submit" className="auth-btn-primary" disabled={loading}>
+          {loading ? "Бүртгэж байна…" : "Бүртгүүлэх"}
         </button>
       </form>
 
-      <p style={{ textAlign: "center", marginTop: 14, fontSize: 13, color: "#64748B" }}>
+      <p className="auth-footer-text">
         Бүртгэлтэй юу?{" "}
-        <button onClick={onSwitch} style={{
-          color: "#4361EE", fontWeight: 700, background: "none",
-          border: "none", cursor: "pointer", fontSize: 13, fontFamily: "inherit",
-        }}>
-          Нэвтрэх →
+        <button type="button" className="auth-btn-text" onClick={onSwitch}>
+          Нэвтрэх
         </button>
       </p>
     </>
@@ -388,7 +351,7 @@ function AuthContent() {
           </div>
           <h2>CyberPhysics</h2>
           <p>
-            Физикийг тоглоомоор сур.<br />XP цуглуул. Streak хадгал.
+            Физикийг тоглоомоор сур.
           </p>
         </div>
       </div>
@@ -434,19 +397,15 @@ function AuthContent() {
             ))}
           </div>
 
+          <p className="auth-tab-desc">
+            {tab === "login"
+              ? "CyberPhysics бүртгэлээрээ нэвтэрнэ үү."
+              : "Сурагчийн мэдээллээ оруулж бүртгүүлнэ үү."}
+          </p>
+
           {authError && (
-            <div
-              style={{
-                background: "rgba(239,68,68,0.1)",
-                border: "1px solid rgba(239,68,68,0.3)",
-                borderRadius: 8,
-                padding: "10px 12px",
-                marginBottom: 14,
-                color: "#FCA5A5",
-                fontSize: 13,
-              }}
-            >
-              ⚠ {mapAuthError(authError)}
+            <div className="auth-alert auth-alert--error" role="alert">
+              {mapAuthError(authError)}
             </div>
           )}
 
@@ -465,7 +424,7 @@ function AuthContent() {
 ════════════════════════════════════════════ */
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div style={{ minHeight: "100vh", background: "#0D0D15" }} />}>
+    <Suspense fallback={<Loading fullScreen background="#0D0D15" size={120} />}>
       <AuthContent />
     </Suspense>
   );
