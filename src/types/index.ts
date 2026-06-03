@@ -11,6 +11,8 @@ export interface AppState {
   streak: number;
   name: string;
   isPremium: boolean;
+  dailyFreeAIRemaining: number;
+  dailyFreeProblemRemaining: number;
 }
 
 export type Screen = 'dashboard' | 'game';

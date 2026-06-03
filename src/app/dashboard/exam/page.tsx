@@ -7,7 +7,8 @@ import { Ic } from "@/components/ui/Icon";
 import { BackButton } from "@/components/ui/BackButton";
 import { useAppState } from "@/lib/app-state-context";
 
-const EXAM_COIN_COST = 6;
+const EXAM_FIRST_COST  = 0;  // Эхний оролдлого үнэгүй
+const EXAM_RETAKE_COST = 3;  // Дахин өгөх
 
 interface Exam {
   _id: string; title: string; description?: string;
@@ -41,8 +42,11 @@ export default function ExamListPage() {
     if (!selectedExam) return;
     setErrMsg("");
 
-    // Premium хэрэглэгч — зоос зарцуулахгүй, шууд нээнэ
-    if (appState.isPremium) {
+    const isRetake  = selectedExam.hasAttempt;
+    const coinCost  = appState.isPremium ? 0 : isRetake ? EXAM_RETAKE_COST : EXAM_FIRST_COST;
+    const action    = isRetake ? "exam_retake" : "exam_start";
+
+    if (coinCost === 0) {
       router.push(`/dashboard/exam/${selectedExam._id}`);
       return;
     }
@@ -52,7 +56,7 @@ export default function ExamListPage() {
       const res = await fetch("/api/user/spend-coins", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "exam_start" }),
+        body: JSON.stringify({ action }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -121,15 +125,7 @@ export default function ExamListPage() {
                 key={exam._id}
                 exam={exam}
                 isPremium={appState.isPremium}
-                coinCost={EXAM_COIN_COST}
-                onStart={() => {
-                  if (exam.hasAttempt) {
-                    router.push(`/dashboard/exam/${exam._id}`);
-                  } else {
-                    setSelectedExam(exam);
-                    setErrMsg("");
-                  }
-                }}
+                onStart={() => { setSelectedExam(exam); setErrMsg(""); }}
               />
             ))}
           </div>
@@ -155,33 +151,34 @@ export default function ExamListPage() {
               fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700,
             }}>✕</button>
 
-            <div style={{ textAlign: "center", marginBottom: 24 }}>
-              <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 8 }}>Сорил эхлүүлэх үү?</div>
-              {appState.isPremium ? (
-                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.7)" }}>
-                  Premium эрхтэй тул үнэгүй эхлүүлнэ.
-                </div>
-              ) : (
-                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.7)" }}>
-                  Бүтэн сорилыг эхлүүлэхэд<br />
-                  <strong style={{ color: "#fff", fontSize: 16 }}>{EXAM_COIN_COST} зоос зарцуулна.</strong>
-                </div>
-              )}
-            </div>
-
-            {/* Info rows */}
-            <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: "16px 18px", marginBottom: 20, display: "flex", flexDirection: "column", gap: 10 }}>
-              <InfoRow icon="🟡" label={`Үнэ: ${appState.isPremium ? "үнэгүй (Premium)" : `${EXAM_COIN_COST} зоос`}`} />
-              <InfoRow icon="⏱️" label={`Хугацаа: ${selectedExam.duration} мин`} />
-              <InfoRow icon="📝" label={`Асуулт: ${selectedExam.questions?.length ?? 0}`} />
-              {!appState.isPremium && (
-                <InfoRow
-                  icon="💛"
-                  label={`Үлдэгдэл: ${appState.coins - EXAM_COIN_COST} зоос`}
-                  warn={appState.coins < EXAM_COIN_COST}
-                />
-              )}
-            </div>
+            {(() => {
+              const isRetake = selectedExam.hasAttempt;
+              const cost = appState.isPremium ? 0 : isRetake ? EXAM_RETAKE_COST : EXAM_FIRST_COST;
+              return (
+                <>
+                  <div style={{ textAlign: "center", marginBottom: 24 }}>
+                    <div style={{ fontSize: 28, marginBottom: 8 }}>{isRetake ? "🔄" : "📝"}</div>
+                    <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 6 }}>
+                      {isRetake ? "Дахин өгөх үү?" : "Сорил эхлүүлэх үү?"}
+                    </div>
+                    <div style={{ fontSize: 14, color: "rgba(255,255,255,0.65)" }}>
+                      {appState.isPremium
+                        ? "⭐ Premium — үнэгүй"
+                        : isRetake
+                          ? <><strong style={{ color: "#fff" }}>{EXAM_RETAKE_COST} зоос</strong> зарцуулна</>
+                          : "Эхний оролдлого <strong>үнэгүй!</strong>"
+                      }
+                    </div>
+                  </div>
+                  <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: "16px 18px", marginBottom: 20, display: "flex", flexDirection: "column", gap: 10 }}>
+                    <InfoRow icon={cost === 0 ? "✅" : "🟡"} label={`Үнэ: ${cost === 0 ? (appState.isPremium ? "Үнэгүй (Premium)" : "Үнэгүй") : `${cost} зоос`}`} />
+                    <InfoRow icon="⏱️" label={`Хугацаа: ${selectedExam.duration} мин`} />
+                    <InfoRow icon="📝" label={`Асуулт: ${selectedExam.questions?.length ?? 0}`} />
+                    {cost > 0 && <InfoRow icon="💛" label={`Үлдэгдэл: ${appState.coins - cost} зоос`} warn={appState.coins < cost} />}
+                  </div>
+                </>
+              );
+            })()}
 
             {errMsg && (
               <div style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 10, padding: "10px 14px", fontSize: 13, fontWeight: 600, marginBottom: 14, textAlign: "center" }}>
@@ -204,22 +201,23 @@ export default function ExamListPage() {
               >
                 Болих
               </button>
-              {!appState.isPremium && appState.coins < EXAM_COIN_COST ? (
-                <button
-                  onClick={() => router.push("/dashboard/premium")}
-                  style={{ flex: 1.5, padding: "12px 0", borderRadius: 12, border: "none", background: "#F59E0B", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}
-                >
-                  🟡 Зоос авах
-                </button>
-              ) : (
-                <button
-                  onClick={handleConfirmStart}
-                  disabled={spending}
-                  style={{ flex: 1.5, padding: "12px 0", borderRadius: 12, border: "none", background: spending ? "#555" : "#16a34a", color: "#fff", fontWeight: 800, fontSize: 14, cursor: spending ? "not-allowed" : "pointer", fontFamily: "inherit" }}
-                >
-                  {spending ? "Уншиж байна..." : appState.isPremium ? "✅ Эхлэх" : `🟡 ${EXAM_COIN_COST} зоос зарцуулах`}
-                </button>
-              )}
+              {(() => {
+                const isRetake = selectedExam.hasAttempt;
+                const cost = appState.isPremium ? 0 : isRetake ? EXAM_RETAKE_COST : EXAM_FIRST_COST;
+                const canAfford = cost === 0 || appState.coins >= cost;
+                if (!canAfford) return (
+                  <button onClick={() => router.push("/dashboard/premium")}
+                    style={{ flex: 1.5, padding: "12px 0", borderRadius: 12, border: "none", background: "#F59E0B", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+                    🟡 Зоос авах
+                  </button>
+                );
+                return (
+                  <button onClick={handleConfirmStart} disabled={spending}
+                    style={{ flex: 1.5, padding: "12px 0", borderRadius: 12, border: "none", background: spending ? "#555" : "#16a34a", color: "#fff", fontWeight: 800, fontSize: 14, cursor: spending ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                    {spending ? "..." : cost === 0 ? "✅ Эхлэх" : `🟡 ${cost} зоос зарцуулах`}
+                  </button>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -237,21 +235,21 @@ function InfoRow({ icon, label, warn }: { icon: string; label: string; warn?: bo
   );
 }
 
-function ExamCard({ exam, isPremium, coinCost, onStart }: { exam: Exam; isPremium: boolean; coinCost: number; onStart: () => void }) {
+function ExamCard({ exam, isPremium, onStart }: { exam: Exam; isPremium: boolean; onStart: () => void }) {
   const [hov, setHov] = useState(false);
   const done = exam.hasAttempt;
 
   return (
     <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)} style={{
       background: "#fff", borderRadius: 14,
-      border: `1.5px solid ${hov && !done ? "#4F46E5" : T.border}`,
+      border: `1.5px solid ${hov ? "#4F46E5" : done ? "#86EFAC" : T.border}`,
       padding: "20px 22px",
       boxShadow: hov ? "0 4px 20px rgba(79,70,229,0.12)" : T.shadow,
       transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
     }}>
       <div style={{ flex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: done ? T.greenLight : "#EEF2FF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: done ? T.greenLight : "#EEF2FF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <Ic n={done ? "check" : "task"} size={18} color={done ? T.green : T.blue} />
           </div>
           <div>
@@ -259,39 +257,32 @@ function ExamCard({ exam, isPremium, coinCost, onStart }: { exam: Exam; isPremiu
             {exam.description && <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{exam.description}</div>}
           </div>
         </div>
-        <div style={{ display: "flex", gap: 16, paddingLeft: 46 }}>
+        <div style={{ display: "flex", gap: 12, paddingLeft: 46, flexWrap: "wrap" }}>
           <span style={{ fontSize: 12, color: T.muted, display: "flex", alignItems: "center", gap: 4 }}>
             <Ic n="history" size={13} color={T.muted} /> {exam.duration} мин
           </span>
           <span style={{ fontSize: 12, color: T.muted, display: "flex", alignItems: "center", gap: 4 }}>
             <Ic n="task" size={13} color={T.muted} /> {exam.questions?.length ?? 0} асуулт
           </span>
-          {!done && !isPremium && (
-            <span style={{ fontSize: 12, color: "#D97706", display: "flex", alignItems: "center", gap: 4, fontWeight: 600 }}>
-              🟡 {coinCost} зоос
-            </span>
-          )}
-          {!done && isPremium && (
-            <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 700 }}>✅ Үнэгүй</span>
-          )}
+          {isPremium
+            ? <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 700 }}>⭐ Үнэгүй</span>
+            : done
+              ? <span style={{ fontSize: 12, color: "#D97706", fontWeight: 600 }}>🔄 Дахин: {EXAM_RETAKE_COST}🟡</span>
+              : <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 700 }}>✅ Эхний: үнэгүй</span>
+          }
         </div>
       </div>
 
-      {done ? (
-        <div style={{ background: T.greenLight, color: T.green, padding: "8px 18px", borderRadius: 10, fontSize: 13, fontWeight: 700, border: `1px solid ${T.green}30` }}>
-          ✓ Өгсөн
-        </div>
-      ) : (
-        <button onClick={onStart} style={{
-          background: "#4F46E5", color: "#fff", border: "none", borderRadius: 10,
-          padding: "10px 22px", fontWeight: 800, fontSize: 14, cursor: "pointer",
-          fontFamily: "Plus Jakarta Sans, sans-serif", boxShadow: "0 4px 14px rgba(79,70,229,0.35)",
-          transition: "transform .15s",
-          transform: hov ? "translateY(-1px)" : "none",
-        }}>
-          Эхлэх →
-        </button>
-      )}
+      <button onClick={onStart} style={{
+        background: done ? "#F59E0B" : "#4F46E5", color: "#fff", border: "none", borderRadius: 10,
+        padding: "10px 20px", fontWeight: 800, fontSize: 13, cursor: "pointer",
+        fontFamily: "Plus Jakarta Sans, sans-serif",
+        boxShadow: done ? "0 4px 14px rgba(245,158,11,0.35)" : "0 4px 14px rgba(79,70,229,0.35)",
+        transition: "transform .15s", transform: hov ? "translateY(-1px)" : "none",
+        whiteSpace: "nowrap",
+      }}>
+        {done ? "🔄 Дахин" : "Эхлэх →"}
+      </button>
     </div>
   );
 }

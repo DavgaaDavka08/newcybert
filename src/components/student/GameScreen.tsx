@@ -89,7 +89,9 @@ export function GameScreen({ onNav, state, setState }: Props) {
   const [score, setScore]           = useState(0);
   const [mistakes, setMistakes]     = useState(0);
   const [settings]                  = useState(getSettings());
-  const [lives, setLives]           = useState(settings.livesCount);
+  const PREMIUM_LIVES = 999;
+  const effectiveLivesCount = state.isPremium ? PREMIUM_LIVES : settings.livesCount;
+  const [lives, setLives]           = useState(state.isPremium ? PREMIUM_LIVES : settings.livesCount);
   const [noLives, setNoLives]       = useState(false);
   const [refillAt, setRefillAt]     = useState<number | null>(null);
   const [mapReload, setMapReload]   = useState(0);
@@ -105,6 +107,10 @@ export function GameScreen({ onNav, state, setState }: Props) {
   }, []);
 
   useEffect(() => {
+    if (state.isPremium) {
+      setLives(PREMIUM_LIVES);
+      return;
+    }
     const ls = getLivesState(settings.livesCount);
     if (ls.refillAt && Date.now() >= ls.refillAt) {
       setLives(settings.livesCount);
@@ -113,7 +119,7 @@ export function GameScreen({ onNav, state, setState }: Props) {
       setLives(ls.lives);
       setRefillAt(ls.refillAt);
     }
-  }, [settings.livesCount]);
+  }, [settings.livesCount, state.isPremium]);
 
   function enterQuiz(
     topic: GameTopic,
@@ -140,7 +146,7 @@ export function GameScreen({ onNav, state, setState }: Props) {
   }
 
   async function startSubtopicLevel(topicName: string, subtopicId: string) {
-    if (lives <= 0) { setNoLives(true); return; }
+    if (!state.isPremium && lives <= 0) { setNoLives(true); return; }
     try {
       const r = await fetch(`/api/game/subtopic-questions/${subtopicId}`);
       const d = await r.json();
@@ -233,12 +239,14 @@ export function GameScreen({ onNav, state, setState }: Props) {
       fetch('/api/user/award-xp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ xp: settings.xpPerCorrect, coins: settings.coinsPerCorrect, reason: 'practice_correct' }) }).catch(() => {});
     } else {
       setMistakes(m => m + 1);
-      const newLives  = Math.max(0, lives - 1);
-      const newRefill = newLives <= 0 ? Date.now() + settings.livesRefillMinutes * 60 * 1000 : null;
-      setLives(newLives); setRefillAt(newRefill);
-      setLivesState({ lives: newLives, refillAt: newRefill });
-      if (setState) setState(s => ({ ...s, lives: newLives }));
-      if (newLives <= 0) setTimeout(() => setNoLives(true), 900);
+      if (!state.isPremium) {
+        const newLives  = Math.max(0, lives - 1);
+        const newRefill = newLives <= 0 ? Date.now() + settings.livesRefillMinutes * 60 * 1000 : null;
+        setLives(newLives); setRefillAt(newRefill);
+        setLivesState({ lives: newLives, refillAt: newRefill });
+        if (setState) setState(s => ({ ...s, lives: newLives }));
+        if (newLives <= 0) setTimeout(() => setNoLives(true), 900);
+      }
     }
   }
 
@@ -252,7 +260,7 @@ export function GameScreen({ onNav, state, setState }: Props) {
 
   if (phase === 'map') return (
     <>
-      <GameMapPhase state={{ ...state, lives }} topicIdx={0} onTopicIdx={() => {}} reloadSignal={mapReload}
+      <GameMapPhase state={{ ...state, lives: state.isPremium ? PREMIUM_LIVES : lives }} topicIdx={0} onTopicIdx={() => {}} reloadSignal={mapReload}
         onBackToDashboard={() => onNav('dashboard')}
         onSelectLevel={(topicName, subtopicId) => {
           if (typeof subtopicId === 'string') {
@@ -285,7 +293,7 @@ export function GameScreen({ onNav, state, setState }: Props) {
 
   if (phase === 'quiz' && selectedLv) return (
     <>
-      <GameQuizPhase questions={questions} topicName={selectedLv.lessonName} topicColor={selectedLv.topic.color} level={1} lives={lives} maxLives={settings.livesCount} currentQ={currentQ} selected={selected} feedback={feedback} onSelect={setSelected} onCheck={handleCheck} onBack={() => {
+      <GameQuizPhase questions={questions} topicName={selectedLv.lessonName} topicColor={selectedLv.topic.color} level={1} lives={state.isPremium ? PREMIUM_LIVES : lives} maxLives={effectiveLivesCount} currentQ={currentQ} selected={selected} feedback={feedback} onSelect={setSelected} onCheck={handleCheck} onBack={() => {
         saveWip(selectedLv.subtopicId, { currentQ, score, mistakes });
         setPhase('map');
       }} />

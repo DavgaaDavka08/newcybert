@@ -14,13 +14,21 @@ export function Topbar({ title, sub, appState, actions }: TopbarProps) {
         {sub && <div className="dash-topbar-sub" style={{ fontSize: 13, color: T.muted, marginTop: 2 }}>{sub}</div>}
       </div>
       <div className="dash-topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        <div className="dash-topbar-chip" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface }}>
-          <Ic n="flame" size={14} color={T.amber} />
-          <span style={{ fontSize: 12, fontWeight: 600, color: T.textSub }}>{appState.streak} өдөр</span>
+        {/* XP */}
+        <div className="dash-topbar-chip" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: '1px solid #e0e7ff', background: '#eef2ff' }}>
+          <span style={{ fontSize: 13 }}>⚡</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#4F46E5' }}>{appState.xp} XP</span>
         </div>
-        <div className="dash-topbar-chip" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface }}>
-          <Ic n="coin" size={14} color={T.amber} />
+        {/* Streak */}
+        <div className="dash-topbar-chip" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface }}>
+          <span style={{ fontSize: 13 }}>🔥</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: T.textSub }}>{appState.streak}</span>
+        </div>
+        {/* Coins */}
+        <div className="dash-topbar-chip" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface }}>
+          <span style={{ fontSize: 13 }}>🟡</span>
           <span style={{ fontSize: 12, fontWeight: 600, color: T.textSub }}>{appState.coins}</span>
+          {appState.isPremium && <span style={{ fontSize: 10, background: '#fef3c7', color: '#d97706', borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>PRO</span>}
         </div>
         <button type="button" className="dash-topbar-icon-btn" style={{ width: 40, height: 40, borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Ic n="bell" size={15} color={T.muted} />

@@ -4,7 +4,8 @@ import { useSession } from 'next-auth/react';
 import type { AppState } from '@/types';
 
 const DEFAULT_STATE: AppState = {
-  xp: 0, level: 1, coins: 100, lives: 5, streak: 0, name: 'Сурагч', isPremium: false,
+  xp: 0, level: 1, coins: 100, lives: 5, streak: 0, name: 'Сурагч',
+  isPremium: false, dailyFreeAIRemaining: 3, dailyFreeProblemRemaining: 20,
 };
 
 interface AppStateContextValue {
@@ -36,6 +37,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         streak:    Number(u.streak ?? 0),
         name:      u.name ?? "Сурагч",
         isPremium: Boolean((u as any).isPremium ?? false),
+        dailyFreeAIRemaining:      Number((u as any).dailyFreeAIRemaining ?? 3),
+        dailyFreeProblemRemaining: Number((u as any).dailyFreeProblemRemaining ?? 20),
       });
       setInitialized(true);
     }
@@ -59,6 +62,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         lives:     data.lives     ?? prev.lives,
         streak:    data.streak    ?? prev.streak,
         isPremium: data.isPremium ?? prev.isPremium,
+        dailyFreeAIRemaining:      data.dailyFreeAIRemaining      ?? prev.dailyFreeAIRemaining,
+        dailyFreeProblemRemaining: data.dailyFreeProblemRemaining ?? prev.dailyFreeProblemRemaining,
       }));
     } catch {}
   }
