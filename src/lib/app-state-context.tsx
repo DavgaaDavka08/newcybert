@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import type { AppState } from '@/types';
 
 const DEFAULT_STATE: AppState = {
-  xp: 0, level: 1, coins: 100, lives: 5, streak: 0, name: 'Сурагч',
+  xp: 0, level: 1, coins: 100, lives: 5, streak: 0, name: 'Сурагч', isPremium: false,
 };
 
 interface AppStateContextValue {
@@ -29,12 +29,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     if (status === 'authenticated' && session?.user && !initialized) {
       const u = session.user;
       setAppStateRaw({
-        xp:     Number(u.xp ?? 0),
-        level:  Number(u.level ?? 1),
-        coins:  Number(u.coins ?? 100),
-        lives:  Number(u.lives ?? 5),
-        streak: Number(u.streak ?? 0),
-        name:   u.name ?? "Сурагч",
+        xp:        Number(u.xp ?? 0),
+        level:     Number(u.level ?? 1),
+        coins:     Number(u.coins ?? 100),
+        lives:     Number(u.lives ?? 5),
+        streak:    Number(u.streak ?? 0),
+        name:      u.name ?? "Сурагч",
+        isPremium: Boolean((u as any).isPremium ?? false),
       });
       setInitialized(true);
     }
@@ -52,11 +53,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       const data = await res.json();
       setAppStateRaw(prev => ({
         ...prev,
-        xp:     data.xp     ?? prev.xp,
-        level:  data.level  ?? prev.level,
-        coins:  data.coins  ?? prev.coins,
-        lives:  data.lives  ?? prev.lives,
-        streak: data.streak ?? prev.streak,
+        xp:        data.xp        ?? prev.xp,
+        level:     data.level     ?? prev.level,
+        coins:     data.coins     ?? prev.coins,
+        lives:     data.lives     ?? prev.lives,
+        streak:    data.streak    ?? prev.streak,
+        isPremium: data.isPremium ?? prev.isPremium,
       }));
     } catch {}
   }

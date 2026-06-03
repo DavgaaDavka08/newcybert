@@ -14,13 +14,16 @@ export async function GET() {
     }
 
     await connectDB();
-    const user = await User.findById(session.user.id).select('xp level coins lives streak firstName lastName').lean() as any;
+    const user = await User.findById(session.user.id).select('xp level coins lives streak firstName lastName isPremium premiumUntil').lean() as any;
     if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    const isPremium = user.isPremium && (!user.premiumUntil || new Date(user.premiumUntil) > new Date());
 
     return NextResponse.json({
       xp: user.xp, level: user.level, coins: user.coins,
       lives: user.lives, streak: user.streak,
       name: `${user.firstName} ${user.lastName}`.trim(),
+      isPremium,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
