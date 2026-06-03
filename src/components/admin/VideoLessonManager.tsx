@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { uploadToCloudinary, cloudinaryVideoThumbnail } from "@/lib/cloudinary-upload";
 import { AdminIcon } from "@/components/admin/AdminIcon";
+import { Loading } from "@/components/ui/Loading";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { StatusAlert } from "@/components/ui/status-alert";
 
 interface LessonRow {
   _id: string;
@@ -16,6 +19,7 @@ interface LessonRow {
 }
 
 export function VideoLessonManager() {
+  const { confirm } = useConfirm();
   const [mediaType, setMediaType] = useState<"video" | "pdf">("video");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -126,7 +130,13 @@ export function VideoLessonManager() {
   }
 
   async function onDelete(id: string) {
-    if (!confirm("Устгах уу?")) return;
+    const ok = await confirm({
+      title: "Хичээл устгах",
+      description: "Энэ бичлэгийг устгах уу?",
+      confirmLabel: "Устгах",
+      destructive: true,
+    });
+    if (!ok) return;
     const r = await fetch(`/api/videos/${id}`, { method: "DELETE" });
     if (r.ok) load();
   }
@@ -187,8 +197,8 @@ export function VideoLessonManager() {
               </div>
             )}
           </div>
-          {err && <div className="alert-box error">{err}</div>}
-          {ok && <div style={{ padding: 10, borderRadius: 8, background: "#ECFDF5", color: "#065F46", fontSize: 13, marginBottom: 12 }}>{ok}</div>}
+          {err && <StatusAlert variant="error">{err}</StatusAlert>}
+          {ok && <StatusAlert variant="success">{ok}</StatusAlert>}
           <button type="submit" className="btn primary" disabled={busy} style={{ width: "100%" }}>
             {busy ? "Байршуулж байна…" : mediaType === "video" ? "Видео илгээх" : "PDF илгээх"}
           </button>
@@ -203,7 +213,9 @@ export function VideoLessonManager() {
           </div>
         </div>
         {loading ? (
-          <div className="empty"><div className="empty-sub">Ачаалж байна…</div></div>
+          <div className="empty">
+            <Loading size={72} message="Ачаалж байна…" />
+          </div>
         ) : list.length === 0 ? (
           <div className="empty">
             <div className="empty-title">Хичээл байхгүй</div>

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { T } from "@/styles/tokens";
 import { Ic } from "@/components/ui/Icon";
 import { BackButton } from "@/components/ui/BackButton";
+import { Loading } from "@/components/ui/Loading";
 
 interface VideoRow {
   _id: string;
@@ -91,21 +92,7 @@ export default function VideosPage() {
   }, [toast]);
 
   if (status === "loading" || loading) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: T.bg,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: T.muted,
-          fontFamily: "Plus Jakarta Sans, sans-serif",
-        }}
-      >
-        Ачаалж байна...
-      </div>
-    );
+    return <Loading fullScreen background={T.bg} message="Ачаалж байна…" />;
   }
 
   return (

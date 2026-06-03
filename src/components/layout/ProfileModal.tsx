@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { T } from '@/styles/tokens';
 import { Ic, Avatar, Label } from '@/components/ui';
+import { Loading } from '@/components/ui/Loading';
 import { getRank } from '@/lib/ranks';
 import { useAppState } from '@/lib/app-state-context';
 
@@ -291,7 +292,9 @@ export function ProfileModal({ open, onClose, displayName }: Props) {
 
         <div style={{ overflowY: 'auto', padding: '18px 20px 22px', flex: 1 }}>
           {loading && (
-            <div style={{ textAlign: 'center', color: T.muted, padding: 32 }}>Ачаалж байна…</div>
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
+              <Loading size={72} message="Ачаалж байна…" />
+            </div>
           )}
           {err && !loading && (
             <div style={{ padding: 12, borderRadius: 10, background: T.redLight, color: T.red, fontSize: 13, marginBottom: 14 }}>

@@ -298,7 +298,7 @@ export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicI
             <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.9 }}>Φ</div>
             <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 12px' }}>Хичээл байхгүй байна</h2>
             <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6, margin: 0 }}>
-              Админ самбарт «Тоглоомын курс» хэсгээс сэдэв, хичээл, асуулт нэмсний дараа энд харагдана.
+              Админ самбарт «Physic map» хэсгээс сэдэв, хичээл, асуулт нэмсний дараа энд харагдана.
             </p>
           </div>
         </div>

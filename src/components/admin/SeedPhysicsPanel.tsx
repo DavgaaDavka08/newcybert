@@ -1,8 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { AdminIcon } from '@/components/admin/AdminIcon';
+import { useConfirm } from '@/components/ui/confirm-dialog';
+import { StatusAlert } from '@/components/ui/status-alert';
 
 export function SeedPhysicsPanel({ onSeeded }: { onSeeded?: () => void }) {
+  const { confirm } = useConfirm();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -32,23 +36,37 @@ export function SeedPhysicsPanel({ onSeeded }: { onSeeded?: () => void }) {
   }
 
   return (
-    <div className="card" style={{ marginBottom: 20, padding: 16 }}>
-      <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 6px' }}>Физикийн жишээ агуулга</h3>
-      <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 14px', lineHeight: 1.5 }}>
-        3 сэдэв, 7 хичээл, 70 асуулт, 2 шалгалт — тоглоом болон шалгалтын хэсэгт шууд харагдана.
-      </p>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+    <div className="seed-panel card">
+      <div className="seed-panel-head">
+        <AdminIcon name="book" size={18} />
+        <div>
+          <h3>Физикийн жишээ агуулга</h3>
+          <p>3 сэдэв, 7 хичээл, 70 асуулт, 2 шалгалт</p>
+        </div>
+      </div>
+      <div className="seed-panel-actions">
         <button type="button" className="btn primary" disabled={busy} onClick={() => run(false)}>
           {busy ? 'Суулгаж байна…' : 'Жишээ агуулга суулгах'}
         </button>
-        <button type="button" className="btn danger" disabled={busy} onClick={() => {
-          if (confirm('Бүх сэдэв, хичээлийг устгаад дахин суулгах уу?')) void run(true);
-        }}>
+        <button
+          type="button"
+          className="btn"
+          disabled={busy}
+          onClick={async () => {
+            const ok = await confirm({
+              title: 'Дахин суулгах',
+              description: 'Бүх сэдэв, хичээлийг устгаад дахин суулгах уу?',
+              confirmLabel: 'Тийм, суулгах',
+              destructive: true,
+            });
+            if (ok) void run(true);
+          }}
+        >
           Цэвэрлээд дахин суулгах
         </button>
       </div>
-      {msg && <div className="alert-box success" style={{ marginTop: 12 }}>{msg}</div>}
-      {err && <div className="alert-box error" style={{ marginTop: 12 }}>{err}</div>}
+      {msg && <StatusAlert variant="success">{msg}</StatusAlert>}
+      {err && <StatusAlert variant="error">{err}</StatusAlert>}
     </div>
   );
 }

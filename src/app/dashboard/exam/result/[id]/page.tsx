@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { T } from "@/styles/tokens";
 import { Ic } from "@/components/ui/Icon";
 import { BackButton } from "@/components/ui/BackButton";
+import { Loading } from "@/components/ui/Loading";
 
 interface AnswerResult {
   questionId: string; questionText: string; questionIndex: number;
@@ -38,11 +39,9 @@ export default function ExamResultPage() {
       .catch(() => setLoading(false));
   }, [status, id]);
 
-  if (loading) return (
-    <div style={{ minHeight: "100vh", background: "#f8f9fc", display: "flex", alignItems: "center", justifyContent: "center", color: T.muted, fontFamily: "Plus Jakarta Sans, sans-serif" }}>
-      Ачаалж байна...
-    </div>
-  );
+  if (loading) {
+    return <Loading fullScreen background="#f8f9fc" message="Ачаалж байна…" />;
+  }
 
   if (!result) return null;
 

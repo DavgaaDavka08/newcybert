@@ -1,15 +1,25 @@
 // src/app/layout.tsx
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Plus_Jakarta_Sans, Inter, Geist } from "next/font/google";
 import "./globals.css";
 import "./responsive.css";
 import { Providers } from "./providers";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
   display: "swap",
   variable: "--font-jakarta",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-inter",
 });
 
 function metadataBaseUrl(): URL {
@@ -39,7 +49,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="mn" className={jakarta.variable}>
+    <html lang="mn" className={cn(jakarta.variable, inter.variable, "font-sans", geist.variable)}>
       <body className={jakarta.className}>
         <Providers>{children}</Providers>
       </body>

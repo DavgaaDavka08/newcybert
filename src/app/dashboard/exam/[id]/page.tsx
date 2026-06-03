@@ -7,6 +7,7 @@ import { T } from "@/styles/tokens";
 import { Ic } from "@/components/ui/Icon";
 import { BackButton } from "@/components/ui/BackButton";
 import { useToast } from "@/components/ui/Toast";
+import { Loading } from "@/components/ui/Loading";
 
 interface Option { id: string; text: string; }
 interface Question { id: string; question: string; options: Option[]; }
@@ -132,14 +133,9 @@ export default function TakeExamPage() {
   const urgent = timeLeft < 300 && timeLeft > 0;
   const answered = Object.keys(answers).length;
 
-  if (status === "loading" || loading) return (
-    <div style={{ minHeight: "100vh", background: "#f8f9fc", display: "flex", alignItems: "center", justifyContent: "center", color: T.muted, fontFamily: "Plus Jakarta Sans, sans-serif" }}>
-      <div style={{ textAlign: "center" }}>
-        <div style={{ fontSize: 36, marginBottom: 12 }}>📝</div>
-        Шалгалт ачаалж байна...
-      </div>
-    </div>
-  );
+  if (status === "loading" || loading) {
+    return <Loading fullScreen background="#f8f9fc" message="Шалгалт ачаалж байна…" />;
+  }
 
   if (error) return (
     <div style={{ minHeight: "100vh", background: "#f8f9fc", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Plus Jakarta Sans, sans-serif" }}>
