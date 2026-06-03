@@ -145,7 +145,6 @@ export default function AdminPage() {
     if (tab === "users") loadUsers(1, userRoleFilter, userSearch);
     if (tab === "exams") loadExams();
     if (tab === "live") loadLeaderboard();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
   if (status === "loading") {

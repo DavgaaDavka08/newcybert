@@ -106,7 +106,7 @@ export default function ExamListPage() {
           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.75)" }}>
             {appState.isPremium
               ? "✅ Premium — бүх шалгалт үнэгүй нээлттэй"
-              : `Шалгалт нэг бүр ${EXAM_COIN_COST} зоос зарцуулна. Хугацаатай асуултуудад хариулж, үр дүнгээ шууд харна уу.`}
+              : `Шалгалт нэг бүр ${EXAM_RETAKE_COST} зоос зарцуулна. Хугацаатай асуултуудад хариулж, үр дүнгээ шууд харна уу.`}
           </div>
         </div>
 

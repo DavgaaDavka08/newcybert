@@ -4,7 +4,7 @@ import { User } from "@/models/User";
 import { requireAuth } from "@/lib/auth";
 
 // ── Тогтмол үнэ ────────────────────────────────────────────────
-export const COIN_COSTS: Record<string, number> = {
+const COIN_COSTS: Record<string, number> = {
   exam_start:       0,   // эхний оролдлого үнэгүй
   exam_retake:      2,   // шалгалт дахин өгөх
   ees_retake:       2,   // ЕШ сорил дахин өгөх

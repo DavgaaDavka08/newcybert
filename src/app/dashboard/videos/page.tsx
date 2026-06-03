@@ -318,7 +318,6 @@ function LessonCard({ video, completed, unlocked, coinCost, onClick }: {
             <span style={{ fontSize: 12, fontWeight: 700, color: T.muted }}>PDF</span>
           </div>
         ) : video.thumbnailUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
           <img src={video.thumbnailUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         ) : (
           <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(145deg,#1e293b,#334155)" }}>

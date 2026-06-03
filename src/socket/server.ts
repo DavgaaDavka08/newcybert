@@ -88,7 +88,6 @@ async function startSocketServer(port = 3001) {
       },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     io.on('connection', (socket: any) => {
       console.log(`[Socket] Connected: ${socket.id}`);
 
