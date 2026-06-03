@@ -18,7 +18,7 @@ interface Exam {
 }
 
 export default function ExamListPage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
