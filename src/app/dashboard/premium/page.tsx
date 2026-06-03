@@ -9,33 +9,56 @@ const PLANS = [
     id: "premium_monthly",
     label: "Premium Сар",
     price: "9,900₮",
-    desc: "Бүх боломжоо нээ",
+    desc: "Бүх хичээл, видео, шалгалт нээлттэй",
     icon: "⭐",
     color: T.purple,
-    features: ["Хязгааргүй амь (∞)", "AI тайлбар", "Бүх сорил нээлттэй", "Зар байхгүй", "XP boost ×1.5", "Priority дэмжлэг"],
+    features: [
+      "Хязгааргүй амь (∞)",
+      "Бүх видео үнэгүй",
+      "Бүх шалгалт үнэгүй",
+      "Бүх ЕШ сорил үнэгүй",
+      "XP boost ×1.5",
+      "Premium Badge",
+      "Сар бүр +50 бонус зоос",
+    ],
     badge: "Шилдэг",
   },
   {
     id: "premium_pro",
     label: "Premium Pro",
     price: "19,900₮",
-    desc: "ЭЕШ-д 700+ оноо авах төлөвлөгөө",
+    desc: "ЕШ-д 700+ оноо авах төлөвлөгөө",
     icon: "🏆",
     color: "#DC2626",
-    features: ["Premium бүх зүйл", "Хувийн судалгааны төлөвлөгөө", "Алдааны шинжилгээ (AI)", "Сул сэдвийн тусгай давталт", "Монгол физикийн жишиг шалгалт", "Ахисан амжилтын дэвтэр"],
+    features: [
+      "Premium бүх зүйл",
+      "AI алдааны шинжилгээ",
+      "Хувийн судалгааны төлөвлөгөө",
+      "Сул сэдвийн тусгай давталт",
+      "Монгол физикийн жишиг шалгалт",
+      "Ахисан амжилтын дэвтэр",
+    ],
     badge: "700+ оноо",
   },
 ];
 
+// ── Зоосны багц ─────────────────────────────────────────────
+const COIN_PACKS = [
+  { id: "coins_50",  label: "50 Зоос",  price: "5,000₮",  coins: 50,  icon: "🟡", bonus: "" },
+  { id: "coins_120", label: "120 Зоос", price: "10,000₮", coins: 120, icon: "🟡🟡", bonus: "+20 бонус" },
+  { id: "coins_300", label: "300 Зоос", price: "20,000₮", coins: 300, icon: "💛", bonus: "+50 бонус", popular: true },
+  { id: "coins_800", label: "800 Зоос", price: "50,000₮", coins: 800, icon: "👑", bonus: "+150 бонус" },
+];
+
 const COMPARE = [
-  { feature: "Амь",           free: "5",     premium: "∞" },
-  { feature: "Коин",          free: "Удаан",  premium: "Хурдан" },
-  { feature: "AI тайлбар",    free: "❌",      premium: "✅" },
-  { feature: "Тайлбар",       free: "Хэсэг",  premium: "Бүтэн" },
-  { feature: "Зар",           free: "Байна",  premium: "Байхгүй" },
-  { feature: "XP boost",      free: "×1",     premium: "×1.5" },
-  { feature: "Судалгаа AI",   free: "❌",      premium: "✅" },
-  { feature: "Шалгалт",       free: "Хязгаар", premium: "Хязгааргүй" },
+  { feature: "Амь",              free: "5 (30мин тутам +1)",  premium: "∞ хязгааргүй" },
+  { feature: "Видео",            free: "Өдөрт 1 үнэгүй",      premium: "Хязгааргүй" },
+  { feature: "Шалгалт",         free: "Эхний 1 үнэгүй",       premium: "Хязгааргүй" },
+  { feature: "ЕШ Сорил",        free: "Өдөрт 1 үнэгүй",      premium: "Хязгааргүй" },
+  { feature: "XP boost",        free: "×1",                   premium: "×1.5" },
+  { feature: "Бонус зоос",      free: "❌",                   premium: "+50/сар" },
+  { feature: "Premium Badge",   free: "❌",                   premium: "✅" },
+  { feature: "AI шинжилгээ",    free: "❌",                   premium: "✅" },
 ];
 
 export default function PremiumPage() {
@@ -90,6 +113,65 @@ export default function PremiumPage() {
           {PLANS.map(plan => (
             <PlanCard key={plan.id} plan={plan} loading={loading === plan.id} onBuy={() => handlePurchase(plan.id)} isPremium={isPremium && (plan.id === "premium_monthly" || plan.id === "premium_pro")} />
           ))}
+        </div>
+
+        {/* ── Coin Shop ── */}
+        <div style={{ marginBottom: 48 }}>
+          <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <div style={{ fontWeight: 900, fontSize: 22, color: T.text, marginBottom: 6 }}>🟡 Зоосны дэлгүүр</div>
+            <div style={{ fontSize: 13, color: T.muted }}>Зоосоор видео нээх, шалгалт дахин өгөх, AI тайлбар авах</div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>
+            {COIN_PACKS.map(pack => (
+              <div key={pack.id} style={{
+                background: pack.popular ? "linear-gradient(135deg, #FEF3C7, #FFFBEB)" : "#fff",
+                borderRadius: 16, padding: "18px 16px", textAlign: "center",
+                border: `2px solid ${pack.popular ? "#F59E0B" : T.border}`,
+                boxShadow: pack.popular ? "0 4px 20px rgba(245,158,11,0.2)" : T.shadow,
+                position: "relative",
+              }}>
+                {pack.popular && (
+                  <div style={{ position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)", background: "#F59E0B", color: "#fff", fontSize: 10, fontWeight: 800, padding: "3px 12px", borderRadius: 20 }}>
+                    Хамгийн алдартай
+                  </div>
+                )}
+                <div style={{ fontSize: 28, marginBottom: 6 }}>{pack.icon}</div>
+                <div style={{ fontWeight: 900, fontSize: 18, color: T.text, marginBottom: 2 }}>{pack.label}</div>
+                {pack.bonus && <div style={{ fontSize: 11, color: "#D97706", fontWeight: 700, marginBottom: 8 }}>{pack.bonus}</div>}
+                <div style={{ fontWeight: 800, fontSize: 16, color: "#4F46E5", marginBottom: 12 }}>{pack.price}</div>
+                <button onClick={() => handlePurchase(pack.id)} style={{
+                  width: "100%", padding: "10px 0", borderRadius: 10, border: "none",
+                  background: pack.popular ? "#F59E0B" : "#4F46E5", color: "#fff",
+                  fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                }}>
+                  Авах
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Зоос хаана зарцуулах ── */}
+        <div style={{ background: "#fff", borderRadius: 18, border: `1px solid ${T.border}`, padding: "20px 24px", marginBottom: 36, boxShadow: T.shadow }}>
+          <div style={{ fontWeight: 800, fontSize: 15, color: T.text, marginBottom: 16 }}>🟡 Зоос яаж зарцуулах вэ?</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
+            {[
+              { action: "Видео нээх", cost: 3, icon: "🎬" },
+              { action: "AI тайлбар", cost: 3, icon: "🤖" },
+              { action: "Шалгалт дахин", cost: 2, icon: "📝" },
+              { action: "ЕШ дахин өгөх", cost: 2, icon: "📋" },
+              { action: "Алхамт бодолт", cost: 2, icon: "🔢" },
+              { action: "Full Heal (амь)", cost: 5, icon: "❤️" },
+            ].map(item => (
+              <div key={item.action} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: T.bg, borderRadius: 10 }}>
+                <span style={{ fontSize: 20 }}>{item.icon}</span>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{item.action}</div>
+                  <div style={{ fontSize: 12, color: "#D97706", fontWeight: 700 }}>🟡 {item.cost} зоос</div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Feature comparison table */}

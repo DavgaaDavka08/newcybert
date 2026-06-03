@@ -14,13 +14,27 @@ export async function GET() {
     }
 
     await connectDB();
-    const user = await User.findById(session.user.id).select('xp level coins lives streak firstName lastName').lean() as any;
+    const user = await User.findById(session.user.id).select('xp level coins lives streak firstName lastName isPremium premiumUntil dailyFreeAIUsed dailyFreeProblemUsed lastDailyReset').lean() as any;
     if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    const isPremium = user.isPremium && (!user.premiumUntil || new Date(user.premiumUntil) > new Date());
+
+    // Daily reset шалгах
+    const lastReset = user.lastDailyReset ? new Date(user.lastDailyReset) : null;
+    const isToday = lastReset &&
+      lastReset.getFullYear() === new Date().getFullYear() &&
+      lastReset.getMonth() === new Date().getMonth() &&
+      lastReset.getDate() === new Date().getDate();
+    const dailyAIUsed      = isToday ? (user.dailyFreeAIUsed ?? 0) : 0;
+    const dailyProblemUsed = isToday ? (user.dailyFreeProblemUsed ?? 0) : 0;
 
     return NextResponse.json({
       xp: user.xp, level: user.level, coins: user.coins,
       lives: user.lives, streak: user.streak,
       name: `${user.firstName} ${user.lastName}`.trim(),
+      isPremium,
+      dailyFreeAIRemaining:      isPremium ? 999 : Math.max(0, 3  - dailyAIUsed),
+      dailyFreeProblemRemaining: isPremium ? 999 : Math.max(0, 20 - dailyProblemUsed),
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

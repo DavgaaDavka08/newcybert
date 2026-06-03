@@ -6,7 +6,7 @@ import { VideoLessonModel } from "@/models/VideoLessonModel";
 import { VideoProgressModel } from "@/models/VideoProgressModel";
 import { User } from "@/models/User";
 
-const VIDEO_XP = 10;
+const VIDEO_XP = 5; // Видео бүрэн үзэх = +5 XP
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

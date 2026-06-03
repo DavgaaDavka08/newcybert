@@ -33,6 +33,23 @@ export function DashboardScreen({ onNav, state }: Props) {
   const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>([]);
   const [examAttemptsCount, setExamAttemptsCount] = useState<number | null>(null);
   const [avgExamScorePct, setAvgExamScorePct] = useState<number | null>(null);
+  const [streakToast, setStreakToast] = useState<{ coins: number; streak: number; milestone?: string } | null>(null);
+
+  // Daily streak check-in
+  useEffect(() => {
+    fetch("/api/user/checkin", { method: "POST" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d || d.alreadyDone) return;
+        setStreakToast({
+          coins: d.coinReward,
+          streak: d.streak,
+          milestone: d.milestone?.badge,
+        });
+        setTimeout(() => setStreakToast(null), 5000);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch("/api/exam/exams")
@@ -67,6 +84,29 @@ export function DashboardScreen({ onNav, state }: Props) {
 
   return (
     <div className="dash-page">
+      {/* Streak check-in toast */}
+      {streakToast && (
+        <div style={{
+          position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)", zIndex: 300,
+          background: "linear-gradient(135deg, #1e293b, #0f172a)",
+          color: "#fff", padding: "16px 24px", borderRadius: 16,
+          boxShadow: "0 16px 48px rgba(0,0,0,0.4)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          display: "flex", alignItems: "center", gap: 14, minWidth: 260,
+          animation: "fadeInDown 0.3s ease",
+        }}>
+          <span style={{ fontSize: 32 }}>{streakToast.streak >= 30 ? "🏆" : streakToast.streak >= 7 ? "🔥" : "⚡"}</span>
+          <div>
+            <div style={{ fontWeight: 900, fontSize: 15, marginBottom: 2 }}>
+              {streakToast.streak} өдрийн streak!
+            </div>
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
+              🟡 +{streakToast.coins} зоос шагнал авлаа
+              {streakToast.milestone && <span style={{ marginLeft: 6, color: "#FFD700" }}>🏅 Badge!</span>}
+            </div>
+          </div>
+        </div>
+      )}
       <Topbar
         title="Нүүр хуудас"
         sub={`Сайн уу, ${state.name} — ${new Date().toLocaleDateString("mn-MN", { weekday: "long", month: "long", day: "numeric" })}`}
