@@ -10,6 +10,8 @@ import {
 } from '@/lib/game-data';
 import { useAppState } from '@/lib/app-state-context';
 import { useToast } from '@/components/ui/Toast';
+import { PremiumUpsellModal } from '@/components/gamification';
+import { COIN_COSTS } from '@/lib/gamification';
 import type { AppState, Screen } from '@/types';
 
 const PASS_RATIO = 0.6;
@@ -44,34 +46,155 @@ interface Props {
   setState?: (fn: (s: AppState) => AppState) => void;
 }
 
-function NoLivesOverlay({ refillAt, coins, refillCoins, livesCount: _livesCount, onRefillCoins, onClose }: {
-  refillAt: number | null; coins: number; refillCoins: number; livesCount: number;
-  onRefillCoins: () => void; onClose: () => void;
+function NoLivesOverlay({
+  refillAt,
+  coins,
+  refillCoins,
+  onRefillCoins,
+  onClose,
+  onPremiumUpsell,
+}: {
+  refillAt: number | null;
+  coins: number;
+  refillCoins: number;
+  onRefillCoins: () => void;
+  onClose: () => void;
+  onPremiumUpsell: () => void;
 }) {
   const [now, setNow] = useState(Date.now());
-  useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
-  const rem  = refillAt ? Math.max(0, refillAt - now) : 0;
-  const hrs  = Math.floor(rem / 3_600_000);
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const rem = refillAt ? Math.max(0, refillAt - now) : 0;
+  const hrs = Math.floor(rem / 3_600_000);
   const mins = Math.floor((rem % 3_600_000) / 60_000);
   const secs = Math.floor((rem % 60_000) / 1000);
-  const pad  = (n: number) => String(n).padStart(2, '0');
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const canRefill = coins >= refillCoins;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
-      <div style={{ background: '#1c2333', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 24, padding: 36, maxWidth: 360, width: '100%', textAlign: 'center' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 20 }}>
-          {[0,1,2,3,4].map(i => <svg key={i} width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>)}
-        </div>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.7)',
+        zIndex: 200,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+        fontFamily: 'Plus Jakarta Sans, sans-serif',
+      }}
+    >
+      <div
+        style={{
+          background: '#1c2333',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 24,
+          padding: 36,
+          maxWidth: 360,
+          width: '100%',
+          textAlign: 'center',
+        }}
+      >
         <div style={{ fontWeight: 900, fontSize: 22, color: '#fff', marginBottom: 8 }}>Амь дууслаа!</div>
-        <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginBottom: 24 }}>Дараагийн үнэгүй амийн хүртэлх хугацаа:</div>
-        {rem > 0 && <div style={{ fontWeight: 900, fontSize: 40, color: '#FF4B4B', letterSpacing: 3, marginBottom: 28, fontVariantNumeric: 'tabular-nums' }}>{hrs > 0 && `${pad(hrs)}:`}{pad(mins)}:{pad(secs)}</div>}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <button onClick={onRefillCoins} disabled={coins < refillCoins} style={{ padding: '14px', borderRadius: 12, border: 'none', cursor: coins < refillCoins ? 'not-allowed' : 'pointer', background: coins >= refillCoins ? 'linear-gradient(135deg, #D97706, #B45309)' : 'rgba(255,255,255,0.06)', color: coins >= refillCoins ? '#fff' : 'rgba(255,255,255,0.3)', fontWeight: 800, fontSize: 15, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
-            {refillCoins} коиноор нөхөх
-          </button>
-          <button onClick={onClose} style={{ padding: '14px', borderRadius: 12, border: '2px solid rgba(255,255,255,0.12)', background: 'transparent', fontWeight: 700, fontSize: 15, cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Буцах</button>
+        <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>
+          Premium — амь хязгааргүй
         </div>
-        {coins < refillCoins && <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>Коин: {coins} / {refillCoins}</div>}
+        {rem > 0 && (
+          <>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 8 }}>Үнэгүй +1 амь</div>
+            <div
+              style={{
+                fontWeight: 900,
+                fontSize: 36,
+                color: '#FF4B4B',
+                letterSpacing: 2,
+                marginBottom: 24,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {hrs > 0 && `${pad(hrs)}:`}
+              {pad(mins)}:{pad(secs)}
+            </div>
+          </>
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <button
+            type="button"
+            onClick={onPremiumUpsell}
+            style={{
+              padding: '14px',
+              borderRadius: 12,
+              border: 'none',
+              cursor: 'pointer',
+              background: 'linear-gradient(135deg, #7C3AED, #4F46E5)',
+              color: '#fff',
+              fontWeight: 800,
+              fontSize: 15,
+              fontFamily: 'Plus Jakarta Sans, sans-serif',
+              boxShadow: '0 8px 24px rgba(79,70,229,0.4)',
+            }}
+          >
+            ⭐ Premium авах
+          </button>
+          {canRefill && (
+            <button
+              type="button"
+              onClick={onRefillCoins}
+              style={{
+                padding: '14px',
+                borderRadius: 12,
+                border: 'none',
+                cursor: 'pointer',
+                background: 'linear-gradient(135deg, #D97706, #B45309)',
+                color: '#fff',
+                fontWeight: 800,
+                fontSize: 15,
+                fontFamily: 'Plus Jakarta Sans, sans-serif',
+              }}
+            >
+              {refillCoins} зоосоор нөхөх
+            </button>
+          )}
+          {!canRefill && (
+            <button
+              type="button"
+              onClick={onPremiumUpsell}
+              style={{
+                padding: '12px',
+                borderRadius: 12,
+                border: '1px solid rgba(251,191,36,0.4)',
+                background: 'rgba(245,158,11,0.12)',
+                color: '#fcd34d',
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: 'pointer',
+                fontFamily: 'Plus Jakarta Sans, sans-serif',
+              }}
+            >
+              Зоос хүрэлцэхгүй ({coins}/{refillCoins}) — Premium үзэх
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: '14px',
+              borderRadius: 12,
+              border: '2px solid rgba(255,255,255,0.12)',
+              background: 'transparent',
+              fontWeight: 700,
+              fontSize: 15,
+              cursor: 'pointer',
+              color: 'rgba(255,255,255,0.6)',
+              fontFamily: 'Plus Jakarta Sans, sans-serif',
+            }}
+          >
+            Буцах
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -93,7 +216,9 @@ export function GameScreen({ onNav, state, setState }: Props) {
   const effectiveLivesCount = state.isPremium ? PREMIUM_LIVES : settings.livesCount;
   const [lives, setLives]           = useState(state.isPremium ? PREMIUM_LIVES : settings.livesCount);
   const [noLives, setNoLives]       = useState(false);
+  const [premiumUpsell, setPremiumUpsell] = useState(false);
   const [refillAt, setRefillAt]     = useState<number | null>(null);
+  const healCoinCost = COIN_COSTS.full_heal;
   const [mapReload, setMapReload]   = useState(0);
   const [resumePrompt, setResumePrompt] = useState<{
     subtopicId: string;
@@ -101,6 +226,45 @@ export function GameScreen({ onNav, state, setState }: Props) {
     lessonName: string;
     wip: { currentQ: number; score: number; mistakes: number };
   } | null>(null);
+  const [resultReward, setResultReward] = useState({ xp: 0, coins: 0 });
+
+  function applyServerStats(d: { xp?: number; coins?: number; level?: number } | null) {
+    if (!d || !setState) return;
+    setState((s) => ({
+      ...s,
+      xp: d.xp ?? s.xp,
+      coins: d.coins ?? s.coins,
+      level: d.level ?? s.level,
+    }));
+    refreshStats();
+  }
+
+  function awardSubtopicStart(topicId: string, subtopicId: string) {
+    fetch('/api/game/subtopic-complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subtopicId, topicId, awardStart: true, passed: false, perfect: false }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => applyServerStats(d))
+      .catch(() => {});
+  }
+
+  function awardSubtopicComplete(topicId: string, subtopicId: string, perfect: boolean) {
+    return fetch('/api/game/subtopic-complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subtopicId, topicId, passed: true, perfect, awardStart: false }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) {
+          setResultReward({ xp: d.xpAdded ?? 0, coins: d.coinsAdded ?? 0 });
+          applyServerStats(d);
+        }
+        return d;
+      });
+  }
 
   useEffect(() => {
     void hydrateTopicsV2().finally(() => setMapReload(r => r + 1));
@@ -111,15 +275,30 @@ export function GameScreen({ onNav, state, setState }: Props) {
       setLives(PREMIUM_LIVES);
       return;
     }
-    const ls = getLivesState(settings.livesCount);
-    if (ls.refillAt && Date.now() >= ls.refillAt) {
-      setLives(settings.livesCount);
-      setLivesState({ lives: settings.livesCount, refillAt: null });
-    } else {
-      setLives(ls.lives);
-      setRefillAt(ls.refillAt);
-    }
-  }, [settings.livesCount, state.isPremium]);
+    fetch('/api/user/lives', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'sync' }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) {
+          setLives(d.lives);
+          setRefillAt(d.nextRefillAt);
+          setLivesState({ lives: d.lives, refillAt: d.nextRefillAt });
+          if (setState) setState((s) => ({ ...s, lives: d.lives }));
+          return;
+        }
+        const ls = getLivesState(settings.livesCount);
+        setLives(ls.lives);
+        setRefillAt(ls.refillAt);
+      })
+      .catch(() => {
+        const ls = getLivesState(settings.livesCount);
+        setLives(ls.lives);
+        setRefillAt(ls.refillAt);
+      });
+  }, [settings.livesCount, state.isPremium, setState]);
 
   function enterQuiz(
     topic: GameTopic,
@@ -142,7 +321,11 @@ export function GameScreen({ onNav, state, setState }: Props) {
     }
     setSelected(null);
     setFeedback(null);
+    setResultReward({ xp: 0, coins: 0 });
     setPhase('quiz');
+    if (!resume) {
+      awardSubtopicStart(topic.id, subtopicId);
+    }
   }
 
   async function startSubtopicLevel(topicName: string, subtopicId: string) {
@@ -221,9 +404,12 @@ export function GameScreen({ onNav, state, setState }: Props) {
         if (passed && selectedLv) {
           setSubtopicStars(selectedLv.subtopicId, calcStars(mistakes));
           clearWip(selectedLv.subtopicId);
+          const perfect = score === total && mistakes === 0;
+          void awardSubtopicComplete(selectedLv.topic.id, selectedLv.subtopicId, perfect);
+        } else {
+          setResultReward({ xp: 0, coins: 0 });
         }
         setPhase('result');
-        refreshStats();
       } else {
         setCurrentQ(q => q + 1);
       }
@@ -235,32 +421,72 @@ export function GameScreen({ onNav, state, setState }: Props) {
     setFeedback(ok ? 'correct' : 'wrong');
     if (ok) {
       setScore(s => s + 1);
-      if (setState) setState(s => ({ ...s, xp: s.xp + settings.xpPerCorrect, coins: s.coins + settings.coinsPerCorrect }));
-      fetch('/api/user/award-xp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ xp: settings.xpPerCorrect, coins: settings.coinsPerCorrect, reason: 'practice_correct' }) }).catch(() => {});
     } else {
       setMistakes(m => m + 1);
       if (!state.isPremium) {
-        const newLives  = Math.max(0, lives - 1);
-        const newRefill = newLives <= 0 ? Date.now() + settings.livesRefillMinutes * 60 * 1000 : null;
-        setLives(newLives); setRefillAt(newRefill);
-        setLivesState({ lives: newLives, refillAt: newRefill });
-        if (setState) setState(s => ({ ...s, lives: newLives }));
-        if (newLives <= 0) setTimeout(() => setNoLives(true), 900);
+        fetch('/api/user/lives', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'lose' }),
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            if (!d) return;
+            setLives(d.lives);
+            setRefillAt(d.nextRefillAt);
+            setLivesState({ lives: d.lives, refillAt: d.nextRefillAt });
+            if (setState) setState((s) => ({ ...s, lives: d.lives }));
+            if (d.lives <= 0) setTimeout(() => setNoLives(true), 900);
+          })
+          .catch(() => {
+            const newLives = Math.max(0, lives - 1);
+            const newRefill = newLives <= 0 ? Date.now() + settings.livesRefillMinutes * 60 * 1000 : null;
+            setLives(newLives);
+            setRefillAt(newRefill);
+            setLivesState({ lives: newLives, refillAt: newRefill });
+            if (setState) setState((s) => ({ ...s, lives: newLives }));
+            if (newLives <= 0) setTimeout(() => setNoLives(true), 900);
+          });
       }
     }
   }
 
   function handleRefillCoins() {
-    if (state.coins < settings.livesRefillCoins) return;
-    setLives(settings.livesCount); setRefillAt(null);
-    setLivesState({ lives: settings.livesCount, refillAt: null });
-    if (setState) setState(s => ({ ...s, coins: s.coins - settings.livesRefillCoins, lives: settings.livesCount }));
-    setNoLives(false);
+    if (state.coins < healCoinCost) {
+      setPremiumUpsell(true);
+      return;
+    }
+    fetch('/api/user/spend-coins', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'full_heal' }),
+    })
+      .then(async (r) => {
+        const d = (await r.json().catch(() => ({}))) as { success?: boolean; coins?: number; error?: string };
+        if (!r.ok || !d.success) {
+          setPremiumUpsell(true);
+          return;
+        }
+        setLives(settings.livesCount);
+        setRefillAt(null);
+        setLivesState({ lives: settings.livesCount, refillAt: null });
+        if (setState) setState((s) => ({ ...s, coins: d.coins ?? s.coins, lives: settings.livesCount }));
+        setNoLives(false);
+        refreshStats();
+      })
+      .catch(() => setPremiumUpsell(true));
   }
 
   if (phase === 'map') return (
     <>
-      <GameMapPhase state={{ ...state, lives: state.isPremium ? PREMIUM_LIVES : lives }} topicIdx={0} onTopicIdx={() => {}} reloadSignal={mapReload}
+      <GameMapPhase
+        state={state}
+        mapLives={state.isPremium ? effectiveLivesCount : lives}
+        maxLives={effectiveLivesCount}
+        nextRefillAt={state.isPremium ? null : refillAt}
+        topicIdx={0}
+        onTopicIdx={() => {}}
+        reloadSignal={mapReload}
         onBackToDashboard={() => onNav('dashboard')}
         onSelectLevel={(topicName, subtopicId) => {
           if (typeof subtopicId === 'string') {
@@ -287,7 +513,24 @@ export function GameScreen({ onNav, state, setState }: Props) {
           </div>
         </div>
       )}
-      {noLives && <NoLivesOverlay refillAt={refillAt} coins={state.coins} refillCoins={settings.livesRefillCoins} livesCount={settings.livesCount} onRefillCoins={handleRefillCoins} onClose={() => setNoLives(false)} />}
+      {noLives && !state.isPremium && (
+        <NoLivesOverlay
+          refillAt={refillAt}
+          coins={state.coins}
+          refillCoins={healCoinCost}
+          onRefillCoins={handleRefillCoins}
+          onClose={() => setNoLives(false)}
+          onPremiumUpsell={() => setPremiumUpsell(true)}
+        />
+      )}
+      <PremiumUpsellModal
+        open={premiumUpsell && !state.isPremium}
+        onClose={() => setPremiumUpsell(false)}
+        reason="lives"
+        balance={state.coins}
+        refillCoinCost={healCoinCost}
+        nextRefillAt={refillAt}
+      />
     </>
   );
 
@@ -297,7 +540,24 @@ export function GameScreen({ onNav, state, setState }: Props) {
         saveWip(selectedLv.subtopicId, { currentQ, score, mistakes });
         setPhase('map');
       }} />
-      {noLives && <NoLivesOverlay refillAt={refillAt} coins={state.coins} refillCoins={settings.livesRefillCoins} livesCount={settings.livesCount} onRefillCoins={handleRefillCoins} onClose={() => setNoLives(false)} />}
+      {noLives && !state.isPremium && (
+        <NoLivesOverlay
+          refillAt={refillAt}
+          coins={state.coins}
+          refillCoins={healCoinCost}
+          onRefillCoins={handleRefillCoins}
+          onClose={() => setNoLives(false)}
+          onPremiumUpsell={() => setPremiumUpsell(true)}
+        />
+      )}
+      <PremiumUpsellModal
+        open={premiumUpsell && !state.isPremium}
+        onClose={() => setPremiumUpsell(false)}
+        reason="lives"
+        balance={state.coins}
+        refillCoinCost={healCoinCost}
+        nextRefillAt={refillAt}
+      />
     </>
   );
 
@@ -309,8 +569,8 @@ export function GameScreen({ onNav, state, setState }: Props) {
       score={score}
       total={totalQ}
       mistakes={mistakes}
-      xpEarned={score * settings.xpPerCorrect}
-      coinsEarned={score * settings.coinsPerCorrect}
+      xpEarned={resultReward.xp}
+      coinsEarned={resultReward.coins}
       topicName={selectedLv?.lessonName ?? ''}
       topicColor={selectedLv?.topic.color ?? '#2563EB'}
       level={1}

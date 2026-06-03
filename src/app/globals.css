@@ -436,3 +436,1217 @@ body {
     @apply font-sans;
   }
 }
+
+/* ── Gamification UI ─────────────────────────────────────── */
+.cy-coin-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 184, 0, 0.35);
+  background: linear-gradient(145deg, #fffbeb 0%, #fff 55%);
+  min-width: 160px;
+}
+.cy-coin-chip--compact {
+  min-width: auto;
+  padding: 6px 10px;
+  gap: 0;
+}
+.cy-coin-chip-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* Game icons (level.png, fire.png) — assets have black bg; screen hides it */
+.cy-game-icon-wrap {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  background: transparent;
+}
+.cy-game-icon-img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
+  mix-blend-mode: lighten;
+}
+.cy-game-icon-wrap--fire.cy-game-icon-wrap--glow {
+  filter: drop-shadow(0 0 5px rgba(251, 146, 60, 0.85))
+    drop-shadow(0 0 10px rgba(249, 115, 22, 0.45));
+}
+.cy-game-icon-wrap--level.cy-game-icon-wrap--glow {
+  filter: drop-shadow(0 0 5px rgba(74, 222, 128, 0.75))
+    drop-shadow(0 0 10px rgba(34, 197, 94, 0.35));
+}
+.cy-game-icon-wrap--animate.cy-game-icon-wrap--fire .cy-game-icon-img {
+  animation: cy-fire-pulse 2.2s ease-in-out infinite;
+}
+.cy-game-icon-wrap--animate.cy-game-icon-wrap--level .cy-game-icon-img {
+  animation: cy-level-bob 2.5s ease-in-out infinite;
+}
+@keyframes cy-fire-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+@keyframes cy-level-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+.dash-topbar-chip.cy-chip-xp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #bbf7d0;
+  background: linear-gradient(135deg, #ecfdf5, #f0fdf4);
+}
+.cy-chip-xp-val {
+  font-size: 12px;
+  font-weight: 800;
+  color: #15803d;
+}
+.dash-topbar-chip.cy-chip-streak {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #fed7aa;
+  background: linear-gradient(135deg, #fff7ed, #ffedd5);
+}
+.cy-chip-streak-val {
+  font-size: 12px;
+  font-weight: 800;
+  color: #c2410c;
+}
+
+/* Coin asset (/dollar.png) */
+.cy-coin-img-wrap {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  position: relative;
+}
+.cy-coin-img-wrap--glow {
+  filter: drop-shadow(0 0 10px rgba(255, 184, 0, 0.55));
+}
+.cy-coin-img-wrap--animate {
+  animation: cy-coin-shine 3s ease-in-out infinite;
+}
+@keyframes cy-coin-shine {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 8px rgba(255, 184, 0, 0.45));
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 16px rgba(255, 210, 80, 0.75));
+    transform: scale(1.04);
+  }
+}
+.cy-coin-img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
+}
+.cy-coin-amount-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.cy-coin-amount {
+  font-size: 22px;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.cy-coin-unit {
+  font-size: 11px;
+  font-weight: 700;
+  color: #b45309;
+  text-transform: uppercase;
+}
+.cy-account-badge {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.cy-account-badge--premium {
+  color: #7c3aed;
+  background: linear-gradient(135deg, #faf5ff, #fef3c7);
+}
+.cy-coin-goal {
+  font-size: 10px;
+  color: #64748b;
+}
+.cy-coin-goal-bar {
+  height: 4px;
+  border-radius: 99px;
+  background: #e2e8f0;
+  margin-top: 4px;
+  overflow: hidden;
+}
+.cy-coin-goal-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #ffb800, #f59e0b);
+}
+.cy-coin-goal-hint {
+  margin-top: 3px;
+  font-weight: 600;
+  color: #b45309;
+}
+
+/* Coin spend modal (dark) */
+.cy-coin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.cy-coin-modal {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+  background: #1a1f2e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 28px 24px 22px;
+  color: #fff;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  font-family: var(--font-jakarta), system-ui, sans-serif;
+}
+.cy-coin-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: none;
+  background: #c2410c;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+}
+.cy-coin-modal-close:hover {
+  background: #ea580c;
+}
+.cy-coin-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding-right: 40px;
+}
+.cy-coin-modal-title {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  margin: 0;
+  line-height: 1.25;
+}
+.cy-coin-modal-body {
+  margin-bottom: 14px;
+}
+.cy-coin-modal-line {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.88);
+}
+.cy-coin-modal-line--muted {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+}
+.cy-coin-inline-premium {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #a78bfa;
+  font-weight: 800;
+  font-size: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  font-family: inherit;
+}
+.cy-coin-inline-premium:hover {
+  color: #c4b5fd;
+}
+
+/* Premium upsell (зоос / амь дуусахад) */
+.cy-premium-upsell-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 450;
+  background: rgba(0, 0, 0, 0.68);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.cy-premium-upsell {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  background: linear-gradient(165deg, #1e1b4b 0%, #0f172a 55%, #1a1f2e 100%);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  border-radius: 22px;
+  padding: 28px 24px 22px;
+  color: #fff;
+  box-shadow: 0 24px 64px rgba(79, 70, 229, 0.35);
+  font-family: var(--font-jakarta), system-ui, sans-serif;
+  text-align: center;
+}
+.cy-premium-upsell-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+}
+.cy-premium-upsell-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 5px 12px;
+  border-radius: 99px;
+  background: rgba(139, 92, 246, 0.25);
+  color: #c4b5fd;
+  margin-bottom: 12px;
+}
+.cy-premium-upsell-title {
+  font-size: 22px;
+  font-weight: 900;
+  margin: 0 0 10px;
+  letter-spacing: -0.02em;
+}
+.cy-premium-upsell-sub {
+  font-size: 14px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.72);
+  margin: 0 0 16px;
+}
+.cy-premium-upsell-timer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(244, 63, 94, 0.12);
+  border: 1px solid rgba(251, 113, 133, 0.25);
+}
+.cy-premium-upsell-timer-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fda4af;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.cy-premium-upsell-timer-val {
+  font-size: 28px;
+  font-weight: 900;
+  color: #fb7185;
+  font-variant-numeric: tabular-nums;
+}
+.cy-premium-upsell-perks {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  text-align: left;
+}
+.cy-premium-upsell-perks li {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  padding: 6px 0 6px 22px;
+  position: relative;
+}
+.cy-premium-upsell-perks li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: #4ade80;
+  font-weight: 900;
+}
+.cy-premium-upsell-price {
+  margin: 0 0 18px;
+}
+.cy-premium-upsell-price-from {
+  font-size: 20px;
+  font-weight: 900;
+  color: #fde68a;
+}
+.cy-premium-upsell-price-label {
+  display: block;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 2px;
+}
+.cy-premium-upsell-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cy-premium-upsell-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+  font-family: inherit;
+  border: none;
+}
+.cy-premium-upsell-btn--primary {
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(79, 70, 229, 0.45);
+}
+.cy-premium-upsell-btn--primary:hover {
+  filter: brightness(1.06);
+}
+.cy-premium-upsell-btn--ghost {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* Premium QR төлбөрийн modal */
+.cy-pay-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.cy-pay-modal {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  background: #fff;
+  border-radius: 22px;
+  padding: 28px 24px 22px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2);
+  font-family: var(--font-jakarta), system-ui, sans-serif;
+  text-align: center;
+}
+.cy-pay-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: #f1f5f9;
+  font-size: 18px;
+  cursor: pointer;
+}
+.cy-pay-modal-title {
+  font-size: 20px;
+  font-weight: 900;
+  color: #0f172a;
+  margin: 0 0 4px;
+}
+.cy-pay-modal-amount {
+  font-size: 26px;
+  font-weight: 900;
+  color: #4f46e5;
+  margin: 0 0 16px;
+}
+.cy-pay-modal-qr-wrap {
+  margin-bottom: 14px;
+}
+.cy-pay-modal-qr {
+  width: 220px;
+  height: 220px;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+.cy-pay-modal-hint {
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.5;
+  margin: 10px 0 0;
+}
+.cy-pay-modal-khan {
+  margin-bottom: 12px;
+}
+.cy-pay-modal-banks {
+  margin: 12px 0;
+  text-align: left;
+}
+.cy-pay-modal-banks-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  margin: 0 0 8px;
+}
+.cy-pay-modal-banks-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cy-pay-modal-bank-link {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #334155;
+  text-decoration: none;
+}
+.cy-pay-modal-wait {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 14px 0 10px;
+}
+.cy-pay-modal-wait-err {
+  color: #dc2626;
+}
+.cy-pay-modal-btn {
+  display: inline-block;
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: inherit;
+  border: none;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+.cy-pay-modal-btn--primary {
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  color: #fff;
+}
+.cy-pay-modal-btn--ghost {
+  background: #f8fafc;
+  color: #64748b;
+  margin-top: 8px;
+}
+.cy-pay-modal-success-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #16a34a;
+  font-size: 28px;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 12px;
+}
+.cy-pay-modal-success h2 {
+  font-size: 20px;
+  font-weight: 900;
+  margin: 0 0 8px;
+  color: #0f172a;
+}
+.cy-pay-modal-success p {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0 0 16px;
+}
+.cy-coin-modal-balance {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: rgba(255, 255, 255, 0.75);
+}
+.cy-balance-ok {
+  color: #4ade80;
+  font-weight: 800;
+}
+.cy-balance-low {
+  color: #f87171;
+  font-weight: 800;
+}
+.cy-balance-after {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+}
+.cy-coin-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: stretch;
+}
+.cy-coin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s;
+  flex: 1;
+  min-width: 120px;
+}
+.cy-coin-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.cy-coin-btn:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+.cy-coin-btn--ghost {
+  background: transparent;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+.cy-coin-btn--coins {
+  background: #fff;
+  border: 2px solid #fbbf24;
+  color: #b45309;
+}
+.cy-coin-btn--pro {
+  background: transparent;
+  border: 2px solid #22c55e;
+  color: #4ade80;
+}
+.cy-coin-btn--spend {
+  background: #16a34a;
+  border: none;
+  color: #fff;
+  box-shadow: 0 0 24px rgba(34, 197, 94, 0.45);
+  flex: 1.2;
+}
+.cy-coin-btn--spend:not(:disabled):hover {
+  box-shadow: 0 0 32px rgba(34, 197, 94, 0.6);
+}
+@media (max-width: 640px) {
+  .cy-coin-modal-actions {
+    flex-direction: column;
+  }
+  .cy-coin-btn {
+    width: 100%;
+    flex: none;
+  }
+}
+
+.cy-lives {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid #fecdd3;
+  background: #fff1f2;
+}
+.cy-lives--compact {
+  padding: 4px 8px;
+}
+.cy-lives--dark {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+.cy-lives--dark .cy-lives-hearts {
+  font-size: 16px;
+  gap: 3px;
+}
+.cy-lives--dark .cy-lives-count {
+  color: #fda4af;
+  font-size: 13px;
+}
+.cy-lives--dark .cy-lives-timer {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 10px;
+}
+
+/* Game map HUD — pill strip (XP, streak, lives, coins) */
+.game-map-hud {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, rgba(10, 18, 36, 0.94) 0%, rgba(8, 14, 28, 0.9) 100%);
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgba(99, 140, 255, 0.18);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  font-family: var(--font-jakarta), system-ui, sans-serif;
+}
+.game-map-hud-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #dbeafe;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.game-map-hud-back:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.game-map-hud-strip {
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+.game-map-hud-strip::-webkit-scrollbar {
+  display: none;
+}
+.gm-chip {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  flex-shrink: 0;
+  min-height: 52px;
+}
+.gm-chip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.gm-chip-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.gm-chip-text--center {
+  align-items: center;
+  text-align: center;
+}
+.gm-chip-primary {
+  font-size: 13px;
+  font-weight: 800;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+.gm-chip-secondary {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(226, 232, 240, 0.55);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.gm-chip-secondary--coin {
+  color: rgba(253, 224, 71, 0.75);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.gm-progress {
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.gm-progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+.gm-progress-fill--xp {
+  background: linear-gradient(90deg, #34d399, #22c55e 70%, #86efac);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.45);
+}
+.gm-chip--xp {
+  flex: 1 1 180px;
+  min-width: 168px;
+  border-color: rgba(52, 211, 153, 0.28);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.14) 0%, rgba(255, 255, 255, 0.03) 100%);
+}
+.gm-chip--streak {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-width: 72px;
+  border-color: rgba(251, 146, 60, 0.35);
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.16) 0%, rgba(255, 255, 255, 0.03) 100%);
+}
+.gm-chip--streak .gm-chip-primary {
+  font-size: 16px;
+  color: #fdba74;
+}
+.gm-chip--lives {
+  min-width: 88px;
+  border-color: rgba(251, 113, 133, 0.3);
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.12) 0%, rgba(255, 255, 255, 0.03) 100%);
+}
+.gm-chip--lives .cy-lives--dark {
+  width: 100%;
+  align-items: center;
+  gap: 4px;
+}
+.gm-chip--lives .cy-lives--compact {
+  flex-direction: column;
+  gap: 4px;
+}
+.gm-chip--coin {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-width: 80px;
+  border-color: rgba(250, 204, 21, 0.32);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(255, 255, 255, 0.03) 100%);
+}
+.gm-chip--coin .gm-chip-primary {
+  color: #fde68a;
+  font-size: 15px;
+}
+.cy-lives-hearts--dots {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.cy-life-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.cy-life-dot--on {
+  background: linear-gradient(145deg, #fb7185, #e11d48);
+  box-shadow: 0 0 8px rgba(244, 63, 94, 0.55);
+}
+.cy-life-dot--off {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1.5px solid rgba(148, 163, 184, 0.35);
+  opacity: 0.85;
+}
+.gm-chip--lives .cy-lives-count {
+  font-size: 11px;
+  font-weight: 800;
+  color: #fda4af;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 900px) {
+  .game-map-hud {
+    flex-wrap: wrap;
+    padding: 10px 12px;
+  }
+  .game-map-hud-back {
+    width: 100%;
+    justify-content: center;
+  }
+  .game-map-hud-strip {
+    width: 100%;
+  }
+}
+@media (max-width: 520px) {
+  .gm-chip--xp {
+    min-width: 150px;
+  }
+  .gm-chip-primary {
+    font-size: 12px;
+  }
+}
+.cy-lives-hearts {
+  display: flex;
+  gap: 2px;
+  font-size: 14px;
+  line-height: 1;
+}
+.cy-lives-count {
+  font-size: 12px;
+  font-weight: 800;
+  color: #be123c;
+}
+.cy-lives-timer {
+  font-size: 10px;
+  font-weight: 600;
+  color: #9f1239;
+  font-variant-numeric: tabular-nums;
+}
+
+.cy-xp-card,
+.cy-quests-card,
+.cy-lb-panel {
+  background: #fff;
+  border-radius: 16px;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+.cy-xp-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.cy-xp-card-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.cy-xp-card-title {
+  font-size: 18px;
+  font-weight: 900;
+  color: #0f172a;
+  margin-top: 2px;
+}
+.cy-xp-card-sub {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+.cy-xp-progress-numbers {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #475569;
+  margin: 10px 0 6px;
+}
+.cy-xp-progress-numbers strong {
+  color: #0f172a;
+}
+.cy-xp-remaining {
+  font-weight: 700;
+  color: #2563eb;
+}
+.cy-xp-next-reward {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #eff6ff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1d4ed8;
+}
+.cy-xp-history {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+.cy-xp-history-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+.cy-xp-history-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 4px 0;
+}
+.cy-xp-history-amt {
+  font-weight: 800;
+  color: #16a34a;
+}
+.cy-xp-history-reason {
+  color: #64748b;
+}
+
+.cy-quests-title {
+  font-weight: 800;
+  font-size: 14px;
+  color: #0f172a;
+  margin-bottom: 12px;
+}
+.cy-quests-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.cy-quest-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f8fafc;
+  font-size: 13px;
+}
+.cy-quest-item--done .cy-quest-label {
+  text-decoration: line-through;
+  color: #94a3b8;
+}
+.cy-quest-check {
+  width: 18px;
+  flex-shrink: 0;
+}
+.cy-quest-label {
+  flex: 1;
+  font-weight: 600;
+  color: #334155;
+}
+.cy-quest-xp {
+  font-size: 11px;
+  font-weight: 800;
+  color: #2563eb;
+}
+.cy-quests-bonus {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 12px;
+  color: #64748b;
+}
+.cy-quests-bonus--ready {
+  background: #ecfdf5;
+  color: #065f46;
+}
+.cy-quests-bonus strong {
+  color: #b45309;
+}
+
+.cy-achievements-title {
+  font-weight: 800;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+.cy-achievements-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+}
+.cy-achievement {
+  padding: 10px 8px;
+  border-radius: 12px;
+  border: 1px dashed #e2e8f0;
+  text-align: center;
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+.cy-achievement--unlocked {
+  opacity: 1;
+  filter: none;
+  border-style: solid;
+  background: #fffbeb;
+  border-color: #fcd34d;
+}
+.cy-achievement-icon {
+  font-size: 22px;
+  display: block;
+}
+.cy-achievement-name {
+  font-size: 10px;
+  font-weight: 700;
+  color: #334155;
+  margin-top: 4px;
+  display: block;
+}
+
+.cy-lb-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.cy-lb-title {
+  font-weight: 800;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cy-lb-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.cy-lb-tab {
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  font-family: inherit;
+}
+.cy-lb-tab--active {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+.cy-lb-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 4px;
+}
+.cy-lb-row--first {
+  background: #fffbeb;
+  border-radius: 8px;
+  padding: 8px;
+}
+.cy-lb-rank {
+  width: 22px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 12px;
+}
+.cy-lb-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.cy-lb-meta {
+  font-size: 10px;
+  color: #94a3b8;
+}
+.cy-lb-name-wrap {
+  flex: 1;
+  min-width: 0;
+}
+.cy-lb-xp {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2563eb;
+}
+.cy-lb-empty {
+  text-align: center;
+  font-size: 12px;
+  color: #94a3b8;
+  padding: 12px;
+}
+
+.cy-stat-widgets {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+@media (max-width: 1100px) {
+  .cy-stat-widgets {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .cy-stat-widgets {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.cy-stat-widget {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 10px;
+  text-align: center;
+}
+.cy-stat-widget-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  margin: 0 auto 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cy-stat-widget-val {
+  font-size: 15px;
+  font-weight: 900;
+  color: #0f172a;
+}
+.cy-stat-widget-lbl {
+  font-size: 9px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.dash-gamification-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+@media (max-width: 900px) {
+  .dash-gamification-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.dash-topbar-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}

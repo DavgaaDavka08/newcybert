@@ -268,33 +268,16 @@ svg {
   overflow: hidden;
 }
 
-.game-map-stats-bar {
-  flex-wrap: wrap;
-  gap: 10px !important;
-  padding: 10px 12px !important;
+.game-map-hud {
+  padding: 8px 10px !important;
 }
 
-.game-map-stats-bar button {
+.game-map-hud-back {
   min-height: 44px;
-  padding: 10px 14px !important;
-  font-size: 14px !important;
 }
 
-.game-map-stats-pills {
-  width: 100%;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: 8px !important;
-  margin-left: 0 !important;
-}
-
-.game-map-stats-pills > div {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.game-map-stats-pills span:last-child {
-  font-size: 11px !important;
+.gm-chip {
+  min-height: 48px;
 }
 
 @media (max-width: 640px) {

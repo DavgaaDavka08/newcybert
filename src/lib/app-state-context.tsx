@@ -1,10 +1,11 @@
 'use client';
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
+import { calcLevel, STARTER_COINS } from '@/lib/gamification';
 import type { AppState } from '@/types';
 
 const DEFAULT_STATE: AppState = {
-  xp: 0, level: 1, coins: 100, lives: 5, streak: 0, name: 'Сурагч',
+  xp: 0, level: 1, coins: STARTER_COINS, lives: 5, streak: 0, name: 'Сурагч',
   isPremium: false, dailyFreeAIRemaining: 3, dailyFreeProblemRemaining: 20,
 };
 
@@ -29,10 +30,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (status === 'authenticated' && session?.user && !initialized) {
       const u = session.user;
+      const xp = Number(u.xp ?? 0);
       setAppStateRaw({
-        xp:        Number(u.xp ?? 0),
-        level:     Number(u.level ?? 1),
-        coins:     Number(u.coins ?? 100),
+        xp,
+        level:     calcLevel(xp),
+        coins:     Number(u.coins ?? STARTER_COINS),
         lives:     Number(u.lives ?? 5),
         streak:    Number(u.streak ?? 0),
         name:      u.name ?? "Сурагч",
@@ -44,28 +46,40 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     }
   }, [status, session, initialized]);
 
-  function setAppState(fn: (s: AppState) => AppState) {
-    setAppStateRaw(prev => fn(prev));
-  }
-
-  // Pull latest stats from server and update local state + session
-  async function refreshStats() {
+  const refreshStats = useCallback(async () => {
     try {
-      const res = await fetch('/api/user/stats');
+      const res = await fetch('/api/user/stats', { cache: 'no-store' });
       if (!res.ok) return;
       const data = await res.json();
-      setAppStateRaw(prev => ({
+      const xp = data.xp ?? 0;
+      setAppStateRaw((prev) => ({
         ...prev,
-        xp:        data.xp        ?? prev.xp,
-        level:     data.level     ?? prev.level,
-        coins:     data.coins     ?? prev.coins,
-        lives:     data.lives     ?? prev.lives,
-        streak:    data.streak    ?? prev.streak,
+        xp,
+        level: data.level ?? data.progress?.level ?? calcLevel(xp),
+        coins: data.coins ?? prev.coins,
+        lives: data.lives ?? prev.lives,
+        streak: data.streak ?? prev.streak,
         isPremium: data.isPremium ?? prev.isPremium,
-        dailyFreeAIRemaining:      data.dailyFreeAIRemaining      ?? prev.dailyFreeAIRemaining,
+        dailyFreeAIRemaining: data.dailyFreeAIRemaining ?? prev.dailyFreeAIRemaining,
         dailyFreeProblemRemaining: data.dailyFreeProblemRemaining ?? prev.dailyFreeProblemRemaining,
       }));
-    } catch {}
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (status === 'authenticated' && initialized) {
+      void refreshStats();
+    }
+  }, [status, initialized, refreshStats]);
+
+  function setAppState(fn: (s: AppState) => AppState) {
+    setAppStateRaw((prev) => {
+      const next = fn(prev);
+      const level = calcLevel(next.xp);
+      return level === next.level ? next : { ...next, level };
+    });
   }
 
   return (

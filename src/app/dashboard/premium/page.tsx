@@ -1,252 +1,467 @@
 "use client";
-import { useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { T } from "@/styles/tokens";
 import { BackButton } from "@/components/ui/BackButton";
+import {
+  PremiumPaymentModal,
+  type PaymentCheckoutData,
+} from "@/components/premium/PremiumPaymentModal";
+import {
+  PREMIUM_FEATURES,
+  PREMIUM_SAVINGS,
+  formatMnt,
+  perMonthPrice,
+  PREMIUM_PRICES,
+  type PremiumPlanType,
+} from "@/lib/premium-pricing";
 
-const PLANS = [
+type PlanCardData = {
+  type: PremiumPlanType;
+  label: string;
+  price: string;
+  perMonth: string;
+  savings?: string;
+  badge?: string;
+  popular?: boolean;
+  icon: string;
+  color: string;
+};
+
+const PLANS: PlanCardData[] = [
   {
-    id: "premium_monthly",
-    label: "Premium Сар",
-    price: "9,900₮",
-    desc: "Бүх хичээл, видео, шалгалт нээлттэй",
+    type: "monthly",
+    label: "Сарын",
+    price: formatMnt(PREMIUM_PRICES.monthly.amount),
+    perMonth: `Сард ${formatMnt(perMonthPrice("monthly"))}`,
     icon: "⭐",
     color: T.purple,
-    features: [
-      "Хязгааргүй амь (∞)",
-      "Бүх видео үнэгүй",
-      "Бүх шалгалт үнэгүй",
-      "Бүх ЕШ сорил үнэгүй",
-      "XP boost ×1.5",
-      "Premium Badge",
-      "Сар бүр +50 бонус зоос",
-    ],
-    badge: "Шилдэг",
   },
   {
-    id: "premium_pro",
-    label: "Premium Pro",
-    price: "19,900₮",
-    desc: "ЕШ-д 700+ оноо авах төлөвлөгөө",
-    icon: "🏆",
-    color: "#DC2626",
-    features: [
-      "Premium бүх зүйл",
-      "AI алдааны шинжилгээ",
-      "Хувийн судалгааны төлөвлөгөө",
-      "Сул сэдвийн тусгай давталт",
-      "Монгол физикийн жишиг шалгалт",
-      "Ахисан амжилтын дэвтэр",
-    ],
-    badge: "700+ оноо",
+    type: "quarterly",
+    label: "3 сар",
+    price: formatMnt(PREMIUM_PRICES.quarterly.amount),
+    perMonth: `Сард ${formatMnt(perMonthPrice("quarterly"))}`,
+    savings: PREMIUM_SAVINGS.quarterly
+      ? `${formatMnt(PREMIUM_SAVINGS.quarterly)} хэмнэнэ`
+      : undefined,
+    badge: "Хэмнэлттэй",
+    icon: "💎",
+    color: "#4F46E5",
+  },
+  {
+    type: "annual",
+    label: "Жилийн",
+    price: formatMnt(PREMIUM_PRICES.annual.amount),
+    perMonth: `Сард ${formatMnt(perMonthPrice("annual"))}`,
+    savings: PREMIUM_SAVINGS.annual
+      ? `${formatMnt(PREMIUM_SAVINGS.annual)} хэмнэнэ`
+      : undefined,
+    badge: "Хамгийн өргөн",
+    popular: true,
+    icon: "👑",
+    color: "#D97706",
   },
 ];
 
-// ── Зоосны багц ─────────────────────────────────────────────
-const COIN_PACKS = [
-  { id: "coins_50",  label: "50 Зоос",  price: "5,000₮",  coins: 50,  icon: "🟡", bonus: "" },
-  { id: "coins_120", label: "120 Зоос", price: "10,000₮", coins: 120, icon: "🟡🟡", bonus: "+20 бонус" },
-  { id: "coins_300", label: "300 Зоос", price: "20,000₮", coins: 300, icon: "💛", bonus: "+50 бонус", popular: true },
-  { id: "coins_800", label: "800 Зоос", price: "50,000₮", coins: 800, icon: "👑", bonus: "+150 бонус" },
-];
+function PremiumPageInner() {
+  const { data: session, update: updateSession } = useSession();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [loading, setLoading] = useState<PremiumPlanType | null>(null);
+  const [payError, setPayError] = useState("");
+  const [checkout, setCheckout] = useState<PaymentCheckoutData | null>(null);
+  const [payModalOpen, setPayModalOpen] = useState(false);
 
-const COMPARE = [
-  { feature: "Амь",              free: "5 (30мин тутам +1)",  premium: "∞ хязгааргүй" },
-  { feature: "Видео",            free: "Өдөрт 1 үнэгүй",      premium: "Хязгааргүй" },
-  { feature: "Шалгалт",         free: "Эхний 1 үнэгүй",       premium: "Хязгааргүй" },
-  { feature: "ЕШ Сорил",        free: "Өдөрт 1 үнэгүй",      premium: "Хязгааргүй" },
-  { feature: "XP boost",        free: "×1",                   premium: "×1.5" },
-  { feature: "Бонус зоос",      free: "❌",                   premium: "+50/сар" },
-  { feature: "Premium Badge",   free: "❌",                   premium: "✅" },
-  { feature: "AI шинжилгээ",    free: "❌",                   premium: "✅" },
-];
+  useEffect(() => {
+    const payment = searchParams.get("payment");
+    const id = searchParams.get("id");
+    if (payment === "success") {
+      void updateSession?.();
+      setPayError("");
+    } else if (payment === "failed") {
+      setPayError("Төлбөр цуцлагдсан эсвэл амжилтгүй.");
+    } else if (payment === "pending" && id) {
+      setCheckout({
+        paymentId: id,
+        provider: "khan_bank",
+        amount: 0,
+        qrImage: null,
+        qrText: null,
+        formUrl: null,
+        shortUrl: null,
+        bankUrls: [],
+      });
+      setPayModalOpen(true);
+    }
+  }, [searchParams, updateSession]);
 
-export default function PremiumPage() {
-  const { data: session } = useSession();
-  const [loading, setLoading] = useState<string | null>(null);
-  const [_purchaseOk, setPurchaseOk] = useState<string | null>(null);
-
-  async function handlePurchase(planId: string) {
-    setLoading(planId);
+  async function handlePurchase(planType: PremiumPlanType) {
+    setLoading(planType);
+    setPayError("");
     try {
-      const res = await fetch("/api/payment/initiate", {
+      const res = await fetch("/api/payment/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: planId }),
+        body: JSON.stringify({ type: planType }),
       });
       const data = await res.json();
-      if (data.qrImage || data.invoice) {
-        setPurchaseOk(planId);
+      if (!res.ok) {
+        setPayError(data.error ?? "Төлбөр үүсгэхэд алдаа гарлаа");
+        return;
       }
-    } catch {}
+      if (data.paymentId && (data.qrImage || data.formUrl || data.invoice)) {
+        setCheckout({
+          paymentId: data.paymentId,
+          provider: data.provider ?? "qpay",
+          amount: data.amount,
+          qrImage: data.qrImage ?? null,
+          qrText: data.qrText ?? null,
+          formUrl: data.formUrl ?? null,
+          shortUrl: data.shortUrl ?? null,
+          bankUrls: data.bankUrls ?? [],
+        });
+        setPayModalOpen(true);
+      }
+    } catch {
+      setPayError("Сүлжээний алдаа. Дахин оролдоно уу.");
+    }
     setLoading(null);
   }
 
-  const isPremium = (session?.user as any)?.isPremium;
+  const isPremium = (session?.user as { isPremium?: boolean })?.isPremium;
 
   return (
     <div style={{ minHeight: "100vh", background: T.bg, fontFamily: "Plus Jakarta Sans, sans-serif" }}>
-      {/* Header */}
-      <div style={{ background: "#fff", borderBottom: `1px solid ${T.border}`, padding: "0 28px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
+      <div
+        style={{
+          background: "#fff",
+          borderBottom: `1px solid ${T.border}`,
+          padding: "0 28px",
+          height: 60,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+        }}
+      >
         <BackButton href="/dashboard" label="Буцах" />
         <div style={{ fontWeight: 800, fontSize: 15, color: T.text }}>⭐ Premium</div>
         {isPremium && (
-          <span style={{ background: T.purpleLight, color: T.purple, padding: "4px 12px", borderRadius: 99, fontSize: 12, fontWeight: 700 }}>
+          <span
+            style={{
+              background: T.purpleLight,
+              color: T.purple,
+              padding: "4px 12px",
+              borderRadius: 99,
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+          >
             ✓ Идэвхтэй Premium
           </span>
         )}
       </div>
 
-      <div style={{ maxWidth: 1000, margin: "0 auto", padding: "40px 24px" }}>
-        {/* Hero */}
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 24px" }}>
         <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <h1 style={{ fontWeight: 900, fontSize: 34, color: T.text, letterSpacing: "-0.03em", marginBottom: 10, lineHeight: 1.2 }}>
-            CyberPhysics <span style={{ background: "linear-gradient(90deg, #4F46E5, #7C3AED)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Premium</span>
+          <h1
+            style={{
+              fontWeight: 900,
+              fontSize: 34,
+              color: T.text,
+              letterSpacing: "-0.03em",
+              marginBottom: 10,
+              lineHeight: 1.2,
+            }}
+          >
+            CyberPhysics{" "}
+            <span
+              style={{
+                background: "linear-gradient(90deg, #4F46E5, #7C3AED)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              Premium
+            </span>
           </h1>
-          <p style={{ fontSize: 15, color: T.textSub, maxWidth: 440, margin: "0 auto", lineHeight: 1.7 }}>
-            Хязгааргүй амь, коин bonus, бүх сорил нээлттэй.
+          <p style={{ fontSize: 15, color: T.textSub, maxWidth: 480, margin: "0 auto", lineHeight: 1.7 }}>
+            Сар, 3 сар эсвэл жилээр сонгоод хязгааргүй суралцаарай. Төлбөр: QPay QR эсвэл Khan Bank.
           </p>
+          {payError && (
+            <p
+              style={{
+                marginTop: 12,
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#DC2626",
+                maxWidth: 420,
+                marginLeft: "auto",
+                marginRight: "auto",
+              }}
+            >
+              {payError}
+            </p>
+          )}
+          {searchParams.get("payment") === "success" && (
+            <p
+              style={{
+                marginTop: 12,
+                fontSize: 14,
+                fontWeight: 700,
+                color: T.green,
+              }}
+            >
+              ✓ Төлбөр амжилттай — Premium идэвхтэй!
+            </p>
+          )}
         </div>
 
-        {/* Plans grid */}
-        <div className="premium-grid-2" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, marginBottom: 48, maxWidth: 640, margin: "0 auto 48px" }}>
-          {PLANS.map(plan => (
-            <PlanCard key={plan.id} plan={plan} loading={loading === plan.id} onBuy={() => handlePurchase(plan.id)} isPremium={isPremium && (plan.id === "premium_monthly" || plan.id === "premium_pro")} />
+        <div
+          className="premium-plans-grid"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: 16,
+            marginBottom: 48,
+            alignItems: "stretch",
+          }}
+        >
+          {PLANS.map((plan) => (
+            <PlanCard
+              key={plan.type}
+              plan={plan}
+              loading={loading === plan.type}
+              onBuy={() => handlePurchase(plan.type)}
+              isPremium={Boolean(isPremium)}
+            />
           ))}
         </div>
-
-        {/* ── Coin Shop ── */}
-        <div style={{ marginBottom: 48 }}>
-          <div style={{ textAlign: "center", marginBottom: 20 }}>
-            <div style={{ fontWeight: 900, fontSize: 22, color: T.text, marginBottom: 6 }}>🟡 Зоосны дэлгүүр</div>
-            <div style={{ fontSize: 13, color: T.muted }}>Зоосоор видео нээх, шалгалт дахин өгөх, AI тайлбар авах</div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>
-            {COIN_PACKS.map(pack => (
-              <div key={pack.id} style={{
-                background: pack.popular ? "linear-gradient(135deg, #FEF3C7, #FFFBEB)" : "#fff",
-                borderRadius: 16, padding: "18px 16px", textAlign: "center",
-                border: `2px solid ${pack.popular ? "#F59E0B" : T.border}`,
-                boxShadow: pack.popular ? "0 4px 20px rgba(245,158,11,0.2)" : T.shadow,
-                position: "relative",
-              }}>
-                {pack.popular && (
-                  <div style={{ position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)", background: "#F59E0B", color: "#fff", fontSize: 10, fontWeight: 800, padding: "3px 12px", borderRadius: 20 }}>
-                    Хамгийн алдартай
-                  </div>
-                )}
-                <div style={{ fontSize: 28, marginBottom: 6 }}>{pack.icon}</div>
-                <div style={{ fontWeight: 900, fontSize: 18, color: T.text, marginBottom: 2 }}>{pack.label}</div>
-                {pack.bonus && <div style={{ fontSize: 11, color: "#D97706", fontWeight: 700, marginBottom: 8 }}>{pack.bonus}</div>}
-                <div style={{ fontWeight: 800, fontSize: 16, color: "#4F46E5", marginBottom: 12 }}>{pack.price}</div>
-                <button onClick={() => handlePurchase(pack.id)} style={{
-                  width: "100%", padding: "10px 0", borderRadius: 10, border: "none",
-                  background: pack.popular ? "#F59E0B" : "#4F46E5", color: "#fff",
-                  fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-                }}>
-                  Авах
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── Зоос хаана зарцуулах ── */}
-        <div style={{ background: "#fff", borderRadius: 18, border: `1px solid ${T.border}`, padding: "20px 24px", marginBottom: 36, boxShadow: T.shadow }}>
-          <div style={{ fontWeight: 800, fontSize: 15, color: T.text, marginBottom: 16 }}>🟡 Зоос яаж зарцуулах вэ?</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
-            {[
-              { action: "Видео нээх", cost: 3, icon: "🎬" },
-              { action: "AI тайлбар", cost: 3, icon: "🤖" },
-              { action: "Шалгалт дахин", cost: 2, icon: "📝" },
-              { action: "ЕШ дахин өгөх", cost: 2, icon: "📋" },
-              { action: "Алхамт бодолт", cost: 2, icon: "🔢" },
-              { action: "Full Heal (амь)", cost: 5, icon: "❤️" },
-            ].map(item => (
-              <div key={item.action} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: T.bg, borderRadius: 10 }}>
-                <span style={{ fontSize: 20 }}>{item.icon}</span>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{item.action}</div>
-                  <div style={{ fontSize: 12, color: "#D97706", fontWeight: 700 }}>🟡 {item.cost} зоос</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Feature comparison table */}
-        <div style={{ background: "#fff", borderRadius: 18, border: `1px solid ${T.border}`, overflow: "hidden", boxShadow: T.shadow, marginBottom: 48 }}>
-          <div style={{ padding: "20px 24px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ fontWeight: 800, fontSize: 16, color: T.text }}>Боломжуудын харьцуулалт</div>
-          </div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ background: T.bg }}>
-                <th style={{ padding: "12px 20px", textAlign: "left", fontSize: 11, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Боломж</th>
-                <th style={{ padding: "12px 20px", textAlign: "center", fontSize: 12, fontWeight: 700, color: T.textSub, width: 120 }}>🆓 Үнэгүй</th>
-                <th style={{ padding: "12px 20px", textAlign: "center", fontSize: 12, fontWeight: 700, color: T.purple, width: 140, background: T.purpleLight }}>⭐ Premium</th>
-              </tr>
-            </thead>
-            <tbody>
-              {COMPARE.map((row, i) => (
-                <tr key={i} style={{ borderTop: `1px solid ${T.border}` }}>
-                  <td style={{ padding: "12px 20px", fontSize: 13, fontWeight: 600, color: T.text }}>{row.feature}</td>
-                  <td style={{ padding: "12px 20px", textAlign: "center", fontSize: 13, color: T.muted }}>{row.free}</td>
-                  <td style={{ padding: "12px 20px", textAlign: "center", fontSize: 13, fontWeight: 700, color: T.purple, background: T.purpleLight + "40" }}>{row.premium}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
       </div>
+
+      <style jsx global>{`
+        @media (max-width: 900px) {
+          .premium-plans-grid {
+            grid-template-columns: 1fr !important;
+            max-width: 400px;
+            margin-left: auto !important;
+            margin-right: auto !important;
+          }
+        }
+      `}      </style>
+
+      <PremiumPaymentModal
+        open={payModalOpen}
+        checkout={checkout}
+        onClose={() => {
+          setPayModalOpen(false);
+          setCheckout(null);
+        }}
+        onSuccess={() => {
+          void updateSession?.();
+          router.replace("/dashboard/premium?payment=success");
+        }}
+      />
     </div>
   );
 }
 
-function PlanCard({ plan, loading, onBuy, isPremium }: { plan: typeof PLANS[0]; loading: boolean; onBuy: () => void; isPremium: boolean }) {
+function PlanCard({
+  plan,
+  loading,
+  onBuy,
+  isPremium,
+}: {
+  plan: PlanCardData;
+  loading: boolean;
+  onBuy: () => void;
+  isPremium: boolean;
+}) {
   const [hov, setHov] = useState(false);
-  const isHighlight = plan.id === "premium_monthly" || plan.id === "premium_pro";
+  const borderColor = plan.popular ? "#D97706" : hov ? plan.color : T.border;
+  const borderWidth = plan.popular ? 3 : 2;
 
   return (
-    <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)} style={{
-      background: isHighlight ? `linear-gradient(160deg, ${plan.color}10, #fff)` : "#fff",
-      borderRadius: 16, padding: "22px 18px",
-      border: `2px solid ${hov || isHighlight ? plan.color : T.border}`,
-      boxShadow: hov ? `0 8px 32px ${plan.color}22` : T.shadow,
-      transition: "all 0.2s", position: "relative", display: "flex", flexDirection: "column",
-    }}>
-      {plan.badge && (
-        <div style={{ position: "absolute", top: -10, right: 12, background: plan.color, color: "#fff", fontSize: 10, fontWeight: 800, padding: "3px 10px", borderRadius: 99, letterSpacing: "0.04em" }}>
+    <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        background: plan.popular
+          ? "linear-gradient(160deg, #FFFBEB 0%, #fff 55%)"
+          : hov
+            ? `linear-gradient(160deg, ${plan.color}10, #fff)`
+            : "#fff",
+        borderRadius: 18,
+        padding: "24px 20px",
+        border: `${borderWidth}px solid ${borderColor}`,
+        boxShadow: plan.popular
+          ? "0 12px 40px rgba(217, 119, 6, 0.18)"
+          : hov
+            ? `0 8px 32px ${plan.color}22`
+            : T.shadow,
+        transition: "all 0.2s",
+        position: "relative",
+        display: "flex",
+        flexDirection: "column",
+        transform: plan.popular && hov ? "translateY(-2px)" : "none",
+      }}
+    >
+      {plan.popular && (
+        <div
+          style={{
+            position: "absolute",
+            top: -12,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "linear-gradient(90deg, #F59E0B, #D97706)",
+            color: "#fff",
+            fontSize: 11,
+            fontWeight: 800,
+            padding: "4px 14px",
+            borderRadius: 99,
+            whiteSpace: "nowrap",
+            boxShadow: "0 4px 12px rgba(217, 119, 6, 0.35)",
+          }}
+        >
+          Хамгийн алдартай
+        </div>
+      )}
+      {plan.badge && !plan.popular && (
+        <div
+          style={{
+            position: "absolute",
+            top: -10,
+            right: 12,
+            background: plan.color,
+            color: "#fff",
+            fontSize: 10,
+            fontWeight: 800,
+            padding: "3px 10px",
+            borderRadius: 99,
+          }}
+        >
           {plan.badge}
         </div>
       )}
-      <div style={{ fontSize: 28, marginBottom: 10 }}>{plan.icon}</div>
-      <div style={{ fontWeight: 800, fontSize: 15, color: T.text, marginBottom: 4 }}>{plan.label}</div>
-      <div style={{ fontWeight: 900, fontSize: 22, color: plan.color, marginBottom: 6, letterSpacing: "-0.02em" }}>{plan.price}</div>
-      <div style={{ fontSize: 12, color: T.muted, marginBottom: 16, lineHeight: 1.4 }}>{plan.desc}</div>
-      <div style={{ flex: 1, marginBottom: 18 }}>
-        {plan.features.map((f, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12, color: T.textSub, marginBottom: 6 }}>
-            <span style={{ color: plan.color, fontWeight: 900, marginTop: 1, flexShrink: 0 }}>✓</span>
+      {plan.badge && plan.popular && (
+        <div
+          style={{
+            position: "absolute",
+            top: -10,
+            right: 12,
+            background: plan.color,
+            color: "#fff",
+            fontSize: 10,
+            fontWeight: 800,
+            padding: "3px 10px",
+            borderRadius: 99,
+          }}
+        >
+          {plan.badge}
+        </div>
+      )}
+
+      <div style={{ fontSize: 32, marginBottom: 8 }}>{plan.icon}</div>
+      <div style={{ fontWeight: 800, fontSize: 16, color: T.text, marginBottom: 4 }}>{plan.label}</div>
+      <div
+        style={{
+          fontWeight: 900,
+          fontSize: 28,
+          color: plan.color,
+          marginBottom: 4,
+          letterSpacing: "-0.03em",
+        }}
+      >
+        {plan.price}
+      </div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: T.textSub, marginBottom: plan.savings ? 4 : 12 }}>
+        {plan.perMonth}
+      </div>
+      {plan.savings && (
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 800,
+            color: "#059669",
+            background: "#ECFDF5",
+            padding: "6px 10px",
+            borderRadius: 8,
+            marginBottom: 14,
+            display: "inline-block",
+            alignSelf: "flex-start",
+          }}
+        >
+          {plan.savings}
+        </div>
+      )}
+
+      <div style={{ flex: 1, marginBottom: 20, marginTop: plan.savings ? 0 : 4 }}>
+        {PREMIUM_FEATURES.map((f) => (
+          <div
+            key={f}
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 8,
+              fontSize: 12,
+              color: T.textSub,
+              marginBottom: 7,
+            }}
+          >
+            <span style={{ color: plan.color, fontWeight: 900, flexShrink: 0 }}>✓</span>
             {f}
           </div>
         ))}
       </div>
+
       {isPremium ? (
-        <div style={{ padding: "10px", borderRadius: 10, background: T.greenLight, color: T.green, fontWeight: 700, fontSize: 13, textAlign: "center" }}>✓ Идэвхтэй</div>
+        <div
+          style={{
+            padding: "11px",
+            borderRadius: 10,
+            background: T.greenLight,
+            color: T.green,
+            fontWeight: 700,
+            fontSize: 13,
+            textAlign: "center",
+          }}
+        >
+          ✓ Идэвхтэй
+        </div>
       ) : (
-        <button onClick={onBuy} disabled={loading} style={{
-          width: "100%", padding: "11px", borderRadius: 10, border: "none",
-          background: loading ? T.muted : plan.color, color: "#fff", fontWeight: 800, fontSize: 13,
-          cursor: loading ? "not-allowed" : "pointer", fontFamily: "Plus Jakarta Sans, sans-serif",
-          boxShadow: `0 4px 16px ${plan.color}33`,
-          transition: "transform 0.15s",
-          transform: hov && !loading ? "translateY(-1px)" : "none",
-        }}>
+        <button
+          onClick={onBuy}
+          disabled={loading}
+          style={{
+            width: "100%",
+            padding: "12px",
+            borderRadius: 12,
+            border: "none",
+            background: loading ? T.muted : plan.color,
+            color: "#fff",
+            fontWeight: 800,
+            fontSize: 14,
+            cursor: loading ? "not-allowed" : "pointer",
+            fontFamily: "Plus Jakarta Sans, sans-serif",
+            boxShadow: `0 4px 16px ${plan.color}33`,
+          }}
+        >
           {loading ? "Уншиж байна..." : "Худалдан авах"}
         </button>
       )}
     </div>
+  );
+}
+
+export default function PremiumPage() {
+  return (
+    <Suspense fallback={null}>
+      <PremiumPageInner />
+    </Suspense>
   );
 }

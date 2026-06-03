@@ -6,6 +6,7 @@ import { T } from "@/styles/tokens";
 import { Ic } from "@/components/ui/Icon";
 import { Loading } from "@/components/ui/Loading";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { CoinIcon, CoinSpendModal } from "@/components/gamification";
 import {
   buildEesQuestions,
   EES_META,
@@ -42,6 +43,8 @@ export function EesPracticeView() {
   const questions = useMemo(() => buildEesQuestions(), []);
   const tabLabels = useMemo(() => getQuestionTabLabels(questions), [questions]);
   const choiceQuestions = useMemo(() => questions.filter((q) => q.type === "choice"), [questions]);
+  const eesRewardSent = useRef(false);
+  const [eesReward, setEesReward] = useState<{ xp: number; coins: number } | null>(null);
 
   const [phase, setPhase] = useState<Phase>("hub");
   const [hubTab, setHubTab] = useState(0);
@@ -53,6 +56,8 @@ export function EesPracticeView() {
   const [solutionOpenFor, setSolutionOpenFor] = useState<number | null>(null);
   const [coins, setCoins] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [coinModalOpen, setCoinModalOpen] = useState(false);
+  const [coinModalBusy, setCoinModalBusy] = useState(false);
   const [timeLeft, setTimeLeft] = useState(EES_META.durationMin * 60);
   const [hydrated, setHydrated] = useState(false);
 
@@ -160,6 +165,8 @@ export function EesPracticeView() {
   };
 
   const startQuiz = () => {
+    eesRewardSent.current = false;
+    setEesReward(null);
     setQIndex(Math.min(hubTab, questions.length - 1));
     setTimeLeft(EES_META.durationMin * 60);
     setPhase("quiz");
@@ -190,7 +197,35 @@ export function EesPracticeView() {
     setPhase("finished");
   };
 
-  const buySolution = async () => {
+  const eesPercent = useMemo(() => {
+    if (score.maxPoints > 0) {
+      return Math.round((score.points / score.maxPoints) * 100);
+    }
+    if (score.total > 0) {
+      return Math.round((score.correct / score.total) * 100);
+    }
+    return 0;
+  }, [score]);
+
+  useEffect(() => {
+    if (phase !== "finished" || eesRewardSent.current) return;
+    eesRewardSent.current = true;
+    fetch("/api/ees/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ percent: eesPercent }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d || d.alreadyRewarded) return;
+        setEesReward({ xp: d.xpEarned ?? 0, coins: d.coinsEarned ?? 0 });
+        if (typeof d.coins === "number") setCoins(d.coins);
+        void updateSession?.({ xp: d.xp, coins: d.coins, level: d.level });
+      })
+      .catch(() => {});
+  }, [phase, eesPercent, updateSession]);
+
+  const requestSolution = () => {
     if (solutionOpenFor === qIndex) {
       setSolutionOpenFor(null);
       return;
@@ -199,16 +234,21 @@ export function EesPracticeView() {
       setSolutionOpenFor(qIndex);
       return;
     }
+    setCoinModalOpen(true);
+  };
+
+  const confirmBuySolution = async () => {
     const balance = coins ?? session?.user?.coins ?? 0;
     if (balance < 1) {
       pushToast("Зоос хүрэлцэхгүй байна.");
       return;
     }
+    setCoinModalBusy(true);
     try {
-      const r = await fetch("/api/user/award-xp", {
+      const r = await fetch("/api/user/spend-coins", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ coins: -1, reason: "ees-solution" }),
+        body: JSON.stringify({ action: "hint" }),
       });
       const d = await r.json();
       if (!r.ok) {
@@ -219,8 +259,11 @@ export function EesPracticeView() {
       await updateSession?.({ coins: d.coins });
       setSolutionsUnlocked((prev) => new Set([...prev, qIndex]));
       setSolutionOpenFor(qIndex);
+      setCoinModalOpen(false);
     } catch {
       pushToast("Сүлжээний алдаа");
+    } finally {
+      setCoinModalBusy(false);
     }
   };
 
@@ -408,10 +451,10 @@ export function EesPracticeView() {
           <div style={{ marginBottom: 12, fontSize: 12, color: T.muted, textAlign: "center" }}>
             Хариулсан: <strong style={{ color: T.text }}>{answeredCount}</strong> / {questions.length}
             {coins != null && (
-              <>
-                {" · "}
-                Зоос: <strong style={{ color: T.text }}>{coins}</strong>
-              </>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 4 }}>
+                <CoinIcon size="xs" />
+                <strong style={{ color: T.text }}>{coins}</strong>
+              </span>
             )}
           </div>
         )}
@@ -467,11 +510,19 @@ export function EesPracticeView() {
           >
             <div style={{ fontSize: 40, marginBottom: 8 }}>🎓</div>
             <h2 style={{ fontSize: 18, fontWeight: 800, color: T.text, marginBottom: 8 }}>Сорил дууслаа</h2>
-            <p style={{ fontSize: 14, color: T.muted, marginBottom: 16 }}>
+            <p style={{ fontSize: 14, color: T.muted, marginBottom: 8 }}>
               Нэгдүгээр хэсэг: <strong style={{ color: T.green }}>{score.correct}</strong> / {score.total} зөв
               {" · "}
               Оноо: <strong style={{ color: T.blue }}>{score.points}</strong> / {score.maxPoints}
+              {" · "}
+              {eesPercent}%
             </p>
+            {eesReward && (eesReward.xp > 0 || eesReward.coins > 0) && (
+              <p style={{ fontSize: 14, fontWeight: 800, color: T.purple, marginBottom: 16 }}>
+                +{eesReward.xp} XP · +{eesReward.coins} зоос
+              </p>
+            )}
+            {!eesReward && <div style={{ marginBottom: 16 }} />}
             <button
               type="button"
               onClick={() => {
@@ -608,7 +659,7 @@ export function EesPracticeView() {
                 <div style={{ marginTop: 22, position: "relative" }}>
                   <button
                     type="button"
-                    onClick={buySolution}
+                    onClick={requestSolution}
                     style={{
                       width: "100%",
                       border: "none",
@@ -653,12 +704,24 @@ export function EesPracticeView() {
                         boxShadow: T.shadowMd,
                       }}
                     >
-                      <Ic n="coin" size={13} color="#92400e" />
+                      <CoinIcon size={16} />
                       1ш
                     </div>
                   )}
-                  <p style={{ textAlign: "center", marginTop: 10, fontSize: 12, color: T.muted }}>
-                    1 зоос ашиглан бодолт авах · үлдсэн:{" "}
+                  <p
+                    style={{
+                      textAlign: "center",
+                      marginTop: 10,
+                      fontSize: 12,
+                      color: T.muted,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <CoinIcon size="xs" />
+                    1 зоос · үлдсэн{" "}
                     <strong style={{ color: T.text }}>{coins ?? "—"}</strong>
                   </p>
                 </div>
@@ -667,6 +730,16 @@ export function EesPracticeView() {
           </>
         )}
       </div>
+
+      <CoinSpendModal
+        open={coinModalOpen}
+        onClose={() => setCoinModalOpen(false)}
+        coinCost={1}
+        balance={coins ?? session?.user?.coins ?? 0}
+        lines={["Бодолт хийлгэхийн тулд 1 зоос зарцуулна."]}
+        onConfirm={confirmBuySolution}
+        confirmLoading={coinModalBusy}
+      />
     </div>
   );
 }

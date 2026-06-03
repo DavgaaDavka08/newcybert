@@ -5,6 +5,7 @@ import { connectDB } from '@/lib/mongodb';
 import { User } from '@/models/User';
 import { AttemptModel } from '@/models/AttemptModel';
 import mongoose from 'mongoose';
+import { calcLevel } from '@/lib/gamification';
 
 function adminProfile(email: string | null | undefined) {
   return {
@@ -64,6 +65,8 @@ export async function GET() {
       avgExamScorePct = Math.round(parts.reduce((s, x) => s + x, 0) / parts.length);
     }
 
+    const xp = (safe.xp as number) ?? 0;
+
     return NextResponse.json({
       firstName: safe.firstName,
       lastName: safe.lastName,
@@ -74,8 +77,8 @@ export async function GET() {
       grade: typeof safe.grade === 'number' ? safe.grade : undefined,
       hasPassword,
       googleId: safe.googleId ?? undefined,
-      xp: safe.xp ?? 0,
-      level: safe.level ?? 1,
+      xp,
+      level: calcLevel(xp),
       coins: safe.coins ?? 0,
       lives: safe.lives ?? 0,
       streak: safe.streak ?? 0,

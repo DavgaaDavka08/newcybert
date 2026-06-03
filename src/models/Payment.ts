@@ -7,7 +7,15 @@ const PaymentSchema = new Schema(
     amount:    { type: Number, required: true },
     type:      {
       type: String,
-      enum: ["premium_monthly", "premium_pro", "coins_500", "coins_1000", "quiz_pack"],
+      enum: [
+        "premium_monthly",
+        "premium_quarterly",
+        "premium_annual",
+        "premium_pro",
+        "coins_500",
+        "coins_1000",
+        "quiz_pack",
+      ],
       required: true,
     },
     status:    { type: String, enum: ["pending", "success", "failed"], default: "pending" },

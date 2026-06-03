@@ -1,11 +1,12 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { Ic } from '@/components/ui';
 import {
   getTopicsV2, getStarsV2,
   type GameTopicWithSubtopics, type GameSubtopic,
 } from '@/lib/game-data';
 import type { AppState } from '@/types';
+import { getSubtopicRewards } from '@/lib/gamification';
+import { CoinIcon, XpIcon, GameMapHud } from '@/components/gamification';
 
 type OffsetType = 'center' | 'off-l' | 'off-l2' | 'off-r' | 'off-r2';
 const NODE_OFFSETS: OffsetType[] = ['center','off-l','off-r','center','off-l2','off-r','center','off-l','off-r2','center'];
@@ -63,70 +64,12 @@ interface Props {
   onTopicIdx: (i: number) => void;
   onSelectLevel: (topic: string, level: number | string) => void;
   onBackToDashboard?: () => void;
+  /** Current lives (synced from server in GameScreen). */
+  mapLives?: number;
+  maxLives?: number;
+  nextRefillAt?: number | null;
   /** Increment after server path sync so the map re-reads localStorage. */
   reloadSignal?: number;
-}
-
-function MapStatsBar({ state, onBackToDashboard }: { state: AppState; onBackToDashboard?: () => void }) {
-  return (
-    <div
-      className="game-map-stats-bar"
-      style={{
-        position: 'relative',
-        zIndex: 2,
-        flexShrink: 0,
-        padding: '10px 20px',
-        background: 'rgba(5,10,22,0.6)',
-        backdropFilter: 'blur(14px)',
-        borderBottom: '1px solid rgba(120,180,255,0.10)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 16,
-      }}
-    >
-      {onBackToDashboard ? (
-        <button
-          type="button"
-          onClick={onBackToDashboard}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '8px 14px',
-            borderRadius: 10,
-            border: '1px solid rgba(255,255,255,0.14)',
-            background: 'rgba(255,255,255,0.08)',
-            color: '#eaf2ff',
-            fontWeight: 700,
-            fontSize: 13,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            flexShrink: 0,
-          }}
-        >
-          <Ic n="chevLeft" size={16} color="#eaf2ff" />
-          Нүүр хуудас
-        </button>
-      ) : (
-        <div />
-      )}
-      <div className="game-map-stats-pills" style={{ display: 'flex', alignItems: 'center', gap: 20, marginLeft: 'auto' }}>
-        {[
-          { icon: 'award', val: state.xp, clr: '#c4b5fd', bg: 'rgba(139,92,246,.18)' },
-          { icon: 'coin', val: state.coins, clr: '#fde68a', bg: 'rgba(245,184,0,.18)' },
-          { icon: 'flame', val: `${state.streak} өдөр`, clr: '#fca5a5', bg: 'rgba(239,68,68,.18)' },
-        ].map((s, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: '#9fb2cf', fontWeight: 600 }}>
-            <div style={{ width: 26, height: 26, borderRadius: 7, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Ic n={s.icon} size={13} color={s.clr} />
-            </div>
-            <span style={{ fontWeight: 800, color: '#eaf2ff' }}>{s.val}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 // ── V2: Single subtopic node ───────────────────────────────────
@@ -145,6 +88,7 @@ function SubtopicNode({ sub, index, topicColor, subtopicStars, prevDone, onSelec
   const nodeStatus: 'done' | 'current' | 'locked' = isDone ? 'done' : isCurr ? 'current' : 'locked';
   const offset = NODE_OFFSETS[index % NODE_OFFSETS.length] ?? 'center';
   const starCount = subtopicStars[sub.id] ?? 0;
+  const rewards = getSubtopicRewards(index);
   const size = nodeStatus === 'current' ? 88 : 72;
 
   let circleBg = '', circleBorder = '', circleShadow = '';
@@ -207,7 +151,16 @@ function SubtopicNode({ sub, index, topicColor, subtopicStars, prevDone, onSelec
           {hov && !isLock && (
             <div style={{ position: 'absolute', bottom: size + (nodeStatus === 'done' ? 46 : 16), left: '50%', transform: 'translateX(-50%)', background: `linear-gradient(135deg, ${topicColor}, ${topicColor}dd)`, borderRadius: 18, padding: '14px 20px', minWidth: 190, zIndex: 20, boxShadow: `0 12px 40px ${topicColor}66`, pointerEvents: 'none' }}>
               <div style={{ position: 'absolute', bottom: -7, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderTop: `8px solid ${topicColor}` }} />
-              <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 10 }}>{sub.name}</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 8 }}>{sub.name}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 10, fontSize: 11, fontWeight: 700 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <XpIcon size={18} glow /> {rewards.xp} XP
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <CoinIcon size={18} /> {rewards.coins} зоос
+                </span>
+                {rewards.badge && <span>🏆 Badge</span>}
+              </div>
               {sub.description && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', marginBottom: 10 }}>{sub.description}</div>}
               <div style={{ background: 'rgba(255,255,255,.2)', border: '2px solid rgba(255,255,255,.5)', borderRadius: 12, padding: '10px 14px', textAlign: 'center', fontWeight: 900, fontSize: 15, color: '#fff' }}>
                 ЭХЛЭХ
@@ -267,7 +220,18 @@ function SubtopicSection({ topic, subtopicStars, onSelectSubtopic }: {
   );
 }
 
-export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicIdx, onSelectLevel, onBackToDashboard, reloadSignal = 0 }: Props) {
+export function GameMapPhase({
+  state,
+  topicIdx: _topicIdx,
+  onTopicIdx: _onTopicIdx,
+  onSelectLevel,
+  onBackToDashboard,
+  mapLives,
+  maxLives,
+  nextRefillAt,
+  reloadSignal = 0,
+}: Props) {
+  const livesCount = mapLives ?? state.lives ?? 5;
   const [topicsV2, setTopicsV2State] = useState<GameTopicWithSubtopics[]>([]);
   const [starsV2, setStarsV2State]   = useState<Record<string, number>>({});
   const [loaded, setLoaded]          = useState(false);
@@ -292,7 +256,7 @@ export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicI
     return (
       <div className="game-map-screen" style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: 'Plus Jakarta Sans, sans-serif', position: 'relative' }}>
         <AtmosphereLayer />
-        <MapStatsBar state={state} onBackToDashboard={onBackToDashboard} />
+        <GameMapHud state={state} lives={livesCount} maxLives={maxLives} nextRefillAt={nextRefillAt} onBackToDashboard={onBackToDashboard} />
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, position: 'relative', zIndex: 2 }}>
           <div style={{ maxWidth: 400, textAlign: 'center', color: '#fff' }}>
             <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.9 }}>Φ</div>
@@ -311,7 +275,7 @@ export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicI
     return (
       <div className="game-map-screen" style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: 'Plus Jakarta Sans, sans-serif', position: 'relative' }}>
         <AtmosphereLayer />
-        <MapStatsBar state={state} onBackToDashboard={onBackToDashboard} />
+        <GameMapHud state={state} lives={livesCount} maxLives={maxLives} nextRefillAt={nextRefillAt} onBackToDashboard={onBackToDashboard} />
         <div style={{ flex: 1, overflowY: 'auto', position: 'relative', zIndex: 2 }}>
           <div className="game-map-scroll" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '44px 24px 100px' }}>
             <div style={{ width: '100%', maxWidth: 480 }}>
@@ -348,8 +312,10 @@ export function GameMapPhase({ state, topicIdx: _topicIdx, onTopicIdx: _onTopicI
   }
 
   return (
-    <div className="game-map-screen" style={{ height: '100vh', background: '#0a0f1a' }}>
-      <MapStatsBar state={state} onBackToDashboard={onBackToDashboard} />
+    <div className="game-map-screen" style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: 'Plus Jakarta Sans, sans-serif', position: 'relative' }}>
+      <AtmosphereLayer />
+      <GameMapHud state={state} lives={livesCount} maxLives={maxLives} nextRefillAt={nextRefillAt} onBackToDashboard={onBackToDashboard} />
+      <style>{mapStyles}</style>
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { Ic, Avatar, Label } from '@/components/ui';
 import { Loading } from '@/components/ui/Loading';
 import { getRank } from '@/lib/ranks';
 import { useAppState } from '@/lib/app-state-context';
+import { ProfileGameStats } from '@/components/profile/ProfileGameStats';
 
 const AIMags = [
   '',
@@ -304,40 +305,8 @@ export function ProfileModal({ open, onClose, displayName }: Props) {
 
           {!loading && (
             <>
-              <Label style={{ ...fieldLabel, marginBottom: 10 }}>Тоглолт, түвшин</Label>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                  gap: 10,
-                  marginBottom: 20,
-                }}
-              >
-                {[
-                  { k: 'XP', v: String(xp) },
-                  { k: 'Rank', v: rank.name },
-                  { k: 'Анги (тоглолт)', v: `Lv ${level}` },
-                  { k: 'Зоос', v: String(coins) },
-                  { k: 'Амь', v: String(lives) },
-                  { k: 'Streak', v: `${streak} өдөр` },
-                  { k: 'Шалгалт (давсан)', v: String(examAttemptsCount) },
-                  { k: 'Дундаж оноо', v: avgExamScorePct != null ? `${avgExamScorePct}%` : '—' },
-                ].map(row => (
-                  <div
-                    key={row.k}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: 12,
-                      border: `1px solid ${T.border}`,
-                      background: '#F8FAFC',
-                    }}
-                  >
-                    <div style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      {row.k}
-                    </div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: T.text, marginTop: 4 }}>{row.v}</div>
-                  </div>
-                ))}
+              <div style={{ marginBottom: 18 }}>
+                <ProfileGameStats />
               </div>
 
               <Label style={{ ...fieldLabel, marginBottom: 10 }}>Хувийн мэдээлэл</Label>

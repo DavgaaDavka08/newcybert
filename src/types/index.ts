@@ -120,7 +120,14 @@ export interface IPayment {
   _id: string;
   userId: string;
   amount: number;
-  type: "premium_monthly" | "premium_pro" | "coins_500" | "coins_1000" | "quiz_pack";
+  type:
+    | "premium_monthly"
+    | "premium_quarterly"
+    | "premium_annual"
+    | "premium_pro"
+    | "coins_500"
+    | "coins_1000"
+    | "quiz_pack";
   status: "pending" | "success" | "failed";
   method: "qpay" | "khan_bank";
   invoiceId?: string;

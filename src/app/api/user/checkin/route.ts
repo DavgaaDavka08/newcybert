@@ -2,23 +2,8 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { User } from "@/models/User";
 import { requireAuth } from "@/lib/auth";
-
-// Streak-ийн зоосны шагнал
-const STREAK_REWARDS: { days: number; coins: number; badge?: string }[] = [
-  { days: 1,  coins: 1 },
-  { days: 3,  coins: 3 },
-  { days: 7,  coins: 10, badge: "streak_7"  },
-  { days: 30, coins: 50, badge: "streak_30" },
-];
-
-function getStreakReward(streak: number): number {
-  let coins = 1;
-  for (const r of STREAK_REWARDS) {
-    if (streak >= r.days) coins = r.coins;
-  }
-  // 30+ өдөр: хамгийн их 50
-  return Math.min(coins, 50);
-}
+import { getStreakCoinReward, STREAK_COIN_REWARDS } from "@/lib/gamification";
+import { calcLevel } from "@/lib/gamification-server";
 
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() &&
@@ -63,26 +48,19 @@ export async function POST() {
   user.lastStreakDate = now;
   user.lastLoginDate  = now;
 
-  const coinReward = getStreakReward(user.streak);
+  const coinReward = getStreakCoinReward(user.streak);
   user.coins = (user.coins ?? 0) + coinReward;
-
-  // XP premium boost
-  const premiumActive = user.isPremium && (!user.premiumUntil || new Date(user.premiumUntil) > now);
-  const xpReward = premiumActive ? 15 : 10; // Premium: +15 XP/өдөр, Үнэгүй: +10 XP
-  user.xp    = (user.xp ?? 0) + xpReward;
-  user.level = Math.floor(user.xp / 200) + 1;
+  user.level = calcLevel(user.xp ?? 0);
 
   await user.save();
 
-  // Streak milestone
-  const milestone = STREAK_REWARDS.find(r => r.days === user.streak);
+  const milestone = STREAK_COIN_REWARDS.find((r) => r.days === user.streak);
 
   return NextResponse.json({
     alreadyDone: false,
     streak: user.streak,
     coins: user.coins,
     coinReward,
-    xpReward,
     streakBroken,
     milestone: milestone ? { days: milestone.days, badge: milestone.badge } : null,
   });

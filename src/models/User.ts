@@ -1,5 +1,6 @@
 // src/models/User.ts
 import { Schema, model, models } from "mongoose";
+import { calcLevel } from "@/lib/gamification";
 
 const UserSchema = new Schema(
   {
@@ -20,12 +21,13 @@ const UserSchema = new Schema(
     // ── Premium ──────────────────────────────────────
     isPremium:    { type: Boolean, default: false },
     premiumUntil: { type: Date },
-    premiumType:  { type: String, enum: ["monthly", "pro"], default: null },
+    premiumType:  { type: String, enum: ["monthly", "quarterly", "annual"], default: null },
 
     // ── Game stats ───────────────────────────────────
     xp:           { type: Number, default: 0 },
     level:        { type: Number, default: 1 },
-    coins:        { type: Number, default: 100 },
+    coins:        { type: Number, default: 10 },
+    economyVersion: { type: Number, default: 0 },
     lives:        { type: Number, default: 5 },
     maxLives:     { type: Number, default: 5 },
     streak:       { type: Number, default: 0 },
@@ -52,6 +54,49 @@ const UserSchema = new Schema(
     // ── Streak tracking ──────────────────────────────
     lastStreakDate:         { type: Date },
 
+    livesUpdatedAt: { type: Date },
+
+    dailyXp:   { type: Number, default: 0 },
+    weeklyXp:  { type: Number, default: 0 },
+    dailyXpDate:  { type: String },
+    weeklyXpDate: { type: String },
+
+    xpHistory: [
+      {
+        amount: { type: Number, required: true },
+        reason: { type: String, default: "" },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
+
+    achievements: [
+      {
+        id: { type: String, required: true },
+        unlockedAt: { type: Date, default: Date.now },
+      },
+    ],
+
+    claimedLevelRewards: [{ type: Number }],
+
+    dailyQuests: {
+      date: { type: String },
+      video: { type: Boolean, default: false },
+      exam: { type: Boolean, default: false },
+      questions: { type: Number, default: 0 },
+      allClaimed: { type: Boolean, default: false },
+    },
+
+    statsCounters: {
+      examsTaken: { type: Number, default: 0 },
+      questionsAnswered: { type: Number, default: 0 },
+      videosWatched: { type: Number, default: 0 },
+      topicsCompleted: { type: Number, default: 0 },
+    },
+
+    gameCompletedSubtopics: [{ type: String }],
+    gameCompletedTopics: [{ type: String }],
+    lastEesRewardDate: { type: String },
+
     // ── Teacher code (for teacher role) ─────────────
     teacherCode: { type: String, sparse: true },
     isTeacherVerified: { type: Boolean, default: false },
@@ -63,9 +108,8 @@ const UserSchema = new Schema(
   { timestamps: true }
 );
 
-// XP → Level calculation
 UserSchema.methods.calculateLevel = function () {
-  this.level = Math.floor(this.xp / 100) + 1;
+  this.level = calcLevel(this.xp ?? 0);
 };
 
 // Lives refill (1 life per 30 min)

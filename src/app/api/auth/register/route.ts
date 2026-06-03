@@ -5,6 +5,7 @@ import { connectDB } from "@/lib/mongodb";
 import { User } from "@/models/User";
 import { sendWelcomeEmail } from "@/lib/email";
 import { PROVINCES, isValidSchoolGrade } from "@/lib/mn-constants";
+import { STARTER_COINS } from "@/lib/gamification";
 
 export async function POST(req: NextRequest) {
   try {
@@ -62,7 +63,8 @@ export async function POST(req: NextRequest) {
       role: effectiveRole,
       teacherCode,
       isVerified: true, // Email verification disabled for simplicity
-      coins: 100, // Welcome bonus
+      coins: STARTER_COINS,
+      economyVersion: 2,
     });
 
     // Send welcome email (non-blocking)

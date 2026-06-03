@@ -9,6 +9,7 @@ import {
   createAdminSessionUser,
   isBuiltinAdminLogin,
 } from "./admin-auth";
+import { calcLevel } from "@/lib/gamification";
 
 /** Mongoose user document fields used by streak logic */
 interface UserDocForStreak {
@@ -162,7 +163,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         console.log("[authorize] ✅ student/teacher login success, role:", user.role);
-        await updateStreak(user);
+        await recordLogin(user);
 
         return {
           id: user._id.toString(),
@@ -172,7 +173,7 @@ export const authOptions: NextAuthOptions = {
           grade: typeof user.grade === "number" ? user.grade : undefined,
           isPremium: user.isPremium,
           xp: user.xp,
-          level: user.level,
+          level: calcLevel(user.xp ?? 0),
           coins: user.coins,
           lives: user.lives,
           streak: user.streak,
@@ -207,8 +208,9 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as string;
         session.user.grade = token.grade as number | undefined;
         session.user.isPremium = token.isPremium as boolean;
-        session.user.xp = token.xp as number;
-        session.user.level = token.level as number;
+        const xp = (token.xp as number) ?? 0;
+        session.user.xp = xp;
+        session.user.level = calcLevel(xp);
         session.user.coins = token.coins as number;
         session.user.lives = token.lives as number;
         session.user.streak = token.streak as number;
@@ -218,33 +220,8 @@ export const authOptions: NextAuthOptions = {
   },
 };
 
-// ── Streak helper ────────────────────────────────────────────────────────────
-async function updateStreak(user: UserDocForStreak) {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const lastLogin = user.lastLoginDate
-    ? new Date(
-        user.lastLoginDate.getFullYear(),
-        user.lastLoginDate.getMonth(),
-        user.lastLoginDate.getDate()
-      )
-    : null;
-
-  const diffDays = lastLogin
-    ? Math.floor((today.getTime() - lastLogin.getTime()) / 86400000)
-    : null;
-
-  if (diffDays === null || diffDays > 1) {
-    user.streak = 1;
-  } else if (diffDays === 1) {
-    user.streak = (user.streak ?? 0) + 1;
-    const bonus = Math.min(user.streak * 5, 50);
-    user.coins = (user.coins ?? 0) + bonus;
-  }
-  if (diffDays !== 0) {
-    user.coins = (user.coins ?? 0) + 20;
-  }
-
-  user.lastLoginDate = now;
+// ── Login (зоос/streak энд олгохгүй — зөвхөн /api/user/checkin) ─────────────
+async function recordLogin(user: UserDocForStreak) {
+  user.lastLoginDate = new Date();
   await user.save();
 }

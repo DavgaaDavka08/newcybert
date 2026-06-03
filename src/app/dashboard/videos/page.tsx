@@ -88,7 +88,8 @@ export default function VideosPage() {
         setCompletedIds((prev) => new Set(prev).add(videoId));
         if (data.xpAwarded > 0) {
           setToast({ msg: data.message ?? `+${data.xpAwarded} XP`, type: "ok" });
-          const level = Math.floor((data.totalXp ?? 0) / 200) + 1;
+          const { calcLevel } = await import('@/lib/gamification');
+          const level = calcLevel(data.totalXp ?? 0);
           await update({ xp: data.totalXp, level });
         }
       } catch {
@@ -262,8 +263,8 @@ export default function VideosPage() {
                 {spendErr}
                 {spendErr.includes("хүрэлцэхгүй") && (
                   <button onClick={() => router.push("/dashboard/premium")}
-                    style={{ display: "block", margin: "8px auto 0", background: "#4F46E5", color: "#fff", border: "none", borderRadius: 8, padding: "6px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                    Зоос авах →
+                    style={{ display: "block", margin: "8px auto 0", background: "linear-gradient(135deg, #7C3AED, #4F46E5)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
+                    ⭐ Premium авах →
                   </button>
                 )}
               </div>
@@ -276,8 +277,8 @@ export default function VideosPage() {
               </button>
               {appState.coins < (pendingVideo.mediaType === "pdf" ? PDF_COIN_COST : VIDEO_COIN_COST) ? (
                 <button onClick={() => router.push("/dashboard/premium")}
-                  style={{ flex: 1.5, padding: "12px 0", borderRadius: 12, border: "none", background: "#F59E0B", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
-                  🟡 Зоос авах
+                  style={{ flex: 1.5, padding: "12px 0", borderRadius: 12, border: "none", background: "linear-gradient(135deg, #7C3AED, #4F46E5)", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+                  ⭐ Premium авах
                 </button>
               ) : (
                 <button onClick={handleConfirmWatch} disabled={spending}

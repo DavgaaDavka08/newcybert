@@ -5,8 +5,17 @@ import { connectDB } from "@/lib/mongodb";
 import { VideoLessonModel } from "@/models/VideoLessonModel";
 import { VideoProgressModel } from "@/models/VideoProgressModel";
 import { User } from "@/models/User";
+import {
+  calcLevel,
+  pushXpHistory,
+  resetXpPeriods,
+  trackDailyQuest,
+  applyLevelRewards,
+  evaluateAchievements,
+  tryClaimDailyAllBonus,
+} from "@/lib/gamification-server";
 
-const VIDEO_XP = 5; // Видео бүрэн үзэх = +5 XP
+const VIDEO_XP = 0;
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -42,8 +51,17 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
     const user = await User.findById(userId);
     if (user) {
+      const oldLevel = user.level ?? calcLevel(user.xp ?? 0);
       user.xp = (user.xp ?? 0) + VIDEO_XP;
-      user.level = Math.floor((user.xp ?? 0) / 200) + 1;
+      resetXpPeriods(user, VIDEO_XP);
+      pushXpHistory(user, VIDEO_XP, "Видео үзсэн");
+      trackDailyQuest(user, "video");
+      user.statsCounters = user.statsCounters ?? {};
+      user.statsCounters.videosWatched = (user.statsCounters.videosWatched ?? 0) + 1;
+      user.level = calcLevel(user.xp);
+      applyLevelRewards(user, oldLevel, user.level);
+      tryClaimDailyAllBonus(user);
+      evaluateAchievements(user);
       await user.save();
     }
 

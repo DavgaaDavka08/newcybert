@@ -2,34 +2,53 @@
 import React from 'react';
 import { T } from '@/styles/tokens';
 import { Ic, Avatar } from '@/components/ui';
+import { CoinChip, LivesHearts, XpIcon, StreakIcon } from '@/components/gamification';
+import { getXpProgress } from '@/lib/gamification';
 import type { AppState } from '@/types';
 
-interface TopbarProps { title: string; sub?: string; appState: AppState; actions?: React.ReactNode; }
+interface TopbarProps {
+  title: string;
+  sub?: string;
+  appState: AppState;
+  actions?: React.ReactNode;
+  lives?: number;
+  maxLives?: number;
+  nextRefillAt?: number | null;
+  coinGoal?: { target: number; remaining: number; label: string };
+}
 
-export function Topbar({ title, sub, appState, actions }: TopbarProps) {
+export function Topbar({
+  title,
+  sub,
+  appState,
+  actions,
+  lives,
+  maxLives = 5,
+  nextRefillAt = null,
+  coinGoal,
+}: TopbarProps) {
+  const displayLives = lives ?? appState.lives;
+  const level = getXpProgress(appState.xp).level;
+
   return (
     <div className="dash-topbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, gap: 12 }}>
       <div className="dash-topbar-titles" style={{ minWidth: 0, flex: 1 }}>
         <div style={{ fontWeight: 700, fontSize: 20, color: T.text, letterSpacing: '-0.02em' }}>{title}</div>
         {sub && <div className="dash-topbar-sub" style={{ fontSize: 13, color: T.muted, marginTop: 2 }}>{sub}</div>}
       </div>
-      <div className="dash-topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        {/* XP */}
-        <div className="dash-topbar-chip" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: '1px solid #e0e7ff', background: '#eef2ff' }}>
-          <span style={{ fontSize: 13 }}>⚡</span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: '#4F46E5' }}>{appState.xp} XP</span>
+      <div className="dash-topbar-actions dash-topbar-stats">
+        <div className="dash-topbar-chip cy-chip-xp">
+          <XpIcon size="md" glow />
+          <span className="cy-chip-xp-val">
+            Lv.{level} · {appState.xp} XP
+          </span>
         </div>
-        {/* Streak */}
-        <div className="dash-topbar-chip" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface }}>
-          <span style={{ fontSize: 13 }}>🔥</span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: T.textSub }}>{appState.streak}</span>
+        <div className="dash-topbar-chip cy-chip-streak">
+          <StreakIcon size="md" glow />
+          <span className="cy-chip-streak-val">{appState.streak}</span>
         </div>
-        {/* Coins */}
-        <div className="dash-topbar-chip" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface }}>
-          <span style={{ fontSize: 13 }}>🟡</span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: T.textSub }}>{appState.coins}</span>
-          {appState.isPremium && <span style={{ fontSize: 10, background: '#fef3c7', color: '#d97706', borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>PRO</span>}
-        </div>
+        <LivesHearts lives={displayLives} maxLives={maxLives} nextRefillAt={nextRefillAt} compact />
+        <CoinChip coins={appState.coins} isPremium={appState.isPremium} compact showGoal={false} coinGoal={coinGoal} />
         <button type="button" className="dash-topbar-icon-btn" style={{ width: 40, height: 40, borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Ic n="bell" size={15} color={T.muted} />
         </button>

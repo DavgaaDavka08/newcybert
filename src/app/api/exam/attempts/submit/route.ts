@@ -5,10 +5,16 @@ import { ExamModel } from '@/models/ExamModel';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { User } from '@/models/User';
-
-function calcLevel(xp: number) {
-  return Math.floor(xp / 200) + 1;
-}
+import { calcExamXp, calcExamCoins } from '@/lib/gamification';
+import {
+  calcLevel,
+  pushXpHistory,
+  resetXpPeriods,
+  trackDailyQuest,
+  applyLevelRewards,
+  evaluateAchievements,
+  tryClaimDailyAllBonus,
+} from '@/lib/gamification-server';
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,10 +44,8 @@ export async function POST(req: NextRequest) {
 
     const percentage = total === 0 ? 0 : Math.round((correctCount / total) * 100);
 
-    // ── XP: spec-д нийцсэн шагнал ───────────────────────
-    // 80%+ = +20 XP | 50–79% = +10 XP | 50%-аас доош = +5 XP
-    const xpEarned    = percentage >= 80 ? 20 : percentage >= 50 ? 10 : 5;
-    const coinsEarned = 0; // Зоос шалгалтаас олгохгүй
+    const xpEarned = calcExamXp(percentage);
+    const coinsEarned = calcExamCoins(percentage);
 
     let newXP = 0, newLevel = 1, newCoins = 0;
 
@@ -51,9 +55,18 @@ export async function POST(req: NextRequest) {
       if (userId && userId !== 'admin-hardcoded') {
         const user = await User.findById(userId);
         if (user) {
-          user.xp    = (user.xp    ?? 0) + xpEarned;
+          const oldLevel = user.level ?? calcLevel(user.xp ?? 0);
+          user.xp = (user.xp ?? 0) + xpEarned;
           user.coins = (user.coins ?? 0) + coinsEarned;
+          resetXpPeriods(user, xpEarned);
+          pushXpHistory(user, xpEarned, 'Шалгалт өгсөн');
+          trackDailyQuest(user, 'exam');
+          user.statsCounters = user.statsCounters ?? {};
+          user.statsCounters.examsTaken = (user.statsCounters.examsTaken ?? 0) + 1;
           user.level = calcLevel(user.xp);
+          applyLevelRewards(user, oldLevel, user.level);
+          tryClaimDailyAllBonus(user);
+          evaluateAchievements(user);
           await user.save();
           newXP    = user.xp;
           newLevel = user.level;

@@ -1,15 +1,24 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { T } from "@/styles/tokens";
-import { Label, Ic, Bar, Ring } from "@/components/ui";
+import { Ic } from "@/components/ui";
 import { Topbar } from "@/components/layout/Topbar";
-import { getRank } from "@/lib/ranks";
+import { useAppState } from "@/lib/app-state-context";
+import {
+  XpProgressCard,
+  LeaderboardPanel,
+  StreakIcon,
+  type LbEntry,
+} from "@/components/gamification";
 import type { AppState, Screen } from "@/types";
 
 interface ExamPreview {
-  _id: string; title: string; duration: number;
-  questions: { id: string }[]; hasAttempt: boolean;
+  _id: string;
+  title: string;
+  duration: number;
+  questions: { id: string }[];
+  hasAttempt: boolean;
 }
 
 interface Props {
@@ -17,29 +26,63 @@ interface Props {
   state: AppState;
 }
 
-
-interface LeaderEntry {
-  id: string;
-  name: string;
-  level: number;
-  xp: number;
-}
+type GamificationData = {
+  progress: {
+    xpInLevel: number;
+    xpToNext: number;
+    remaining: number;
+    pct: number;
+    nextLevel: number;
+  };
+  xpHistory: { amount: number; reason: string }[];
+  nextLevelReward?: { level: number; label: string };
+  coinGoal: { target: number; remaining: number; label: string };
+  lives: number;
+  maxLives: number;
+  nextRefillAt: number | null;
+};
 
 export function DashboardScreen({ onNav, state }: Props) {
-  const rank = getRank(state.xp);
-  const xpInLevel = state.xp % 100;
   const router = useRouter();
+  const { refreshStats } = useAppState();
   const [exams, setExams] = useState<ExamPreview[]>([]);
-  const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>([]);
-  const [examAttemptsCount, setExamAttemptsCount] = useState<number | null>(null);
-  const [avgExamScorePct, setAvgExamScorePct] = useState<number | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LbEntry[]>([]);
+  const [gData, setGData] = useState<GamificationData | null>(null);
   const [streakToast, setStreakToast] = useState<{ coins: number; streak: number; milestone?: string } | null>(null);
 
-  // Daily streak check-in
+  const loadGamification = useCallback(() => {
+    fetch("/api/user/gamification")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && !d.demo) setGData(d);
+      })
+      .catch(() => {});
+  }, []);
+
+  const loadLeaderboard = useCallback((period: string) => {
+    fetch(`/api/leaderboard?period=${period}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const e = d?.entries;
+        setLeaderboard(
+          Array.isArray(e)
+            ? e.map((p: LbEntry) => ({
+                id: p.id,
+                name: p.name,
+                level: p.level,
+                xp: p.xp,
+                periodXp: p.periodXp,
+              }))
+            : [],
+        );
+      })
+      .catch(() => setLeaderboard([]));
+  }, []);
+
   useEffect(() => {
     fetch("/api/user/checkin", { method: "POST" })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
         if (!d || d.alreadyDone) return;
         setStreakToast({
           coins: d.coinReward,
@@ -47,81 +90,80 @@ export function DashboardScreen({ onNav, state }: Props) {
           milestone: d.milestone?.badge,
         });
         setTimeout(() => setStreakToast(null), 5000);
+        void refreshStats();
+        loadGamification();
       })
       .catch(() => {});
-  }, []);
+  }, [refreshStats, loadGamification]);
+
+  useEffect(() => {
+    loadGamification();
+    loadLeaderboard("all");
+  }, [loadGamification, loadLeaderboard]);
 
   useEffect(() => {
     fetch("/api/exam/exams")
-      .then(r => r.ok ? r.json() : [])
-      .then(d => setExams(Array.isArray(d) ? d.slice(0, 3) : []))
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setExams(Array.isArray(d) ? d.slice(0, 3) : []))
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    fetch("/api/leaderboard")
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => {
-        const e = d?.entries;
-        setLeaderboard(Array.isArray(e) ? e.slice(0, 5) : []);
-      })
-      .catch(() => setLeaderboard([]));
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/user/dashboard-summary")
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => {
-        if (!d) return;
-        setExamAttemptsCount(typeof d.examAttemptsCount === "number" ? d.examAttemptsCount : 0);
-        setAvgExamScorePct(typeof d.avgExamScorePct === "number" ? d.avgExamScorePct : null);
-      })
-      .catch(() => {
-        setExamAttemptsCount(null);
-        setAvgExamScorePct(null);
-      });
-  }, []);
-
+  const lives = gData?.lives ?? state.lives;
+  const maxLives = gData?.maxLives ?? 5;
   return (
     <div className="dash-page">
-      {/* Streak check-in toast */}
       {streakToast && (
-        <div style={{
-          position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)", zIndex: 300,
-          background: "linear-gradient(135deg, #1e293b, #0f172a)",
-          color: "#fff", padding: "16px 24px", borderRadius: 16,
-          boxShadow: "0 16px 48px rgba(0,0,0,0.4)",
-          border: "1px solid rgba(255,255,255,0.1)",
-          display: "flex", alignItems: "center", gap: 14, minWidth: 260,
-          animation: "fadeInDown 0.3s ease",
-        }}>
-          <span style={{ fontSize: 32 }}>{streakToast.streak >= 30 ? "🏆" : streakToast.streak >= 7 ? "🔥" : "⚡"}</span>
+        <div
+          style={{
+            position: "fixed",
+            top: 20,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 300,
+            background: "linear-gradient(135deg, #1e293b, #0f172a)",
+            color: "#fff",
+            padding: "16px 24px",
+            borderRadius: 16,
+            boxShadow: "0 16px 48px rgba(0,0,0,0.4)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            minWidth: 260,
+          }}
+        >
+          <StreakIcon size={36} glow animate />
           <div>
             <div style={{ fontWeight: 900, fontSize: 15, marginBottom: 2 }}>
               {streakToast.streak} өдрийн streak!
             </div>
             <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
-              🟡 +{streakToast.coins} зоос шагнал авлаа
-              {streakToast.milestone && <span style={{ marginLeft: 6, color: "#FFD700" }}>🏅 Badge!</span>}
+              🪙 +{streakToast.coins} зоос
+              {streakToast.milestone && (
+                <span style={{ marginLeft: 6, color: "#FFD700" }}>🏅 Badge!</span>
+              )}
             </div>
           </div>
         </div>
       )}
+
       <Topbar
         title="Нүүр хуудас"
         sub={`Сайн уу, ${state.name} — ${new Date().toLocaleDateString("mn-MN", { weekday: "long", month: "long", day: "numeric" })}`}
         appState={state}
+        lives={lives}
+        maxLives={maxLives}
+        nextRefillAt={gData?.nextRefillAt ?? null}
+        coinGoal={gData?.coinGoal}
       />
 
-      {/* ── Hero banner ── */}
       <div
         className="dash-hero"
         style={{
-          background:
-            "linear-gradient(120deg, #0D9488 0%, #2563EB 60%, #7C3AED 100%)",
+          background: "linear-gradient(120deg, #0D9488 0%, #2563EB 60%, #7C3AED 100%)",
           borderRadius: 18,
           padding: "28px 32px",
-          marginBottom: 22,
+          marginBottom: 18,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -130,56 +172,15 @@ export function DashboardScreen({ onNav, state }: Props) {
           position: "relative",
         }}
       >
-        <div
-          style={{
-            position: "absolute",
-            right: 160,
-            top: -30,
-            width: 130,
-            height: 130,
-            borderRadius: "50%",
-            background: "rgba(255,255,255,0.07)",
-            pointerEvents: "none",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            right: 80,
-            bottom: -40,
-            width: 100,
-            height: 100,
-            borderRadius: "50%",
-            background: "rgba(255,255,255,0.05)",
-            pointerEvents: "none",
-          }}
-        />
         <div style={{ zIndex: 1 }}>
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: "rgba(255,255,255,0.7)",
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              marginBottom: 6,
-            }}
-          >
+          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
             🎯 ЭЕШ-д бэлтгэх
           </div>
-          <div
-            style={{
-              fontWeight: 900,
-              fontSize: 22,
-              color: "#fff",
-              lineHeight: 1.3,
-              marginBottom: 12,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            Физикийг хамт сур,
-            <br />
-            XP цуглуул!
+          <div style={{ fontWeight: 900, fontSize: 22, color: "#fff", lineHeight: 1.3, marginBottom: 8 }}>
+            Физикийн давталт, шалгалтаар түвшин ахиулаарай
+          </div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", marginBottom: 12 }}>
+            Level {state.level} · {gData?.progress ? `${gData.progress.xpInLevel}/${gData.progress.xpToNext} XP` : `${state.xp} XP`}
           </div>
           <button
             onClick={() => onNav("game")}
@@ -205,263 +206,54 @@ export function DashboardScreen({ onNav, state }: Props) {
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).style.display = "none";
           }}
-          style={{
-            height: 120,
-            width: "auto",
-            objectFit: "contain",
-            mixBlendMode: "screen",
-            filter: "drop-shadow(0 0 20px rgba(255,210,63,0.5))",
-            zIndex: 1,
-            flexShrink: 0,
-          }}
+          style={{ height: 110, objectFit: "contain", mixBlendMode: "screen", zIndex: 1 }}
         />
       </div>
 
-      {/* ── Stat strip ── */}
-      <div className="dash-stat-grid" style={{ marginBottom: 22 }}>
-        {[
-          {
-            label: "Миний дэвшил",
-            value: `Level ${state.level}`,
-            sub: `${xpInLevel}% дараагийн`,
-            color: T.blue,
-            icon: "trophy",
-          },
-          {
-            label: "Нийт шалгалт",
-            value: examAttemptsCount == null ? "—" : String(examAttemptsCount),
-            sub: "Өгсөн шалгалт",
-            color: T.purple,
-            icon: "exam",
-          },
-          {
-            label: "Дундаж оноо",
-            value: avgExamScorePct == null ? "—" : `${avgExamScorePct}%`,
-            sub: avgExamScorePct == null ? "Шалгалт өгөөд үүснэ" : "Шалгалтын дундаж",
-            color: T.green,
-            icon: "award",
-          },
-          {
-            label: "Нийт XP",
-            value: state.xp.toLocaleString(),
-            sub: "",
-            color: T.amber,
-            icon: "zap",
-          },
-        ].map((s, i) => (
-          <div
-            key={i}
-            style={{
-              background: "#fff",
-              borderRadius: 14,
-              padding: "16px 18px",
-              border: `1px solid ${T.border}`,
-              boxShadow: T.shadow,
-              display: "flex",
-              alignItems: "center",
-              gap: 14,
-            }}
-          >
-            <div
-              style={{
-                width: 42,
-                height: 42,
-                borderRadius: 12,
-                background: s.color + "14",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <Ic n={s.icon} size={20} color={s.color} />
-            </div>
-            <div>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: T.muted,
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                {s.label}
-              </div>
-              <div
-                style={{
-                  fontWeight: 800,
-                  fontSize: 18,
-                  color: T.text,
-                  letterSpacing: "-0.02em",
-                  lineHeight: 1.2,
-                }}
-              >
-                {s.value}
-              </div>
-              {s.sub && <div
-                style={{
-                  fontSize: 11,
-                  color: s.color,
-                  fontWeight: 600,
-                  marginTop: 1,
-                }}
-              >
-                {s.sub}
-              </div>}
-            </div>
-          </div>
-        ))}
-      </div>
-
-
-      {/* ── Bottom: level + leaderboard ── */}
-      <div className="dash-bottom-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        {/* Level card */}
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: 16,
-            padding: "18px",
-            border: `1px solid ${T.border}`,
-            boxShadow: T.shadow,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 14,
-            }}
-          >
-            <Label>Таны дэвшил</Label>
-            <Ring pct={xpInLevel} size={50} stroke={5} color={rank.color}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: T.text }}>
-                {xpInLevel}%
-              </span>
-            </Ring>
-          </div>
-          <div
-            style={{
-              fontWeight: 800,
-              fontSize: 20,
-              color: T.text,
-              marginBottom: 6,
-            }}
-          >
-            Level {state.level}
-          </div>
-          <Bar pct={xpInLevel} color={rank.color} height={6} />
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginTop: 8,
-            }}
-          >
-            <span style={{ fontSize: 11, color: T.muted }}>{state.xp} XP</span>
-            <span style={{ fontSize: 11, color: rank.color, fontWeight: 700 }}>
-              {rank.name}
-            </span>
-          </div>
+      {gData && (
+        <div className="dash-gamification-grid" style={{ marginBottom: 18 }}>
+          <XpProgressCard
+            xp={state.xp}
+            level={state.level}
+            progress={gData.progress}
+            xpHistory={gData.xpHistory}
+            nextLevelReward={gData.nextLevelReward}
+          />
+          <LeaderboardPanel entries={leaderboard} onPeriodChange={loadLeaderboard} />
         </div>
+      )}
 
-        {/* Mini leaderboard */}
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: 16,
-            padding: "18px",
-            border: `1px solid ${T.border}`,
-            boxShadow: T.shadow,
-          }}
-        >
-          <div
-            style={{
-              fontWeight: 800,
-              fontSize: 13,
-              color: T.text,
-              marginBottom: 12,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            <Ic n="trophy" size={14} color={T.amber} /> Шилдэг оюутнууд
-          </div>
-          {leaderboard.length === 0 ? (
-            <div style={{ fontSize: 12, color: T.muted, padding: "8px 0", textAlign: "center" }}>
-              Жагсаалт хоосон байна
-            </div>
-          ) : (
-            leaderboard.map((p, i) => (
-            <div
-              key={p.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                marginBottom: i < leaderboard.length - 1 ? 10 : 0,
-                padding: "6px 8px",
-                borderRadius: 8,
-                background: i === 0 ? T.amber + "0a" : "transparent",
-              }}
-            >
-              <span
-                style={{
-                  width: 20,
-                  fontSize: 12,
-                  fontWeight: 800,
-                  color: i === 0 ? T.amber : T.muted,
-                  textAlign: "center",
-                }}
-              >
-                {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`}
-              </span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: T.text }}>
-                  {p.name}
-                </div>
-                <div style={{ fontSize: 10, color: T.muted }}>Lv {p.level}</div>
-              </div>
-              <span style={{ fontSize: 11, fontWeight: 700, color: T.blue }}>
-                {p.xp.toLocaleString()} XP
-              </span>
-            </div>
-          ))
-          )}
-        </div>
-      </div>
-
-      {/* ── Exam section ── */}
-      <div style={{ marginTop: 22 }}>
+      <div style={{ marginTop: 8 }}>
         <div
           style={{
             background: "linear-gradient(120deg, #1e3a8a 0%, #4F46E5 100%)",
-            borderRadius: 18, padding: "20px 24px", marginBottom: 14,
-            display: "flex", alignItems: "center", justifyContent: "space-between",
+            borderRadius: 18,
+            padding: "20px 24px",
+            marginBottom: 14,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
             boxShadow: "0 6px 24px rgba(79,70,229,0.25)",
           }}
         >
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
-              📝 Шалгалтын систем
+            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)", textTransform: "uppercase", marginBottom: 4 }}>
+              📝 Шалгалт
             </div>
-            <div style={{ fontWeight: 900, fontSize: 18, color: "#fff", marginBottom: 4 }}>
-              Шалгалт өгч мэдлэгээ баталгаажуулна уу
-            </div>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)" }}>
-              Хугацаатай шалгалт, автомат үр дүн
-            </div>
+            <div style={{ fontWeight: 900, fontSize: 18, color: "#fff" }}>Мэдлэгээ шалгаж XP аваарай</div>
           </div>
           <button
             onClick={() => router.push("/dashboard/exam")}
             style={{
-              padding: "10px 20px", borderRadius: 10, background: "#FFD23F",
-              color: "#1e3a8a", fontWeight: 800, fontSize: 13, border: "none",
-              cursor: "pointer", fontFamily: "Plus Jakarta Sans, sans-serif",
-              boxShadow: "0 4px 14px rgba(255,210,63,0.4)", whiteSpace: "nowrap",
+              padding: "10px 20px",
+              borderRadius: 10,
+              background: "#FFD23F",
+              color: "#1e3a8a",
+              fontWeight: 800,
+              fontSize: 13,
+              border: "none",
+              cursor: "pointer",
+              fontFamily: "Plus Jakarta Sans, sans-serif",
             }}
           >
             Бүгдийг харах →
@@ -469,14 +261,8 @@ export function DashboardScreen({ onNav, state }: Props) {
         </div>
 
         {exams.length === 0 ? (
-          <div
-            style={{
-              background: "#fff", borderRadius: 14, padding: "24px",
-              border: `1px solid ${T.border}`, textAlign: "center", color: T.muted,
-            }}
-          >
-            <div style={{ fontSize: 24, marginBottom: 8 }}>📋</div>
-            <div style={{ fontSize: 13 }}>Одоогоор шалгалт байхгүй байна</div>
+          <div style={{ background: "#fff", borderRadius: 14, padding: 24, border: `1px solid ${T.border}`, textAlign: "center", color: T.muted, fontSize: 13 }}>
+            Одоогоор шалгалт байхгүй
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
@@ -484,19 +270,19 @@ export function DashboardScreen({ onNav, state }: Props) {
               <div
                 key={exam._id}
                 style={{
-                  background: "#fff", borderRadius: 14,
+                  background: "#fff",
+                  borderRadius: 14,
                   border: `1.5px solid ${exam.hasAttempt ? T.green + "40" : T.border}`,
-                  padding: "16px 18px", boxShadow: T.shadow,
+                  padding: "16px 18px",
+                  boxShadow: T.shadow,
                 }}
               >
-                <div style={{ fontWeight: 700, fontSize: 13, color: T.text, marginBottom: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {exam.title}
-                </div>
-                <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-                  <span style={{ fontSize: 11, color: T.muted, display: "flex", alignItems: "center", gap: 3 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: T.text, marginBottom: 8 }}>{exam.title}</div>
+                <div style={{ display: "flex", gap: 12, marginBottom: 12, fontSize: 11, color: T.muted }}>
+                  <span>
                     <Ic n="history" size={11} color={T.muted} /> {exam.duration}мин
                   </span>
-                  <span style={{ fontSize: 11, color: T.muted, display: "flex", alignItems: "center", gap: 3 }}>
+                  <span>
                     <Ic n="task" size={11} color={T.muted} /> {exam.questions?.length ?? 0}
                   </span>
                 </div>
@@ -508,9 +294,16 @@ export function DashboardScreen({ onNav, state }: Props) {
                   <button
                     onClick={() => router.push(`/dashboard/exam/${exam._id}`)}
                     style={{
-                      width: "100%", padding: "8px", borderRadius: 8, border: "none",
-                      background: "#4F46E5", color: "#fff", fontWeight: 700, fontSize: 12,
-                      cursor: "pointer", fontFamily: "Plus Jakarta Sans, sans-serif",
+                      width: "100%",
+                      padding: 8,
+                      borderRadius: 8,
+                      border: "none",
+                      background: "#4F46E5",
+                      color: "#fff",
+                      fontWeight: 700,
+                      fontSize: 12,
+                      cursor: "pointer",
+                      fontFamily: "Plus Jakarta Sans, sans-serif",
                     }}
                   >
                     Эхлэх →
