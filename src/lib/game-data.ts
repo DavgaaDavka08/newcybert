@@ -58,7 +58,11 @@ export const DEFAULT_QUESTIONS: GameQuestion[] = [
 ];
 
 export const DEFAULT_SETTINGS: GameSettings = {
-  livesCount: 5, xpPerCorrect: 10, coinsPerCorrect: 5, livesRefillCoins: 50, livesRefillMinutes: 300,
+  livesCount: 5,
+  xpPerCorrect: 5,        // Зөв хариулт бүр +5 XP
+  coinsPerCorrect: 0,     // Зоос тоглоомоос биш streak-ээс олгоно
+  livesRefillCoins: 5,    // Full Heal = 5 Coin
+  livesRefillMinutes: 30, // 30 мин тутам +1 амь
 };
 
 const KEYS = {

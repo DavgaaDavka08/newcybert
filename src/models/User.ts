@@ -44,7 +44,13 @@ const UserSchema = new Schema(
     // ── Daily free limits ────────────────────────────
     dailyFreeAIUsed:       { type: Number, default: 0 },
     dailyFreeProblemUsed:  { type: Number, default: 0 },
+    dailyFreeVideoUsed:    { type: Number, default: 0 },
+    dailyFreeExamUsed:     { type: Number, default: 0 },
+    dailyFreeEESUsed:      { type: Number, default: 0 },
     lastDailyReset:        { type: Date },
+
+    // ── Streak tracking ──────────────────────────────
+    lastStreakDate:         { type: Date },
 
     // ── Teacher code (for teacher role) ─────────────
     teacherCode: { type: String, sparse: true },

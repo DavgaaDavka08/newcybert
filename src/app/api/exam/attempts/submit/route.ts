@@ -38,12 +38,10 @@ export async function POST(req: NextRequest) {
 
     const percentage = total === 0 ? 0 : Math.round((correctCount / total) * 100);
 
-    // ── Award XP + Coins based on score ──────────────────
-    // Base: 50 XP for completing, +50 if score >= 80%, +20 coin per correct
-    const baseXP    = 50;
-    const bonusXP   = percentage >= 80 ? 50 : percentage >= 60 ? 20 : 0;
-    const xpEarned  = baseXP + bonusXP;
-    const coinsEarned = correctCount * 5;
+    // ── XP: spec-д нийцсэн шагнал ───────────────────────
+    // 80%+ = +20 XP | 50–79% = +10 XP | 50%-аас доош = +5 XP
+    const xpEarned    = percentage >= 80 ? 20 : percentage >= 50 ? 10 : 5;
+    const coinsEarned = 0; // Зоос шалгалтаас олгохгүй
 
     let newXP = 0, newLevel = 1, newCoins = 0;
 

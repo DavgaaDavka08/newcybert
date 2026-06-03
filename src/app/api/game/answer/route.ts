@@ -19,17 +19,22 @@ export async function POST(req: NextRequest) {
   }
 
   const isCorrect = selectedIndex === question.correctIndex;
+  const XP_PER_CORRECT = 5; // Зөв хариулт бүр +5 XP
 
-  // Update user stats (skip for admin)
   if (session!.user.id !== "admin-hardcoded") {
     const user = await User.findById(session!.user.id);
     if (user) {
+      const premiumActive = user.isPremium && (!user.premiumUntil || new Date(user.premiumUntil) > new Date());
       if (isCorrect) {
-        user.xp = (user.xp ?? 0) + question.xpReward;
-        user.coins = (user.coins ?? 0) + question.coinReward;
-        user.calculateLevel();
+        // Premium: XP boost ×1.5
+        const xp = premiumActive ? Math.round(XP_PER_CORRECT * 1.5) : XP_PER_CORRECT;
+        user.xp = (user.xp ?? 0) + xp;
+        user.level = Math.floor(user.xp / 200) + 1;
       } else {
-        user.lives = Math.max(0, (user.lives ?? 0) - 1);
+        // Premium: амь хасахгүй
+        if (!premiumActive) {
+          user.lives = Math.max(0, (user.lives ?? 0) - 1);
+        }
       }
       await user.save();
     }
@@ -39,7 +44,7 @@ export async function POST(req: NextRequest) {
     isCorrect,
     correctIndex: question.correctIndex,
     explanation: question.explanation,
-    xpEarned: isCorrect ? question.xpReward : 0,
-    coinEarned: isCorrect ? question.coinReward : 0,
+    xpEarned: isCorrect ? XP_PER_CORRECT : 0,
+    coinEarned: 0,
   });
 }

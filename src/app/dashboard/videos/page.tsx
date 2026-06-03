@@ -8,8 +8,8 @@ import { Ic } from "@/components/ui/Icon";
 import { BackButton } from "@/components/ui/BackButton";
 import { useAppState } from "@/lib/app-state-context";
 
-const VIDEO_COIN_COST = 2;
-const PDF_COIN_COST   = 10;
+const VIDEO_COIN_COST = 3;  // Видео нээх = 3 зоос
+const PDF_COIN_COST   = 10; // PDF татах = 10 зоос
 
 interface VideoRow {
   _id: string;

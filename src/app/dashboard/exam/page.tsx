@@ -8,7 +8,7 @@ import { BackButton } from "@/components/ui/BackButton";
 import { useAppState } from "@/lib/app-state-context";
 
 const EXAM_FIRST_COST  = 0;  // Эхний оролдлого үнэгүй
-const EXAM_RETAKE_COST = 3;  // Дахин өгөх
+const EXAM_RETAKE_COST = 2;  // Дахин өгөх = 2 зоос
 
 interface Exam {
   _id: string; title: string; description?: string;
