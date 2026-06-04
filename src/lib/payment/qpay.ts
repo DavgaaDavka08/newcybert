@@ -126,7 +126,14 @@ export async function qpayCreateInvoice(input: {
   };
 }
 
-export async function qpayCheckInvoicePaid(invoiceId: string): Promise<boolean> {
+/**
+ * Check whether an invoice has been fully paid.
+ * Pass expectedAmount (in MNT) to guard against partial / fake payments.
+ */
+export async function qpayCheckInvoicePaid(
+  invoiceId: string,
+  expectedAmount?: number,
+): Promise<boolean> {
   const data = await qpayFetch<{
     count?: number;
     paid_amount?: number;
@@ -139,6 +146,17 @@ export async function qpayCheckInvoicePaid(invoiceId: string): Promise<boolean> 
       offset: { page_number: 1, page_limit: 10 },
     }),
   });
-  const paid = data.paid_amount ?? data.paidAmount ?? 0;
-  return (data.count ?? 0) > 0 || paid > 0;
+
+  const count = data.count ?? 0;
+  const paidAmount = Math.round(data.paid_amount ?? data.paidAmount ?? 0);
+
+  if (count === 0 && paidAmount === 0) return false;
+
+  // Reject partial payments — paid amount must cover the full invoice
+  if (expectedAmount && paidAmount > 0 && paidAmount < Math.round(expectedAmount)) {
+    console.warn(`[qpay] Partial payment detected: paid ${paidAmount}, expected ${expectedAmount}`);
+    return false;
+  }
+
+  return true;
 }

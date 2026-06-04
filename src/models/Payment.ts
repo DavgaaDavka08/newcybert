@@ -18,7 +18,8 @@ const PaymentSchema = new Schema(
       ],
       required: true,
     },
-    status:    { type: String, enum: ["pending", "success", "failed"], default: "pending" },
+    // 'processing' is set atomically to prevent duplicate fulfillment across concurrent requests
+    status:    { type: String, enum: ["pending", "processing", "success", "failed"], default: "pending" },
     method:    { type: String, enum: ["qpay", "khan_bank"], required: true },
     invoiceId: { type: String },
     qrData:    { type: String },

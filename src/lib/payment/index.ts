@@ -85,8 +85,9 @@ export async function createCheckout(input: {
 export async function verifyExternalPayment(
   provider: PaymentProvider,
   externalId: string,
+  expectedAmount?: number,
 ): Promise<boolean> {
-  if (provider === 'qpay') return qpayCheckInvoicePaid(externalId);
+  if (provider === 'qpay') return qpayCheckInvoicePaid(externalId, expectedAmount);
   const status = await khanCheckOrder(externalId);
   return status.success;
 }
