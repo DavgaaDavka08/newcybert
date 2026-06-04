@@ -1,9 +1,32 @@
 'use client';
 
-import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import dynamic from 'next/dynamic';
+
+// DotLottie uses WebAssembly — must be loaded client-side only.
+// next/dynamic with ssr:false prevents WASM errors during SSR on Vercel.
+const DotLottieReact = dynamic(
+  () => import('@lottiefiles/dotlottie-react').then((m) => m.DotLottieReact),
+  { ssr: false, loading: () => <FallbackSpinner /> }
+);
 
 export const LOADING_LOTTIE_SRC =
   'https://lottie.host/7374b437-a0c7-4083-b17b-c66568142373/ZYvqELTKZ3.lottie';
+
+function FallbackSpinner() {
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        width: 40,
+        height: 40,
+        border: '3px solid #e2e8f0',
+        borderTop: '3px solid #3b82f6',
+        borderRadius: '50%',
+        animation: 'spin 0.8s linear infinite',
+      }}
+    />
+  );
+}
 
 type LoadingProps = {
   /** Optional caption below the animation */

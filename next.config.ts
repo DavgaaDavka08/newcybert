@@ -36,8 +36,8 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              // Scripts: self + Next.js inline chunks + Cloudinary widget
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://widget.cloudinary.com",
+              // Scripts: self + Next.js inline chunks + Cloudinary widget + WASM (dotlottie renderer)
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://widget.cloudinary.com",
               // Styles: self + inline (Next.js injects inline styles)
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               // Fonts
@@ -46,8 +46,10 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: blob: https://res.cloudinary.com https://lh3.googleusercontent.com",
               // Media (video/audio from Cloudinary)
               "media-src 'self' blob: https://res.cloudinary.com",
-              // Connections: API, Next-Auth, WebSocket
-              `connect-src 'self' ${process.env.NEXT_PUBLIC_APP_URL ?? ""} ${process.env.NEXT_PUBLIC_SOCKET_URL ?? ""} https://api.cloudinary.com wss:`,
+              // Web Workers (dotlottie renderer runs in a worker)
+              "worker-src 'self' blob:",
+              // Connections: API, Next-Auth, WebSocket, Lottie animation host
+              `connect-src 'self' ${process.env.NEXT_PUBLIC_APP_URL ?? ""} ${process.env.NEXT_PUBLIC_SOCKET_URL ?? ""} https://api.cloudinary.com https://lottie.host wss:`,
               // Frames: deny all
               "frame-src 'none'",
               // Object embeds: deny
@@ -63,6 +65,13 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
+  },
+
+  // Enable async WebAssembly for @lottiefiles/dotlottie-react
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  webpack(config: any) {
+    config.experiments = { ...(config.experiments ?? {}), asyncWebAssembly: true };
+    return config;
   },
 
   images: {
