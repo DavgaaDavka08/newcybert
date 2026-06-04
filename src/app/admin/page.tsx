@@ -326,6 +326,19 @@ export default function AdminPage() {
                 ))}
               </div>
             ))}
+            <div className="nav-section">
+              <div className="nav-section-label">Санхүү</div>
+              <a
+                href="/admin/payments"
+                className="nav-item"
+                style={{ textDecoration: "none" }}
+              >
+                <span className="nav-icon">
+                  <AdminIcon name="coin" size={15} />
+                </span>
+                Төлбөрүүд
+              </a>
+            </div>
           </nav>
           <div className="user-area">
             <div className="avatar">{(session?.user?.name ?? "A")[0].toUpperCase()}</div>

@@ -9,6 +9,10 @@ import {
   type PaymentCheckoutData,
 } from "@/components/premium/PremiumPaymentModal";
 import {
+  PremiumPaymentCard,
+  type BankTransferInfo,
+} from "@/components/payment/PremiumPaymentCard";
+import {
   PREMIUM_FEATURES,
   PREMIUM_SAVINGS,
   formatMnt,
@@ -71,8 +75,14 @@ function PremiumPageInner() {
   const router = useRouter();
   const [loading, setLoading] = useState<PremiumPlanType | null>(null);
   const [payError, setPayError] = useState("");
+
+  // ── QPay / KhanBank modal (kept for backward-compat) ─────────
   const [checkout, setCheckout] = useState<PaymentCheckoutData | null>(null);
   const [payModalOpen, setPayModalOpen] = useState(false);
+
+  // ── Bank transfer modal ───────────────────────────────────────
+  const [bankInfo, setBankInfo] = useState<BankTransferInfo | null>(null);
+  const [bankModalOpen, setBankModalOpen] = useState(false);
 
   useEffect(() => {
     const payment = searchParams.get("payment");
@@ -83,6 +93,7 @@ function PremiumPageInner() {
     } else if (payment === "failed") {
       setPayError("Төлбөр цуцлагдсан эсвэл амжилтгүй.");
     } else if (payment === "pending" && id) {
+      // Legacy QPay pending redirect
       setCheckout({
         paymentId: id,
         provider: "khan_bank",
@@ -97,33 +108,44 @@ function PremiumPageInner() {
     }
   }, [searchParams, updateSession]);
 
+  /** Bank transfer flow — primary payment method */
   async function handlePurchase(planType: PremiumPlanType) {
     setLoading(planType);
     setPayError("");
     try {
-      const res = await fetch("/api/payment/create", {
+      const res = await fetch("/api/payment/bank-transfer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: planType }),
+        body: JSON.stringify({ plan: planType }),
       });
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await res.json() as {
+        ok?: boolean;
+        paymentId?: string;
+        paymentCode?: string;
+        amount?: number;
+        plan?: string;
+        months?: number;
+        bankName?: string;
+        accountNumber?: string;
+        accountHolder?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.ok) {
         setPayError(data.error ?? "Төлбөр үүсгэхэд алдаа гарлаа");
         return;
       }
-      if (data.paymentId && (data.qrImage || data.formUrl || data.invoice)) {
-        setCheckout({
-          paymentId: data.paymentId,
-          provider: data.provider ?? "qpay",
-          amount: data.amount,
-          qrImage: data.qrImage ?? null,
-          qrText: data.qrText ?? null,
-          formUrl: data.formUrl ?? null,
-          shortUrl: data.shortUrl ?? null,
-          bankUrls: data.bankUrls ?? [],
-        });
-        setPayModalOpen(true);
-      }
+      setBankInfo({
+        paymentId: data.paymentId ?? "",
+        paymentCode: data.paymentCode ?? "",
+        amount: data.amount ?? 0,
+        plan: data.plan ?? planType,
+        months: data.months ?? 1,
+        bankName: data.bankName ?? "ХААН Банк",
+        accountNumber: data.accountNumber ?? "",
+        accountHolder: data.accountHolder ?? "",
+        status: "pending",
+      });
+      setBankModalOpen(true);
     } catch {
       setPayError("Сүлжээний алдаа. Дахин оролдоно уу.");
     }
@@ -191,7 +213,8 @@ function PremiumPageInner() {
             </span>
           </h1>
           <p style={{ fontSize: 15, color: T.textSub, maxWidth: 480, margin: "0 auto", lineHeight: 1.7 }}>
-            Сар, 3 сар эсвэл жилээр сонгоод хязгааргүй суралцаарай. Төлбөр: QPay QR эсвэл Khan Bank.
+            Сар, 3 сар эсвэл жилээр сонгоод хязгааргүй суралцаарай.
+            Банкны шилжүүлгээр төлж, баримтаа байршуулаарай.
           </p>
           {payError && (
             <p
@@ -255,6 +278,7 @@ function PremiumPageInner() {
         }
       `}      </style>
 
+      {/* QPay / KhanBank modal — kept for legacy redirects */}
       <PremiumPaymentModal
         open={payModalOpen}
         checkout={checkout}
@@ -267,6 +291,33 @@ function PremiumPageInner() {
           router.replace("/dashboard/premium?payment=success");
         }}
       />
+
+      {/* Bank transfer modal */}
+      {bankModalOpen && bankInfo && (
+        <div
+          onClick={() => setBankModalOpen(false)}
+          style={{
+            position: "fixed", inset: 0,
+            background: "rgba(15,23,42,0.6)",
+            backdropFilter: "blur(4px)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div onClick={(e) => e.stopPropagation()}>
+            <PremiumPaymentCard
+              info={bankInfo}
+              onClose={() => setBankModalOpen(false)}
+              onReceiptUploaded={() => {
+                void updateSession?.();
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -71,3 +71,49 @@ export function cloudinaryPdfInlineUrl(url: string): string {
   if (url.includes("fl_inline")) return url;
   return url.replace("/upload/", "/upload/fl_inline/");
 }
+
+/**
+ * Upload an image Buffer (jpg/png/webp) to Cloudinary.
+ * Used for payment receipts.
+ */
+export async function uploadImageToCloudinary(
+  buffer: Buffer,
+  filename: string,
+  folder = "receipts",
+): Promise<{ url: string; publicId: string }> {
+  const { cloud, preset } = getCloudinaryConfig();
+
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
+  const mimeMap: Record<string, string> = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+  };
+  const mime = mimeMap[ext] ?? "image/jpeg";
+
+  const body = new FormData();
+  const blob = new Blob([new Uint8Array(buffer)], { type: mime });
+  // Sanitize filename: strip path characters
+  const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+  body.append("file", blob, safeName);
+  body.append("upload_preset", preset);
+  body.append("folder", folder);
+
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/image/upload`, {
+    method: "POST",
+    body,
+  });
+
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown> & {
+    error?: { message?: string };
+    secure_url?: string;
+    public_id?: string;
+  };
+
+  if (!res.ok || !data.secure_url) {
+    throw new Error(data.error?.message ?? `Cloudinary image upload алдаа (${res.status})`);
+  }
+
+  return { url: data.secure_url, publicId: data.public_id ?? "" };
+}

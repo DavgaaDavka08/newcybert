@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   CircleDot,
   ClipboardList,
+  CreditCard,
   FileText,
   Flame,
   Folder,
@@ -33,7 +34,8 @@ export type AdminIconName =
   | 'book'
   | 'chevron-left'
   | 'flame'
-  | 'atom';
+  | 'atom'
+  | 'coin';
 
 const ICON_MAP: Record<AdminIconName, LucideIcon> = {
   chart: BarChart3,
@@ -51,6 +53,7 @@ const ICON_MAP: Record<AdminIconName, LucideIcon> = {
   'chevron-left': ChevronLeft,
   flame: Flame,
   atom: Atom,
+  coin: CreditCard,
 };
 
 export function AdminIcon({
