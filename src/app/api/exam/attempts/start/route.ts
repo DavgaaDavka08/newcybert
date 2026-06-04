@@ -2,19 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { AttemptModel } from '@/models/AttemptModel';
 import { ExamModel } from '@/models/ExamModel';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
+import { requireAuth } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
+  const { session, error } = await requireAuth();
+  if (error) return error;
+
   try {
     await connectDB();
-    const session = await getServerSession(authOptions);
     const body = await req.json();
-    const studentId = session?.user?.id ?? body.studentId;
+
+    // studentId always comes from the verified session — never from request body
+    const studentId = session!.user.id;
     const { examId } = body;
 
-    if (!studentId || !examId) {
-      return NextResponse.json({ error: 'studentId болон examId шаардлагатай' }, { status: 400 });
+    if (!examId) {
+      return NextResponse.json({ error: 'examId шаардлагатай' }, { status: 400 });
     }
 
     // Already submitted check
@@ -41,7 +44,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(attempt);
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (e: unknown) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : 'Server error' }, { status: 500 });
   }
 }

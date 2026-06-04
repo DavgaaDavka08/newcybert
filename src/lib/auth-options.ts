@@ -27,10 +27,12 @@ const authSecret =
   process.env.NEXTAUTH_SECRET?.trim() ||
   process.env.JWT_SECRET?.trim();
 
-console.log("[auth-options] NEXTAUTH_URL  =", process.env.NEXTAUTH_URL  ?? "❌ NOT SET");
-console.log("[auth-options] NEXTAUTH_SECRET set?", authSecret ? "✅ YES" : "❌ NO");
-console.log("[auth-options] MONGODB_URI set?", process.env.MONGODB_URI ? "✅ YES" : "❌ NO");
-console.log("[auth-options] NODE_ENV      =", process.env.NODE_ENV);
+if (process.env.NODE_ENV !== "production") {
+  console.log("[auth-options] NEXTAUTH_URL  =", process.env.NEXTAUTH_URL  ?? "❌ NOT SET");
+  console.log("[auth-options] NEXTAUTH_SECRET set?", authSecret ? "✅ YES" : "❌ NO");
+  console.log("[auth-options] MONGODB_URI set?", process.env.MONGODB_URI ? "✅ YES" : "❌ NO");
+  console.log("[auth-options] NODE_ENV      =", process.env.NODE_ENV);
+}
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
@@ -50,7 +52,9 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Нууц үг", type: "password" },
       },
       async authorize(credentials) {
-        console.log("[authorize] called with email:", credentials?.email ?? "(empty)");
+        if (process.env.NODE_ENV !== "production") {
+          console.log("[authorize] called with email:", credentials?.email ?? "(empty)");
+        }
 
         if (!authSecret) {
           console.error("[authorize] ❌ NEXTAUTH_SECRET / JWT_SECRET тохируулаагүй!");
@@ -197,7 +201,16 @@ export const authOptions: NextAuthOptions = {
         token.streak = user.streak;
       }
       if (trigger === "update" && session) {
-        return { ...token, ...session };
+        // Only allow safe display fields to be updated from the client.
+        // Never allow role, id, or email to be overwritten.
+        const allowed = ["name", "xp", "level", "coins", "lives", "streak", "isPremium", "grade"] as const;
+        type AllowedKey = typeof allowed[number];
+        const safe: Partial<Record<AllowedKey, unknown>> = {};
+        for (const key of allowed) {
+          if (key in session) safe[key] = (session as Record<string, unknown>)[key];
+        }
+        // Cast needed: JWT has an index signature but TypeScript can't infer it here
+        return { ...token, ...safe } as typeof token;
       }
       return token;
     },

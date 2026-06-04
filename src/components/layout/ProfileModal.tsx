@@ -103,12 +103,12 @@ export function ProfileModal({ open, onClose, displayName }: Props) {
   const [googleId, setGoogleId] = useState<string | undefined>();
   const [xp, setXp] = useState(0);
   const [level, setLevel] = useState(1);
-  const [coins, setCoins] = useState(0);
-  const [lives, setLives] = useState(0);
-  const [streak, setStreak] = useState(0);
+  const [_coins, setCoins] = useState(0);
+  const [_lives, setLives] = useState(0);
+  const [_streak, setStreak] = useState(0);
   const [isPremium, setIsPremium] = useState(false);
-  const [examAttemptsCount, setExamAttemptsCount] = useState(0);
-  const [avgExamScorePct, setAvgExamScorePct] = useState<number | null>(null);
+  const [_examAttemptsCount, setExamAttemptsCount] = useState(0);
+  const [_avgExamScorePct, setAvgExamScorePct] = useState<number | null>(null);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');

@@ -1,9 +1,15 @@
-/** Built-in admin — Vercel env-ээс хамааралгүй үргэлж ажиллана */
+/**
+ * Built-in admin credentials — env vars only, no hardcoded fallback.
+ * Set ADMIN_EMAIL and ADMIN_PASS in your Vercel / .env.local.
+ */
 
-export const BUILTIN_ADMIN_EMAIL = "admin@gmail.com";
-export const BUILTIN_ADMIN_PASSWORD = "TCB-757";
+export const BUILTIN_ADMIN_EMAIL =
+  process.env.ADMIN_EMAIL?.toLowerCase().trim() ?? "";
+
+const BUILTIN_ADMIN_PASSWORD = process.env.ADMIN_PASS?.trim() ?? "";
 
 export function isBuiltinAdminLogin(email: string, password: string): boolean {
+  if (!BUILTIN_ADMIN_EMAIL || !BUILTIN_ADMIN_PASSWORD) return false;
   return (
     email.toLowerCase().trim() === BUILTIN_ADMIN_EMAIL &&
     password.trim() === BUILTIN_ADMIN_PASSWORD

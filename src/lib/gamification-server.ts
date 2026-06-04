@@ -148,7 +148,7 @@ export function syncLives(user: UserDoc) {
 
 export function loseLife(user: UserDoc): { lives: number; nextRefillAt: number | null } {
   const max = user.maxLives ?? 5;
-  let lives = Math.max(0, (user.lives ?? max) - 1);
+  const lives = Math.max(0, (user.lives ?? max) - 1);
   user.lives = lives;
   if (lives < max && !user.livesUpdatedAt) {
     user.livesUpdatedAt = new Date();

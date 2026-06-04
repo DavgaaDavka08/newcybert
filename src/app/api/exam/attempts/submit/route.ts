@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { AttemptModel } from '@/models/AttemptModel';
 import { ExamModel } from '@/models/ExamModel';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
+import { requireAuth } from '@/lib/auth';
 import { User } from '@/models/User';
 import { calcExamXp, calcExamCoins } from '@/lib/gamification';
 import {
@@ -17,12 +16,25 @@ import {
 } from '@/lib/gamification-server';
 
 export async function POST(req: NextRequest) {
+  const { session, error } = await requireAuth();
+  if (error) return error;
+
   try {
     await connectDB();
     const { attemptId } = await req.json();
 
+    if (!attemptId) {
+      return NextResponse.json({ error: 'attemptId шаардлагатай' }, { status: 400 });
+    }
+
     const attempt = await AttemptModel.findById(attemptId);
     if (!attempt) return NextResponse.json({ error: 'Attempt not found' }, { status: 404 });
+
+    // Only the owner can submit
+    if (String(attempt.studentId) !== session!.user.id) {
+      return NextResponse.json({ error: 'Зөвшөөрөл байхгүй' }, { status: 403 });
+    }
+
     if (attempt.isSubmitted) return NextResponse.json({ error: 'Шалгалт аль хэдийн дууссан байна!' }, { status: 400 });
 
     const exam = await ExamModel.findById(attempt.examId);
@@ -31,9 +43,9 @@ export async function POST(req: NextRequest) {
     const total = exam.questions.length;
     let correctCount = 0;
 
-    exam.questions.forEach((q: any) => {
-      const ans = attempt.answers.find((a: any) => a.questionId === q.id);
-      if (ans && ans.selectedOption === q.correctAnswer) correctCount++;
+    exam.questions.forEach((q: { id: string; correctAnswer: unknown }) => {
+      const ans = attempt.answers.find((a: { questionId: string }) => a.questionId === q.id);
+      if (ans && (ans as { selectedOption: unknown }).selectedOption === q.correctAnswer) correctCount++;
     });
 
     attempt.score = correctCount;
@@ -43,15 +55,13 @@ export async function POST(req: NextRequest) {
     await attempt.save();
 
     const percentage = total === 0 ? 0 : Math.round((correctCount / total) * 100);
-
     const xpEarned = calcExamXp(percentage);
     const coinsEarned = calcExamCoins(percentage);
 
     let newXP = 0, newLevel = 1, newCoins = 0;
 
     try {
-      const session = await getServerSession(authOptions);
-      const userId = session?.user?.id;
+      const userId = session!.user.id;
       if (userId && userId !== 'admin-hardcoded') {
         const user = await User.findById(userId);
         if (user) {
@@ -91,8 +101,8 @@ export async function POST(req: NextRequest) {
       newLevel,
       newCoins,
     });
-  } catch (err: any) {
-    console.error('[submit]', err?.message);
+  } catch (err: unknown) {
+    console.error('[submit]', err instanceof Error ? err.message : err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

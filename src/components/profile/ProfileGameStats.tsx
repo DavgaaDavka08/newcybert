@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { T } from '@/styles/tokens';
 import { CoinIcon, XpIcon, StreakIcon, LivesHearts } from '@/components/gamification';
 import { getXpProgress } from '@/lib/gamification';
 import { getRank } from '@/lib/ranks';

@@ -6,8 +6,11 @@ import { User } from "@/models/User";
 import { sendWelcomeEmail } from "@/lib/email";
 import { PROVINCES, isValidSchoolGrade } from "@/lib/mn-constants";
 import { STARTER_COINS } from "@/lib/gamification";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
+  const limited = checkRateLimit(req, { limit: 10, windowMs: 15 * 60 * 1000 });
+  if (limited) return limited;
   try {
     const body = await req.json();
     const { firstName, lastName, email, password, phone, province, school, role, grade } = body;

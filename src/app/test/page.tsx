@@ -1,7 +1,7 @@
 "use client"
 import React, { useState } from 'react'
 
-const page = () => {
+const Page = () => {
     const [serach ,setSearch ]=useState("")
     const [ serachValue, setSearchValue ]=useState([])
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -23,4 +23,4 @@ const page = () => {
   )
 }
 
-export default page
+export default Page

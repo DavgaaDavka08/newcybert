@@ -4,8 +4,11 @@ import crypto from "crypto";
 import { connectDB } from "@/lib/mongodb";
 import { User } from "@/models/User";
 import { sendResetPasswordEmail } from "@/lib/email";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
+  const limited = checkRateLimit(req, { limit: 5, windowMs: 15 * 60 * 1000 });
+  if (limited) return limited;
   try {
     const { email } = await req.json();
     if (!email) {
