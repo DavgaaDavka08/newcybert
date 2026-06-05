@@ -41,7 +41,7 @@ export default function EesPracticePage() {
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <BackButton href="/dashboard" label="Нүүр хуудас" />
             <div style={{ width: 1, height: 20, background: T.border }} />
-            <div style={{ fontWeight: 800, fontSize: 15, color: T.text }}>Цахим ЕЭШ</div>
+            <div style={{ fontWeight: 800, fontSize: 15, color: T.text }}>Цахим ЭЕШ</div>
           </div>
           <div style={{ fontSize: 13, color: T.muted }}>{session?.user?.name?.split(" ")[0]}</div>
         </header>

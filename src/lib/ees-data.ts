@@ -1,11 +1,11 @@
 /**
- * 2025 ЕЭШ Физик А хувилбар — сорилын өгөгдөл
+
  */
 import { EES_QUESTIONS } from "./ees-questions";
 
 export const EES_META = {
   title: "2025 ОНЫ ФИЗИК А ХУВИЛБАР",
-  subtitle: "Элсэлтийн шалгалт 2025 — Нэгдүгээр хэсэг",
+  subtitle: "ЭЕШ 2025 — Нэгдүгээр хэсэг",
   durationMin: 100,
   totalQuestions: 46,
   part2Count: 4,
