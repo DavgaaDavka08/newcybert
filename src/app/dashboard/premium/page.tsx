@@ -314,6 +314,10 @@ function PremiumPageInner() {
               onReceiptUploaded={() => {
                 void updateSession?.();
               }}
+              onApproved={() => {
+                void updateSession?.();
+                router.replace("/dashboard/premium?payment=success");
+              }}
             />
           </div>
         </div>

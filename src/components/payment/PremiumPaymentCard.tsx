@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { formatMnt } from '@/lib/premium-pricing';
 import { PaymentStatusBadge, type PaymentStatus } from './PaymentStatusBadge';
 import { ReceiptUploader } from './ReceiptUploader';
@@ -22,12 +23,48 @@ type Props = {
   info: BankTransferInfo;
   onReceiptUploaded?: (receiptUrl: string) => void;
   onClose?: () => void;
+  /** Called when admin approves — triggers session refresh */
+  onApproved?: () => void;
 };
 
-export function PremiumPaymentCard({ info, onReceiptUploaded, onClose }: Props) {
+export function PremiumPaymentCard({ info, onReceiptUploaded, onClose, onApproved }: Props) {
+  const router = useRouter();
   const [copied, setCopied] = useState<string | null>(null);
   const [status, setStatus] = useState<PaymentStatus>(info.status ?? 'pending');
   const [receiptImage, setReceiptImage] = useState(info.receiptImage ?? '');
+  const [checking, setChecking] = useState(false);
+
+  // Poll for approval every 15s when waiting for verification
+  const checkStatus = useCallback(async () => {
+    if (status === 'success' || status === 'rejected' || status === 'failed') return;
+    try {
+      const res = await fetch('/api/payment/me', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json() as { payments?: { _id: string; status: PaymentStatus }[] };
+      const found = data.payments?.find((p) => p._id === info.paymentId);
+      if (!found) return;
+      if (found.status !== status) {
+        setStatus(found.status);
+        if (found.status === 'success') {
+          onApproved?.();
+          router.refresh(); // refresh server components / session
+        }
+      }
+    } catch { /* silent */ }
+  }, [status, info.paymentId, onApproved, router]);
+
+  useEffect(() => {
+    if (status === 'waiting_verification') {
+      const id = setInterval(() => void checkStatus(), 15_000);
+      return () => clearInterval(id);
+    }
+  }, [status, checkStatus]);
+
+  async function handleManualCheck() {
+    setChecking(true);
+    await checkStatus();
+    setChecking(false);
+  }
 
   function copy(value: string, key: string) {
     navigator.clipboard.writeText(value).catch(() => null);
@@ -173,17 +210,29 @@ export function PremiumPaymentCard({ info, onReceiptUploaded, onClose }: Props) 
           <div style={{ color: '#1D4ED8', fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
             📬 Баримт хүлээн авлаа
           </div>
-          <div style={{ color: '#3B82F6', fontSize: 12 }}>
-            Admin шалгаж байна. 24 цагийн дотор баталгаажна.
+          <div style={{ color: '#3B82F6', fontSize: 12, marginBottom: 10 }}>
+            Admin шалгаж байна. Баталгаажсан даруйд нээгдэнэ.
           </div>
           <img
             src={receiptImage}
             alt="Гүйлгээний баримт"
             style={{
-              marginTop: 12, maxWidth: '100%', maxHeight: 120,
-              borderRadius: 8, objectFit: 'cover',
+              marginTop: 4, maxWidth: '100%', maxHeight: 120,
+              borderRadius: 8, objectFit: 'cover', marginBottom: 12,
             }}
           />
+          <button
+            onClick={() => void handleManualCheck()}
+            disabled={checking}
+            style={{
+              padding: '6px 18px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+              background: checking ? '#DBEAFE' : '#3B82F6', color: '#fff',
+              border: 'none', cursor: checking ? 'default' : 'pointer',
+              opacity: checking ? 0.8 : 1,
+            }}
+          >
+            {checking ? '⏳ Шалгаж байна…' : '🔄 Статус шалгах'}
+          </button>
         </div>
       ) : canUpload ? (
         <ReceiptUploader

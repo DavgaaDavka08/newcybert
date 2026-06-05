@@ -17,7 +17,14 @@ export async function GET() {
   })
     .sort({ createdAt: -1 })
     .limit(20)
+    .select('_id status paymentCode receiptImage amount type createdAt paidAt')
     .lean();
 
-  return NextResponse.json({ payments });
+  // Serialize _id to string for client consumption
+  const serialized = payments.map((p) => ({
+    ...p,
+    _id: String(p._id),
+  }));
+
+  return NextResponse.json({ payments: serialized });
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { User } from "@/models/User";
 import { requireAuth } from "@/lib/auth";
-import { COIN_COSTS, type CoinSpendAction } from "@/lib/gamification";
+import { COIN_COSTS, MAX_LIVES, type CoinSpendAction } from "@/lib/gamification";
 
 type DailyField =
   | "dailyFreeAIUsed"
@@ -91,6 +91,22 @@ export async function POST(req: NextRequest) {
   }
 
   user.coins = (user.coins ?? 0) - cost;
+
+  // full_heal: refill lives to max in DB so it persists across refreshes
+  if (key === "full_heal") {
+    const maxLives = user.maxLives ?? MAX_LIVES;
+    user.lives = maxLives;
+    user.livesUpdatedAt = null; // reset refill timer
+    await user.save();
+    return NextResponse.json({
+      success: true,
+      coins: user.coins,
+      spent: cost,
+      lives: maxLives,
+      maxLives,
+    });
+  }
+
   await user.save();
 
   return NextResponse.json({ success: true, coins: user.coins, spent: cost });
