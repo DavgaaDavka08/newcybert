@@ -21,6 +21,9 @@ import {
   PREMIUM_PRICES,
   type PremiumPlanType,
 } from "@/lib/premium-pricing";
+import { PaymentAlertBanner } from "@/components/payment/PaymentAlertBanner";
+import { usePaymentNotifications } from "@/hooks/usePaymentNotifications";
+import { useToast } from "@/components/ui/Toast";
 
 type PlanCardData = {
   type: PremiumPlanType;
@@ -74,8 +77,33 @@ function PremiumPageInner() {
   const { data: session, update: updateSession } = useSession();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const toast = useToast();
   const [loading, setLoading] = useState<PremiumPlanType | null>(null);
   const [payError, setPayError] = useState("");
+
+  const { notification, resolvedBanner, dismissNotification, payments, bankInfo: apiBankInfo } = usePaymentNotifications({
+    enabled: Boolean(session?.user?.id),
+    pollMs: 15_000,
+    onSuccess: () => {
+      void updateSession?.();
+      toast.success("Таны төлбөр баталгаажлаа. Premium идэвхжлээ!", "CyberPhysics");
+      setBankInfo((prev) => (prev ? { ...prev, status: "success" } : prev));
+    },
+    onRejected: (reason) => {
+      toast.error(
+        reason
+          ? `Шалтгаан: ${reason}`
+          : "Баримт эсвэл гүйлгээний утга буруу байж болзошгүй.",
+        "Төлбөр татгалзагдлаа",
+      );
+      setBankInfo((prev) =>
+        prev
+          ? { ...prev, status: "rejected", rejectedReason: reason ?? "" }
+          : prev,
+      );
+      setBankModalOpen(true);
+    },
+  });
 
   // ── QPay / KhanBank modal (kept for backward-compat) ─────────
   const [checkout, setCheckout] = useState<PaymentCheckoutData | null>(null);
@@ -85,41 +113,49 @@ function PremiumPageInner() {
   const [bankInfo, setBankInfo] = useState<BankTransferInfo | null>(null);
   const [bankModalOpen, setBankModalOpen] = useState(false);
 
-  // On mount: restore existing pending/waiting payment so user doesn't lose their code
+  // Restore pending/waiting/rejected payment from shared poll (no duplicate fetch)
   useEffect(() => {
-    if (!session?.user?.id) return;
-    fetch("/api/payment/me", { cache: "no-store" })
-      .then((r) => r.ok ? r.json() : null)
-      .then((data: {
-        payments?: { _id: string; status: string; paymentCode?: string; amount: number; type?: string; receiptImage?: string }[];
-        bankInfo?: { bankName: string; accountNumber: string; accountHolder: string };
-      } | null) => {
-        if (!data?.payments?.length) return;
-        const active = data.payments.find(
-          (p) => p.status === "pending" || p.status === "waiting_verification"
-        );
-        if (!active) return;
-        const planType = active.type?.includes("annual")
-          ? "annual"
-          : active.type?.includes("quarterly")
-          ? "quarterly"
-          : "monthly";
-        const pricing = PREMIUM_PRICES[planType as PremiumPlanType] ?? PREMIUM_PRICES.monthly;
-        setBankInfo((prev) => prev ? prev : {
-          paymentId: active._id,
-          paymentCode: active.paymentCode ?? "",
-          amount: active.amount,
-          plan: planType,
-          months: pricing.months,
-          bankName: data.bankInfo?.bankName ?? "ХААН Банк",
-          accountNumber: data.bankInfo?.accountNumber ?? "",
-          accountHolder: data.bankInfo?.accountHolder ?? "",
-          status: active.status as BankTransferInfo["status"],
-          receiptImage: active.receiptImage ?? "",
-        });
-      })
-      .catch(() => null);
-  }, [session?.user?.id]);
+    if (!session?.user?.id || !payments.length) return;
+    const active = payments.find(
+      (p) =>
+        p.status === "pending" ||
+        p.status === "waiting_verification" ||
+        p.status === "rejected",
+    );
+    if (!active) return;
+    const planType = active.type?.includes("annual")
+      ? "annual"
+      : active.type?.includes("quarterly")
+      ? "quarterly"
+      : "monthly";
+    const pricing = PREMIUM_PRICES[planType as PremiumPlanType] ?? PREMIUM_PRICES.monthly;
+    const info: BankTransferInfo = {
+      paymentId: active._id,
+      paymentCode: active.paymentCode ?? "",
+      amount: active.amount,
+      plan: planType,
+      months: pricing.months,
+      bankName: apiBankInfo?.bankName ?? "ХААН Банк",
+      accountNumber: apiBankInfo?.accountNumber ?? "",
+      accountHolder: apiBankInfo?.accountHolder ?? "",
+      status: active.status as BankTransferInfo["status"],
+      receiptImage: active.receiptImage ?? "",
+      rejectedReason: active.rejectedReason ?? "",
+    };
+    setBankInfo((prev) => {
+      if (!prev) {
+        if (active.status === "rejected") setBankModalOpen(true);
+        return info;
+      }
+      if (prev.paymentId !== active._id) return prev;
+      return {
+        ...prev,
+        status: active.status as BankTransferInfo["status"],
+        receiptImage: active.receiptImage ?? prev.receiptImage,
+        rejectedReason: active.rejectedReason ?? prev.rejectedReason,
+      };
+    });
+  }, [session?.user?.id, payments, apiBankInfo]);
 
   useEffect(() => {
     const payment = searchParams.get("payment");
@@ -234,6 +270,15 @@ function PremiumPageInner() {
       </div>
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 24px" }}>
+        {(notification || (resolvedBanner?.type === "rejected" && !bankModalOpen)) && (
+          <div style={{ marginBottom: 20 }}>
+            <PaymentAlertBanner
+              notification={notification ?? resolvedBanner!}
+              onDismiss={() => dismissNotification(notification ?? resolvedBanner)}
+            />
+          </div>
+        )}
+
         <div style={{ textAlign: "center", marginBottom: 40 }}>
           <h1
             style={{
@@ -262,26 +307,45 @@ function PremiumPageInner() {
             Банкны шилжүүлгээр төлж, баримтаа байршуулаарай.
           </p>
           {/* Restore existing pending payment banner */}
-          {bankInfo && !bankModalOpen && (bankInfo.status === "pending" || bankInfo.status === "waiting_verification") && (
-            <div style={{
-              marginTop: 14,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 10,
-              background: bankInfo.status === "waiting_verification" ? "#DBEAFE" : "#FEF3C7",
-              border: `1px solid ${bankInfo.status === "waiting_verification" ? "#93C5FD" : "#FCD34D"}`,
-              borderRadius: 12,
-              padding: "10px 18px",
-              fontSize: 13,
-              color: bankInfo.status === "waiting_verification" ? "#1D4ED8" : "#92400E",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-            onClick={() => setBankModalOpen(true)}
+          {bankInfo && !bankModalOpen && (
+            <div
+              style={{
+                marginTop: 14,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 10,
+                background:
+                  bankInfo.status === "rejected"
+                    ? "#FEE2E2"
+                    : bankInfo.status === "waiting_verification"
+                      ? "#DBEAFE"
+                      : "#FEF3C7",
+                border: `1px solid ${
+                  bankInfo.status === "rejected"
+                    ? "#FECACA"
+                    : bankInfo.status === "waiting_verification"
+                      ? "#93C5FD"
+                      : "#FCD34D"
+                }`,
+                borderRadius: 12,
+                padding: "10px 18px",
+                fontSize: 13,
+                color:
+                  bankInfo.status === "rejected"
+                    ? "#991B1B"
+                    : bankInfo.status === "waiting_verification"
+                      ? "#1D4ED8"
+                      : "#92400E",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+              onClick={() => setBankModalOpen(true)}
             >
-              {bankInfo.status === "waiting_verification"
-                ? "📬 Баримтыг шалгаж байна — харах →"
-                : `⏳ Хүлээгдэж буй төлбөр: ${bankInfo.paymentCode} — үргэлжлүүлэх →`}
+              {bankInfo.status === "rejected"
+                ? `⚠️ Татгалзсан төлбөр (${bankInfo.paymentCode}) — дэлгэрэнгүй →`
+                : bankInfo.status === "waiting_verification"
+                  ? "📬 Баримтыг шалгаж байна — харах →"
+                  : `⏳ Хүлээгдэж буй төлбөр: ${bankInfo.paymentCode} — үргэлжлүүлэх →`}
             </div>
           )}
 
@@ -385,7 +449,17 @@ function PremiumPageInner() {
               }}
               onApproved={() => {
                 void updateSession?.();
+                dismissNotification();
                 router.replace("/dashboard/premium?payment=success");
+              }}
+              onRejected={(reason) => {
+                setBankInfo((prev) =>
+                  prev ? { ...prev, status: "rejected", rejectedReason: reason ?? "" } : prev,
+                );
+              }}
+              onRetry={() => {
+                setBankModalOpen(false);
+                setBankInfo(null);
               }}
             />
           </div>

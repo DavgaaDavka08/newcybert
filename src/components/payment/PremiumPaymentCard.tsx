@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatMnt } from '@/lib/premium-pricing';
+import { markPaymentNotificationSeen } from '@/hooks/usePaymentNotifications';
 import { PaymentStatusBadge, type PaymentStatus } from './PaymentStatusBadge';
 import { ReceiptUploader } from './ReceiptUploader';
 
@@ -17,6 +18,7 @@ export type BankTransferInfo = {
   accountHolder: string;
   status?: PaymentStatus;
   receiptImage?: string;
+  rejectedReason?: string;
 };
 
 type Props = {
@@ -25,56 +27,79 @@ type Props = {
   onClose?: () => void;
   /** Called when admin approves — triggers session refresh */
   onApproved?: () => void;
+  onRejected?: (reason?: string) => void;
+  onRetry?: () => void;
 };
 
-export function PremiumPaymentCard({ info, onReceiptUploaded, onClose, onApproved }: Props) {
+export function PremiumPaymentCard({
+  info,
+  onReceiptUploaded,
+  onClose,
+  onApproved,
+  onRejected,
+  onRetry,
+}: Props) {
   const router = useRouter();
   const [copied, setCopied] = useState<string | null>(null);
   const [status, setStatus] = useState<PaymentStatus>(info.status ?? 'pending');
   const [receiptImage, setReceiptImage] = useState(info.receiptImage ?? '');
   const [checking, setChecking] = useState(false);
   const [checkMsg, setCheckMsg] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState(info.rejectedReason ?? '');
 
-  // Poll for approval every 15s when waiting for verification
+  useEffect(() => {
+    if (info.status) setStatus(info.status);
+    if (info.rejectedReason) setRejectReason(info.rejectedReason);
+    if (info.receiptImage) setReceiptImage(info.receiptImage);
+  }, [info.status, info.rejectedReason, info.receiptImage]);
+
   const checkStatus = useCallback(async (manual = false) => {
-    if (status === 'success' || status === 'rejected' || status === 'failed') return;
+    if (status === 'success' || status === 'failed') return;
     try {
       const res = await fetch('/api/payment/me', { cache: 'no-store' });
       if (!res.ok) return;
-      const data = await res.json() as { payments?: { _id: string; status: PaymentStatus }[] };
+      const data = await res.json() as {
+        payments?: {
+          _id: string;
+          status: PaymentStatus;
+          rejectedReason?: string;
+        }[];
+      };
       const found = data.payments?.find((p) => p._id === info.paymentId);
       if (!found) {
         if (manual) setCheckMsg('Төлбөр олдсонгүй.');
         return;
       }
+      if (found.rejectedReason) setRejectReason(found.rejectedReason);
       if (found.status !== status) {
         setStatus(found.status);
         if (found.status === 'success') {
+          markPaymentNotificationSeen(info.paymentId, 'success');
           onApproved?.();
           router.refresh();
+        } else if (found.status === 'rejected') {
+          markPaymentNotificationSeen(info.paymentId, 'rejected');
+          onRejected?.(found.rejectedReason);
         } else if (manual) {
           setCheckMsg('Статус шинэчлэгдлээ.');
         }
       } else if (manual) {
-        setCheckMsg('Admin шалгаж байна. Баталгаажсан даруйд нээгдэнэ.');
+        if (status === 'rejected') {
+          setCheckMsg('Энэ төлбөр татгалзсан байна.');
+        } else {
+          setCheckMsg('Admin шалгаж байна. Баталгаажсан даруйд мэдэгдэл ирнэ.');
+        }
       }
     } catch {
       if (manual) setCheckMsg('Сүлжээний алдаа гарлаа.');
     }
-  }, [status, info.paymentId, onApproved, router]);
+  }, [status, info.paymentId, onApproved, onRejected, router]);
 
   useEffect(() => {
     if (!checkMsg) return;
     const t = setTimeout(() => setCheckMsg(null), 4000);
     return () => clearTimeout(t);
   }, [checkMsg]);
-
-  useEffect(() => {
-    if (status === 'waiting_verification') {
-      const id = setInterval(() => void checkStatus(), 15_000);
-      return () => clearInterval(id);
-    }
-  }, [status, checkStatus]);
 
   async function handleManualCheck() {
     setChecking(true);
@@ -204,30 +229,41 @@ export function PremiumPaymentCard({ info, onReceiptUploaded, onClose, onApprove
 
       {/* Receipt section */}
       {status === 'success' ? (
-        <div style={{
-          textAlign: 'center', padding: '16px 0',
-          color: '#059669', fontSize: 15, fontWeight: 600,
-        }}>
-          ✅ Premium идэвхжлээ! Баярлалаа.
+        <div className="cy-pay-card-result cy-pay-card-result--success">
+          <div className="cy-pay-card-result-icon">✓</div>
+          <div className="cy-pay-card-result-title">Premium идэвхжлээ</div>
+          <p className="cy-pay-card-result-text">
+            Төлбөр баталгаажлаа. CyberPhysics Premium бүх боломж нээгдлээ.
+          </p>
         </div>
       ) : status === 'rejected' ? (
-        <div style={{
-          background: '#FEF2F2', border: '1px solid #FECACA',
-          borderRadius: 10, padding: 14, textAlign: 'center',
-          color: '#DC2626', fontSize: 13,
-        }}>
-          ❌ Баримтыг admin татгалзлаа. Дахин шинэ гүйлгээ хийж явуулна уу.
+        <div className="cy-pay-card-result cy-pay-card-result--rejected">
+          <div className="cy-pay-card-result-icon">!</div>
+          <div className="cy-pay-card-result-title">Төлбөр татгалзагдлаа</div>
+          <p className="cy-pay-card-result-text">
+            {rejectReason
+              ? <>Шалтгаан: <strong>{rejectReason}</strong></>
+              : 'Баримт эсвэл гүйлгээний утга буруу байж болзошгүй. Шинэ кодоор дахин оролдоно уу.'}
+          </p>
+          {onRetry && (
+            <button type="button" className="cy-pay-card-retry-btn" onClick={onRetry}>
+              Шинээр худалдан авах
+            </button>
+          )}
+          <button
+            type="button"
+            className="cy-pay-card-check-btn"
+            onClick={() => void handleManualCheck()}
+            disabled={checking}
+          >
+            {checking ? 'Шалгаж байна…' : 'Статус шалгах'}
+          </button>
         </div>
       ) : status === 'waiting_verification' && receiptImage ? (
-        <div style={{
-          background: '#EFF6FF', border: '1px solid #BFDBFE',
-          borderRadius: 10, padding: 14, textAlign: 'center',
-        }}>
-          <div style={{ color: '#1D4ED8', fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
-            📬 Баримт хүлээн авлаа
-          </div>
-          <div style={{ color: '#3B82F6', fontSize: 12, marginBottom: 10 }}>
-            Admin шалгаж байна. Баталгаажсан даруйд нээгдэнэ.
+        <div className="cy-pay-card-waiting">
+          <div className="cy-pay-card-waiting-title">📬 Баримт хүлээн авлаа</div>
+          <div className="cy-pay-card-waiting-sub">
+            Admin шалгаж байна. Баталгаажсан эсвэл татгалзсан даруйд энд мэдэгдэл гарна.
           </div>
           <img
             src={receiptImage}

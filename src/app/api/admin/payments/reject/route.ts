@@ -21,9 +21,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'paymentId буруу' }, { status: 400 });
   }
 
+  const reasonText = String(reason ?? '').trim();
+  if (reasonText.length < 3) {
+    return NextResponse.json(
+      { error: 'Татгалзах шалтгаанаа бичнэ үү (хамгийн багадаа 3 тэмдэгт)' },
+      { status: 400 },
+    );
+  }
+
   await connectDB();
 
-  const result = await rejectPayment(paymentId, session!.user.email ?? 'admin', reason);
+  const result = await rejectPayment(paymentId, session!.user.email ?? 'admin', reasonText);
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 409 });

@@ -1663,3 +1663,205 @@ body {
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* ── Payment notifications (official) ── */
+.cy-payment-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  font-family: Plus Jakarta Sans, sans-serif;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.14), 0 2px 8px rgba(15, 23, 42, 0.06);
+  border: 1.5px solid transparent;
+}
+.cy-payment-alert--success {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border-color: #6ee7b7;
+}
+.cy-payment-alert--rejected {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  border-color: #fca5a5;
+}
+.cy-payment-alert-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 16px;
+  color: #fff;
+}
+.cy-payment-alert--success .cy-payment-alert-icon {
+  background: #059669;
+}
+.cy-payment-alert--rejected .cy-payment-alert-icon {
+  background: #dc2626;
+}
+.cy-payment-alert-body {
+  flex: 1;
+  min-width: 0;
+}
+.cy-payment-alert-kicker {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+.cy-payment-alert-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+.cy-payment-alert-msg {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.55;
+  font-weight: 500;
+}
+.cy-payment-alert-msg code {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: #4f46e5;
+  background: rgba(99, 102, 241, 0.08);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.cy-payment-alert-reason {
+  display: block;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  font-weight: 600;
+  color: #991b1b;
+}
+.cy-payment-alert--success .cy-payment-alert-reason {
+  border-color: rgba(5, 150, 105, 0.2);
+  color: #065f46;
+}
+.cy-payment-alert-link {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #4f46e5;
+  text-decoration: none;
+}
+.cy-payment-alert-link:hover {
+  text-decoration: underline;
+}
+.cy-payment-alert-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  color: #94a3b8;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+.cy-payment-alert-close:hover {
+  color: #64748b;
+}
+
+/* ── Payment card result states ── */
+.cy-pay-card-result {
+  text-align: center;
+  padding: 20px 16px;
+  border-radius: 12px;
+  border: 1.5px solid transparent;
+}
+.cy-pay-card-result--success {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  border-color: #6ee7b7;
+}
+.cy-pay-card-result--rejected {
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  border-color: #fca5a5;
+}
+.cy-pay-card-result-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  margin: 0 auto 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 20px;
+  color: #fff;
+}
+.cy-pay-card-result--success .cy-pay-card-result-icon {
+  background: #059669;
+}
+.cy-pay-card-result--rejected .cy-pay-card-result-icon {
+  background: #dc2626;
+}
+.cy-pay-card-result-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 8px;
+}
+.cy-pay-card-result-text {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.6;
+  margin: 0 0 14px;
+}
+.cy-pay-card-retry-btn {
+  display: block;
+  width: 100%;
+  padding: 11px;
+  border-radius: 10px;
+  border: none;
+  background: #4f46e5;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  margin-bottom: 8px;
+  font-family: Plus Jakarta Sans, sans-serif;
+}
+.cy-pay-card-check-btn {
+  display: block;
+  width: 100%;
+  padding: 9px;
+  border-radius: 10px;
+  border: 1.5px solid #cbd5e1;
+  background: #fff;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: Plus Jakarta Sans, sans-serif;
+}
+.cy-pay-card-waiting {
+  background: #eff6ff;
+  border: 1.5px solid #93c5fd;
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+.cy-pay-card-waiting-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1d4ed8;
+  margin-bottom: 6px;
+}
+.cy-pay-card-waiting-sub {
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}

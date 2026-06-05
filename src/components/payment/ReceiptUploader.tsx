@@ -58,16 +58,12 @@ export function ReceiptUploader({ paymentId, onUploaded }: Props) {
     }
   }, [paymentId, onUploaded]);
 
-  function handleFile(file: File | null | undefined) {
-    if (file) void upload(file);
-  }
-
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
     const file = e.dataTransfer.files[0];
-    handleFile(file);
-  }, [upload]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (file) void upload(file);
+  }, [upload]);
 
   return (
     <div>
@@ -76,7 +72,10 @@ export function ReceiptUploader({ paymentId, onUploaded }: Props) {
         type="file"
         accept={ACCEPTED}
         style={{ display: 'none' }}
-        onChange={(e) => handleFile(e.target.files?.[0])}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void upload(file);
+        }}
       />
 
       <div

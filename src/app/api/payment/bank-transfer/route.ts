@@ -5,10 +5,18 @@ import { requireAuth } from '@/lib/auth';
 import { generatePaymentCode } from '@/lib/payment/generate-code';
 import { parsePremiumPlanType, PREMIUM_PRICES, premiumPaymentType } from '@/lib/premium-pricing';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { assertProductionEnv } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+  try {
+    assertProductionEnv('payment');
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Тохиргооны алдаа';
+    return NextResponse.json({ error: msg }, { status: 503 });
+  }
+
   const limited = checkRateLimit(req, { limit: 10, windowMs: 60 * 1000 });
   if (limited) return limited;
 

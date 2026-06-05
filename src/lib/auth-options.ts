@@ -27,11 +27,16 @@ const authSecret =
   process.env.NEXTAUTH_SECRET?.trim() ||
   process.env.JWT_SECRET?.trim();
 
-if (process.env.NODE_ENV !== "production") {
-  console.log("[auth-options] NEXTAUTH_URL  =", process.env.NEXTAUTH_URL  ?? "❌ NOT SET");
-  console.log("[auth-options] NEXTAUTH_SECRET set?", authSecret ? "✅ YES" : "❌ NO");
-  console.log("[auth-options] MONGODB_URI set?", process.env.MONGODB_URI ? "✅ YES" : "❌ NO");
-  console.log("[auth-options] NODE_ENV      =", process.env.NODE_ENV);
+const isDev = process.env.NODE_ENV !== "production";
+
+function authLog(...args: unknown[]) {
+  if (isDev) console.log(...args);
+}
+
+if (isDev) {
+  authLog("[auth-options] NEXTAUTH_URL  =", process.env.NEXTAUTH_URL ?? "❌ NOT SET");
+  authLog("[auth-options] NEXTAUTH_SECRET set?", authSecret ? "✅ YES" : "❌ NO");
+  authLog("[auth-options] MONGODB_URI set?", process.env.MONGODB_URI ? "✅ YES" : "❌ NO");
 }
 
 export const authOptions: NextAuthOptions = {
@@ -52,9 +57,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Нууц үг", type: "password" },
       },
       async authorize(credentials) {
-        if (process.env.NODE_ENV !== "production") {
-          console.log("[authorize] called with email:", credentials?.email ?? "(empty)");
-        }
+        authLog("[authorize] called with email:", credentials?.email ?? "(empty)");
 
         if (!authSecret) {
           console.error("[authorize] ❌ NEXTAUTH_SECRET / JWT_SECRET тохируулаагүй!");
@@ -69,10 +72,10 @@ export const authOptions: NextAuthOptions = {
 
         // 1) Кодонд суулгасан admin — MongoDB-д upsert хийж, жинхэнэ _id буцаана
         if (isBuiltinAdminLogin(email, password)) {
-          console.log("[authorize] built-in admin login attempt");
+          authLog("[authorize] built-in admin login attempt");
           try {
             await connectDB();
-            console.log("[authorize] MongoDB холбогдлоо, admin upsert хийж байна...");
+            authLog("[authorize] MongoDB холбогдлоо, admin upsert хийж байна...");
             const adminDoc = await User.findOneAndUpdate(
               { email: BUILTIN_ADMIN_EMAIL },
               {
@@ -86,7 +89,7 @@ export const authOptions: NextAuthOptions = {
               },
               { upsert: true, new: true }
             );
-            console.log("[authorize] ✅ admin upsert амжилттай, _id:", adminDoc._id.toString());
+            authLog("[authorize] ✅ admin upsert амжилттай, _id:", adminDoc._id.toString());
             return {
               id:        adminDoc._id.toString(),
               email:     adminDoc.email,
@@ -102,7 +105,7 @@ export const authOptions: NextAuthOptions = {
             };
           } catch (err) {
             console.error("[authorize] ❌ MongoDB upsert алдаа:", err);
-            console.log("[authorize] hardcoded fallback ашиглаж байна");
+            authLog("[authorize] hardcoded fallback ашиглаж байна");
             return createAdminSessionUser(BUILTIN_ADMIN_EMAIL);
           }
         }
@@ -111,7 +114,7 @@ export const authOptions: NextAuthOptions = {
         const envAdminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
         const envAdminPass = process.env.ADMIN_PASS?.trim();
         if (envAdminEmail && envAdminPass && email === envAdminEmail && password === envAdminPass) {
-          console.log("[authorize] ✅ env admin login");
+          authLog("[authorize] ✅ env admin login");
           return createAdminSessionUser(envAdminEmail);
         }
 
@@ -122,7 +125,7 @@ export const authOptions: NextAuthOptions = {
           if (dbAdmin?.password) {
             const ok = await bcrypt.compare(password, dbAdmin.password);
             if (ok) {
-              console.log("[authorize] ✅ DB admin login");
+              authLog("[authorize] ✅ DB admin login");
               return {
                 id: dbAdmin._id.toString(),
                 email: dbAdmin.email,
@@ -152,21 +155,21 @@ export const authOptions: NextAuthOptions = {
         }
 
         const user = await User.findOne({ email }).select("+password");
-        console.log("[authorize] DB user found?", user ? "✅ YES" : "❌ NO");
+        authLog("[authorize] DB user found?", user ? "✅ YES" : "❌ NO");
 
         if (!user) throw new Error("И-мэйл эсвэл нууц үг буруу байна");
         if (!user.isVerified) {
-          console.log("[authorize] ❌ user not verified");
+          authLog("[authorize] ❌ user not verified");
           throw new Error("Имэйл баталгаажуулна уу");
         }
 
         const valid = await bcrypt.compare(password, user.password);
         if (!valid) {
-          console.log("[authorize] ❌ wrong password");
+          authLog("[authorize] ❌ wrong password");
           throw new Error("И-мэйл эсвэл нууц үг буруу байна");
         }
 
-        console.log("[authorize] ✅ student/teacher login success, role:", user.role);
+        authLog("[authorize] ✅ student/teacher login success, role:", user.role);
         await recordLogin(user);
 
         return {

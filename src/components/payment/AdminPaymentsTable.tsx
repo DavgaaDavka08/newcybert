@@ -94,6 +94,10 @@ export function AdminPaymentsTable() {
 
   async function reject() {
     if (!rejectModal) return;
+    if (rejectReason.trim().length < 3) {
+      notify('Татгалзах шалтгаанаа бичнэ үү (хамгийн багадаа 3 тэмдэгт)', false);
+      return;
+    }
     setActionLoading(rejectModal.id);
     try {
       const res = await fetch('/api/admin/payments/reject', {
@@ -337,7 +341,7 @@ export function AdminPaymentsTable() {
               Татгалзах — {rejectModal.code}
             </h3>
             <p style={{ margin: '0 0 16px', fontSize: 13, color: '#64748B' }}>
-              Татгалзах шалтгаан (заавал биш):
+              Татгалзах шалтгаан (заавал — хэрэглэгчид харагдана):
             </p>
             <textarea
               value={rejectReason}

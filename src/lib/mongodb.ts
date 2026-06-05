@@ -1,5 +1,6 @@
 // src/lib/mongodb.ts
 import mongoose from "mongoose";
+import { assertProductionEnv } from "./env";
 
 /** URI-г модуль ачаалахад биш, холболт хийхэд шалгана — NextAuth route ачаалагдахад алдаа гаргахгүй. */
 interface MongooseCache {
@@ -15,6 +16,7 @@ const cached: MongooseCache = global.mongooseCache ?? { conn: null, promise: nul
 global.mongooseCache = cached;
 
 export async function connectDB(): Promise<typeof mongoose> {
+  assertProductionEnv('core');
   const uri = process.env.MONGODB_URI;
   if (!uri) {
     throw new Error("MONGODB_URI environment variable тохируулаагүй байна");
