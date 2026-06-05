@@ -89,22 +89,30 @@ function PremiumPageInner() {
     if (!session?.user?.id) return;
     fetch("/api/payment/me", { cache: "no-store" })
       .then((r) => r.ok ? r.json() : null)
-      .then((data: { payments?: { _id: string; status: string; paymentCode?: string; amount: number; receiptImage?: string }[] } | null) => {
+      .then((data: {
+        payments?: { _id: string; status: string; paymentCode?: string; amount: number; type?: string; receiptImage?: string }[];
+        bankInfo?: { bankName: string; accountNumber: string; accountHolder: string };
+      } | null) => {
         if (!data?.payments?.length) return;
         const active = data.payments.find(
           (p) => p.status === "pending" || p.status === "waiting_verification"
         );
         if (!active) return;
-        // Only restore if modal isn't already open
+        const planType = active.type?.includes("annual")
+          ? "annual"
+          : active.type?.includes("quarterly")
+          ? "quarterly"
+          : "monthly";
+        const pricing = PREMIUM_PRICES[planType as PremiumPlanType] ?? PREMIUM_PRICES.monthly;
         setBankInfo((prev) => prev ? prev : {
           paymentId: active._id,
           paymentCode: active.paymentCode ?? "",
           amount: active.amount,
-          plan: "monthly",
-          months: 1,
-          bankName: "",
-          accountNumber: "",
-          accountHolder: "",
+          plan: planType,
+          months: pricing.months,
+          bankName: data.bankInfo?.bankName ?? "ХААН Банк",
+          accountNumber: data.bankInfo?.accountNumber ?? "",
+          accountHolder: data.bankInfo?.accountHolder ?? "",
           status: active.status as BankTransferInfo["status"],
           receiptImage: active.receiptImage ?? "",
         });

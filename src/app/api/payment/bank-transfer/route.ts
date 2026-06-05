@@ -29,6 +29,13 @@ export async function POST(req: NextRequest) {
   const accountNumber = process.env.BANK_ACCOUNT ?? '';
   const accountHolder = process.env.BANK_HOLDER ?? '';
 
+  if (!accountNumber || accountNumber.includes('X') || accountNumber.length < 8) {
+    return NextResponse.json(
+      { error: 'Төлбөрийн систем одоогоор тохируулагдаагүй байна. Удахгүй засагдана.' },
+      { status: 503 },
+    );
+  }
+
   // Auto-expire payments older than 48 hours
   const expiryCutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
   await Payment.updateMany(

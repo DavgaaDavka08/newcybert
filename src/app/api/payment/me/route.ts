@@ -20,11 +20,17 @@ export async function GET() {
     .select('_id status paymentCode receiptImage amount type createdAt paidAt')
     .lean();
 
-  // Serialize _id to string for client consumption
   const serialized = payments.map((p) => ({
     ...p,
     _id: String(p._id),
   }));
 
-  return NextResponse.json({ payments: serialized });
+  return NextResponse.json({
+    payments: serialized,
+    bankInfo: {
+      bankName: process.env.BANK_NAME ?? 'ХААН Банк',
+      accountNumber: process.env.BANK_ACCOUNT ?? '',
+      accountHolder: process.env.BANK_HOLDER ?? '',
+    },
+  });
 }
