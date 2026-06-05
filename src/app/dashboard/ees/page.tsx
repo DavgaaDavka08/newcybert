@@ -7,6 +7,7 @@ import { T } from "@/styles/tokens";
 import { EesPracticeView } from "@/components/ees/EesPracticeView";
 import { Loading } from "@/components/ui/Loading";
 import { SubpageShell } from "@/components/layout/SubpageShell";
+import { BackButton } from "@/components/ui/BackButton";
 
 export default function EesPracticePage() {
   const { data: session, status } = useSession();
@@ -37,7 +38,11 @@ export default function EesPracticePage() {
             zIndex: 10,
           }}
         >
-          <div style={{ fontWeight: 800, fontSize: 15, color: T.text }}>📝 ЕЭШ сорил 2025</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <BackButton href="/dashboard" label="Нүүр хуудас" />
+            <div style={{ width: 1, height: 20, background: T.border }} />
+            <div style={{ fontWeight: 800, fontSize: 15, color: T.text }}>Цахим ЕЭШ</div>
+          </div>
           <div style={{ fontSize: 13, color: T.muted }}>{session?.user?.name?.split(" ")[0]}</div>
         </header>
         <EesPracticeView />

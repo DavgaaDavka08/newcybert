@@ -43,6 +43,7 @@ export const ICON_PATHS: Record<string, string[]> = {
   refresh:     ['M23 4v6h-6', 'M1 20v-6h6', 'M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15'],
   menu:        ['M3 12h18', 'M3 6h18', 'M3 18h18'],
   close:       ['M18 6L6 18', 'M6 6l12 12'],
+  pen:         ['M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7', 'M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z'],
 };
 
 interface IcProps { n: string; size?: number; color?: string; style?: React.CSSProperties; }

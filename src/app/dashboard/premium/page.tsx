@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { T } from "@/styles/tokens";
 import { SubpageShell } from "@/components/layout/SubpageShell";
+import { BackButton } from "@/components/ui/BackButton";
 import {
   PremiumPaymentModal,
   type PaymentCheckoutData,
@@ -211,7 +212,11 @@ function PremiumPageInner() {
           zIndex: 10,
         }}
       >
-        <div style={{ fontWeight: 800, fontSize: 15, color: T.text }}>⭐ Premium</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <BackButton href="/dashboard" label="Нүүр хуудас" />
+          <div style={{ width: 1, height: 20, background: T.border }} />
+          <div style={{ fontWeight: 800, fontSize: 15, color: T.text }}>⭐ Premium</div>
+        </div>
         {isPremium && (
           <span
             style={{

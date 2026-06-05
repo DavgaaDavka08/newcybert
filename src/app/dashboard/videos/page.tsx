@@ -8,6 +8,7 @@ import { Ic } from "@/components/ui/Icon";
 import { useAppState } from "@/lib/app-state-context";
 import { Loading } from "@/components/ui/Loading";
 import { SubpageShell } from "@/components/layout/SubpageShell";
+import { BackButton } from "@/components/ui/BackButton";
 
 const VIDEO_COIN_COST = 3;  // Видео нээх = 3 зоос
 const PDF_COIN_COST   = 10; // PDF татах = 10 зоос
@@ -168,6 +169,8 @@ export default function VideosPage() {
       {/* Header */}
       <div style={{ background: "#fff", borderBottom: `1px solid ${T.border}`, padding: "0 28px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <BackButton href="/dashboard" label="Нүүр хуудас" />
+          <div style={{ width: 1, height: 20, background: T.border }} />
           <div style={{ fontWeight: 800, fontSize: 16, color: T.text, display: "flex", alignItems: "center", gap: 8 }}>
             <Ic n="video" size={18} color={T.blue} />
             Видео хичээл

@@ -59,11 +59,8 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
             style={{ height: 36, width: 'auto', objectFit: 'contain', borderRadius: 8 }}
             onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
           />
-          <div>
-            <div style={{ fontWeight: 900, fontSize: 15, color: T.blue, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-              CyberPhysics
-            </div>
-            <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 500 }}>Физикийн суралцах платформ</div>
+          <div style={{ fontWeight: 900, fontSize: 16, color: T.blue, letterSpacing: '-0.02em' }}>
+            CyberPhysics
           </div>
         </div>
       </div>

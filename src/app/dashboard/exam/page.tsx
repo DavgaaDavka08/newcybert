@@ -8,6 +8,7 @@ import { useAppState } from "@/lib/app-state-context";
 import { Loading } from "@/components/ui/Loading";
 import { CoinIcon, CoinSpendModal } from "@/components/gamification";
 import { SubpageShell } from "@/components/layout/SubpageShell";
+import { BackButton } from "@/components/ui/BackButton";
 
 const EXAM_FIRST_COST  = 0;  // Эхний оролдлого үнэгүй
 const EXAM_RETAKE_COST = 2;  // Дахин өгөх = 2 зоос
@@ -94,6 +95,8 @@ export default function ExamListPage() {
       {/* Header */}
       <div style={{ background: "#fff", borderBottom: `1px solid ${T.border}`, padding: "0 28px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <BackButton href="/dashboard" label="Нүүр хуудас" />
+          <div style={{ width: 1, height: 20, background: T.border }} />
           <div style={{ fontWeight: 800, fontSize: 16, color: T.text }}>📋 Шалгалтууд</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
