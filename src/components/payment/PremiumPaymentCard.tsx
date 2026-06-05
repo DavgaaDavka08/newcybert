@@ -123,6 +123,16 @@ export function PremiumPaymentCard({ info, onReceiptUploaded, onClose, onApprove
         </div>
       </div>
 
+      {/* Config warning */}
+      {(!info.accountNumber || info.accountNumber.includes('XXXX')) && (
+        <div style={{
+          background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 10,
+          padding: '8px 14px', marginBottom: 12, fontSize: 12, color: '#92400E',
+        }}>
+          ⚠️ Банкны данс тохируулаагүй байна. <strong>BANK_ACCOUNT</strong> env нэмнэ үү.
+        </div>
+      )}
+
       {/* Bank details */}
       <div style={{
         background: '#F8FAFC',

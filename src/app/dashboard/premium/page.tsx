@@ -84,6 +84,34 @@ function PremiumPageInner() {
   const [bankInfo, setBankInfo] = useState<BankTransferInfo | null>(null);
   const [bankModalOpen, setBankModalOpen] = useState(false);
 
+  // On mount: restore existing pending/waiting payment so user doesn't lose their code
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    fetch("/api/payment/me", { cache: "no-store" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: { payments?: { _id: string; status: string; paymentCode?: string; amount: number; receiptImage?: string }[] } | null) => {
+        if (!data?.payments?.length) return;
+        const active = data.payments.find(
+          (p) => p.status === "pending" || p.status === "waiting_verification"
+        );
+        if (!active) return;
+        // Only restore if modal isn't already open
+        setBankInfo((prev) => prev ? prev : {
+          paymentId: active._id,
+          paymentCode: active.paymentCode ?? "",
+          amount: active.amount,
+          plan: "monthly",
+          months: 1,
+          bankName: "",
+          accountNumber: "",
+          accountHolder: "",
+          status: active.status as BankTransferInfo["status"],
+          receiptImage: active.receiptImage ?? "",
+        });
+      })
+      .catch(() => null);
+  }, [session?.user?.id]);
+
   useEffect(() => {
     const payment = searchParams.get("payment");
     const id = searchParams.get("id");
@@ -120,6 +148,7 @@ function PremiumPageInner() {
       });
       const data = await res.json() as {
         ok?: boolean;
+        existing?: boolean;
         paymentId?: string;
         paymentCode?: string;
         amount?: number;
@@ -128,6 +157,8 @@ function PremiumPageInner() {
         bankName?: string;
         accountNumber?: string;
         accountHolder?: string;
+        status?: string;
+        receiptImage?: string;
         error?: string;
       };
       if (!res.ok || !data.ok) {
@@ -143,7 +174,8 @@ function PremiumPageInner() {
         bankName: data.bankName ?? "ХААН Банк",
         accountNumber: data.accountNumber ?? "",
         accountHolder: data.accountHolder ?? "",
-        status: "pending",
+        status: (data.status as BankTransferInfo["status"]) ?? "pending",
+        receiptImage: data.receiptImage ?? "",
       });
       setBankModalOpen(true);
     } catch {
@@ -216,6 +248,30 @@ function PremiumPageInner() {
             Сар, 3 сар эсвэл жилээр сонгоод хязгааргүй суралцаарай.
             Банкны шилжүүлгээр төлж, баримтаа байршуулаарай.
           </p>
+          {/* Restore existing pending payment banner */}
+          {bankInfo && !bankModalOpen && (bankInfo.status === "pending" || bankInfo.status === "waiting_verification") && (
+            <div style={{
+              marginTop: 14,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 10,
+              background: bankInfo.status === "waiting_verification" ? "#DBEAFE" : "#FEF3C7",
+              border: `1px solid ${bankInfo.status === "waiting_verification" ? "#93C5FD" : "#FCD34D"}`,
+              borderRadius: 12,
+              padding: "10px 18px",
+              fontSize: 13,
+              color: bankInfo.status === "waiting_verification" ? "#1D4ED8" : "#92400E",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+            onClick={() => setBankModalOpen(true)}
+            >
+              {bankInfo.status === "waiting_verification"
+                ? "📬 Баримтыг шалгаж байна — харах →"
+                : `⏳ Хүлээгдэж буй төлбөр: ${bankInfo.paymentCode} — үргэлжлүүлэх →`}
+            </div>
+          )}
+
           {payError && (
             <p
               style={{
