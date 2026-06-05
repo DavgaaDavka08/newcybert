@@ -455,8 +455,11 @@ body {
 }
 .cy-coin-chip--compact {
   min-width: auto;
-  padding: 6px 10px;
+  padding: 8px 14px;
   gap: 0;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255, 184, 0, 0.45);
+  box-shadow: 0 2px 8px rgba(180, 83, 9, 0.10);
 }
 .cy-coin-chip-main {
   display: flex;
@@ -514,30 +517,34 @@ body {
 .dash-topbar-chip.cy-chip-xp {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid #bbf7d0;
-  background: linear-gradient(135deg, #ecfdf5, #f0fdf4);
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1.5px solid #86efac;
+  background: linear-gradient(135deg, #dcfce7 0%, #ecfdf5 100%);
+  box-shadow: 0 2px 8px rgba(21, 128, 61, 0.10);
 }
 .cy-chip-xp-val {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
   color: #15803d;
+  letter-spacing: -0.01em;
 }
 .dash-topbar-chip.cy-chip-streak {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid #fed7aa;
-  background: linear-gradient(135deg, #fff7ed, #ffedd5);
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1.5px solid #fdba74;
+  background: linear-gradient(135deg, #ffedd5 0%, #fff7ed 100%);
+  box-shadow: 0 2px 8px rgba(194, 65, 12, 0.10);
 }
 .cy-chip-streak-val {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
   color: #c2410c;
+  letter-spacing: -0.01em;
 }
 
 /* Coin asset (/dollar.png) */
@@ -1092,10 +1099,11 @@ body {
 .cy-lives {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 10px;
-  border: 1px solid #fecdd3;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1.5px solid #fda4af;
+  box-shadow: 0 2px 8px rgba(190, 18, 60, 0.10);
   background: #fff1f2;
 }
 .cy-lives--compact {

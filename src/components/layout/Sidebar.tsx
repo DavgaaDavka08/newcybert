@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import { T } from '@/styles/tokens';
-import { Ic, Avatar, Label } from '@/components/ui';
+import { Ic, Avatar } from '@/components/ui';
 import { NAV_ITEMS } from '@/lib/routes';
 import { getRank } from '@/lib/ranks';
 import { useAppState } from '@/lib/app-state-context';
@@ -32,10 +32,12 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
     <aside
       className={`dash-sidebar${mobileOpen ? ' dash-sidebar--open' : ''}`}
       style={{
-      width: 230, flexShrink: 0, background: '#FFFFFF',
+      width: 236, flexShrink: 0,
+      background: 'linear-gradient(180deg, #FAFBFF 0%, #FFFFFF 100%)',
       display: 'flex', flexDirection: 'column', height: '100vh',
-      position: 'sticky', top: 0, zIndex: 10,
-      borderRight: `1px solid ${T.border}`, boxShadow: '2px 0 12px rgba(0,0,0,0.04)',
+      position: 'sticky', top: 0,
+      borderRight: `1px solid #E8EDFB`,
+      boxShadow: '3px 0 20px rgba(37,99,235,0.06)',
     }}
     >
       <div className="dash-sidebar-mobile-head">
@@ -51,58 +53,65 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
       </div>
 
       {/* Logo */}
-      <div className="dash-sidebar-logo" style={{ padding: '18px 16px 14px', borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="dash-sidebar-logo" style={{ padding: '16px 16px 14px', borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <img src="/cyberphysic-logo.png" alt="CyberPhysics"
-            style={{ height: 34, width: 'auto', objectFit: 'contain' }}
+            style={{ height: 36, width: 'auto', objectFit: 'contain', borderRadius: 8 }}
             onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
           />
-          <span style={{ fontWeight: 900, fontSize: 16, color: T.blue, letterSpacing: '-0.02em' }}>
-            CyberPhysics
-          </span>
+          <div>
+            <div style={{ fontWeight: 900, fontSize: 15, color: T.blue, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+              CyberPhysics
+            </div>
+            <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 500 }}>Физикийн суралцах платформ</div>
+          </div>
         </div>
       </div>
 
       {/* Nav */}
-      <nav style={{ flex: 1, padding: '10px', overflowY: 'auto' }}>
-        <Label style={{ padding: '4px 8px 6px', color: T.muted, fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+      <nav style={{ flex: 1, padding: '12px 10px', overflowY: 'auto' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '0 8px 8px' }}>
           Үндсэн цэс
-        </Label>
+        </div>
         {NAV_ITEMS.map(item => {
           const active = pathname === item.path || (item.path !== '/dashboard' && pathname.startsWith(item.path));
           return (
             <button key={item.id} onClick={() => navigate(item.path)}
               style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-                padding: '9px 12px', borderRadius: 13, marginBottom: 3,
-                border: active ? `1.5px solid ${T.blue}22` : '1.5px solid transparent',
-                cursor: 'pointer', transition: 'all 0.14s ease',
-                background: active ? `${T.blue}0f` : 'transparent',
+                width: '100%', display: 'flex', alignItems: 'center', gap: 11,
+                padding: '10px 12px', borderRadius: 12, marginBottom: 2,
+                border: 'none',
+                cursor: 'pointer', transition: 'all 0.15s ease',
+                background: active ? 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)' : 'transparent',
                 textAlign: 'left', fontFamily: 'Plus Jakarta Sans, sans-serif',
-                position: 'relative', boxShadow: active ? `0 2px 12px ${T.blue}1a` : 'none',
+                position: 'relative',
               }}
-              onMouseEnter={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = T.sidebarHover; }}
+              onMouseEnter={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = '#F8FAFC'; }}
               onMouseLeave={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
             >
-              {active && <div style={{ position: 'absolute', left: 0, top: '20%', bottom: '20%', width: 3, borderRadius: '0 3px 3px 0', background: T.blue }} />}
+              {active && <div style={{ position: 'absolute', left: 0, top: '15%', bottom: '15%', width: 3, borderRadius: '0 4px 4px 0', background: T.blue }} />}
               <div style={{
-                width: 33, height: 33, borderRadius: 10,
+                width: 34, height: 34, borderRadius: 10,
                 background: active ? T.blue : '#F1F5F9',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                transition: 'all 0.14s', boxShadow: active ? `0 3px 10px ${T.blue}44` : 'none',
+                transition: 'all 0.15s',
+                boxShadow: active ? `0 4px 12px ${T.blue}33` : 'none',
               }}>
-                <Ic n={item.icon} size={16} color={active ? '#fff' : T.muted} />
+                <Ic n={item.icon} size={16} color={active ? '#fff' : '#64748B'} />
               </div>
-              <span style={{ fontSize: 13, fontWeight: active ? 700 : 500, color: active ? T.blue : T.textSub }}>
+              <span style={{ fontSize: 13, fontWeight: active ? 700 : 500, color: active ? T.blue : '#475569', letterSpacing: '-0.01em' }}>
                 {item.label}
               </span>
+              {active && (
+                <div style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: T.blue, flexShrink: 0 }} />
+              )}
             </button>
           );
         })}
       </nav>
 
       {/* User footer */}
-      <div style={{ padding: '10px 10px 14px', borderTop: `1px solid ${T.border}` }}>
+      <div style={{ padding: '10px 10px 14px', borderTop: `1px solid #E8EDFB` }}>
         <button
           type="button"
           onClick={() => setProfileOpen(true)}

@@ -10,7 +10,7 @@ export { Topbar, TopBar } from './Topbar';
 
 const BG_URL = '/475450911_537240926008065_5395618463015848016_n.jpg';
 
-export function Shell({ children }: { children: React.ReactNode }) {
+export function Shell({ children, noPadding }: { children: React.ReactNode; noPadding?: boolean }) {
   const pathname = usePathname();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -50,11 +50,27 @@ export function Shell({ children }: { children: React.ReactNode }) {
           minHeight: '100vh',
           minWidth: 0,
           width: '100%',
-          padding: '24px 28px',
+          padding: 0,
           backgroundColor: T.bg,
         }}
       >
-        <header className="dash-mobile-header">
+        {/* Sticky mobile header — solid white, always on top */}
+        <header
+          className="dash-mobile-header"
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+            background: '#ffffff',
+            borderBottom: `1px solid ${T.border}`,
+            boxShadow: '0 2px 12px rgba(15,23,42,0.07)',
+            padding: '0 12px',
+            height: 56,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
           <button
             type="button"
             className="dash-menu-btn"
@@ -62,11 +78,19 @@ export function Shell({ children }: { children: React.ReactNode }) {
             aria-expanded={mobileNavOpen}
             onClick={() => setMobileNavOpen(true)}
           >
-            <Ic n="menu" size={26} color={T.text} />
+            <Ic n="menu" size={22} color={T.text} />
           </button>
+          <img
+            src="/cyberphysic-logo.png"
+            alt=""
+            aria-hidden
+            style={{ height: 26, width: 'auto', objectFit: 'contain' }}
+            onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+          />
           <span className="dash-mobile-header-title">CyberPhysics</span>
         </header>
 
+        {/* Page background image */}
         <div
           aria-hidden
           style={{
@@ -101,7 +125,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
             }}
           />
         </div>
-        <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: '100%' }}>{children}</div>
+
+        {/* Page content */}
+        <div
+          className={noPadding ? '' : 'dash-shell-content'}
+          style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: '100%' }}
+        >
+          {children}
+        </div>
       </main>
     </div>
   );

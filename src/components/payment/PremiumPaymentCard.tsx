@@ -33,25 +33,41 @@ export function PremiumPaymentCard({ info, onReceiptUploaded, onClose, onApprove
   const [status, setStatus] = useState<PaymentStatus>(info.status ?? 'pending');
   const [receiptImage, setReceiptImage] = useState(info.receiptImage ?? '');
   const [checking, setChecking] = useState(false);
+  const [checkMsg, setCheckMsg] = useState<string | null>(null);
 
   // Poll for approval every 15s when waiting for verification
-  const checkStatus = useCallback(async () => {
+  const checkStatus = useCallback(async (manual = false) => {
     if (status === 'success' || status === 'rejected' || status === 'failed') return;
     try {
       const res = await fetch('/api/payment/me', { cache: 'no-store' });
       if (!res.ok) return;
       const data = await res.json() as { payments?: { _id: string; status: PaymentStatus }[] };
       const found = data.payments?.find((p) => p._id === info.paymentId);
-      if (!found) return;
+      if (!found) {
+        if (manual) setCheckMsg('Төлбөр олдсонгүй.');
+        return;
+      }
       if (found.status !== status) {
         setStatus(found.status);
         if (found.status === 'success') {
           onApproved?.();
-          router.refresh(); // refresh server components / session
+          router.refresh();
+        } else if (manual) {
+          setCheckMsg('Статус шинэчлэгдлээ.');
         }
+      } else if (manual) {
+        setCheckMsg('Admin шалгаж байна. Баталгаажсан даруйд нээгдэнэ.');
       }
-    } catch { /* silent */ }
+    } catch {
+      if (manual) setCheckMsg('Сүлжээний алдаа гарлаа.');
+    }
   }, [status, info.paymentId, onApproved, router]);
+
+  useEffect(() => {
+    if (!checkMsg) return;
+    const t = setTimeout(() => setCheckMsg(null), 4000);
+    return () => clearTimeout(t);
+  }, [checkMsg]);
 
   useEffect(() => {
     if (status === 'waiting_verification') {
@@ -62,7 +78,7 @@ export function PremiumPaymentCard({ info, onReceiptUploaded, onClose, onApprove
 
   async function handleManualCheck() {
     setChecking(true);
-    await checkStatus();
+    await checkStatus(true);
     setChecking(false);
   }
 
@@ -233,6 +249,14 @@ export function PremiumPaymentCard({ info, onReceiptUploaded, onClose, onApprove
           >
             {checking ? '⏳ Шалгаж байна…' : '🔄 Статус шалгах'}
           </button>
+          {checkMsg && (
+            <div style={{
+              marginTop: 8, fontSize: 12, fontWeight: 600, color: '#1D4ED8',
+              background: '#EFF6FF', borderRadius: 8, padding: '6px 12px',
+            }}>
+              {checkMsg}
+            </div>
+          )}
         </div>
       ) : canUpload ? (
         <ReceiptUploader

@@ -3,7 +3,7 @@ import { Suspense, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { T } from "@/styles/tokens";
-import { BackButton } from "@/components/ui/BackButton";
+import { SubpageShell } from "@/components/layout/SubpageShell";
 import {
   PremiumPaymentModal,
   type PaymentCheckoutData,
@@ -195,6 +195,7 @@ function PremiumPageInner() {
   const isPremium = (session?.user as { isPremium?: boolean })?.isPremium;
 
   return (
+    <SubpageShell>
     <div style={{ minHeight: "100vh", background: T.bg, fontFamily: "Plus Jakarta Sans, sans-serif" }}>
       <div
         style={{
@@ -210,7 +211,6 @@ function PremiumPageInner() {
           zIndex: 10,
         }}
       >
-        <BackButton href="/dashboard" label="Буцах" />
         <div style={{ fontWeight: 800, fontSize: 15, color: T.text }}>⭐ Premium</div>
         {isPremium && (
           <span
@@ -387,6 +387,7 @@ function PremiumPageInner() {
         </div>
       )}
     </div>
+    </SubpageShell>
   );
 }
 

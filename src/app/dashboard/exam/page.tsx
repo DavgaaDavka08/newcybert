@@ -4,10 +4,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { T } from "@/styles/tokens";
 import { Ic } from "@/components/ui/Icon";
-import { BackButton } from "@/components/ui/BackButton";
 import { useAppState } from "@/lib/app-state-context";
 import { Loading } from "@/components/ui/Loading";
 import { CoinIcon, CoinSpendModal } from "@/components/gamification";
+import { SubpageShell } from "@/components/layout/SubpageShell";
 
 const EXAM_FIRST_COST  = 0;  // Эхний оролдлого үнэгүй
 const EXAM_RETAKE_COST = 2;  // Дахин өгөх = 2 зоос
@@ -89,13 +89,12 @@ export default function ExamListPage() {
   }
 
   return (
+    <SubpageShell>
     <div style={{ minHeight: "100vh", background: T.bg, fontFamily: "Plus Jakarta Sans, sans-serif" }}>
       {/* Header */}
       <div style={{ background: "#fff", borderBottom: `1px solid ${T.border}`, padding: "0 28px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <BackButton href="/dashboard" label="Буцах" />
-          <div style={{ width: 1, height: 20, background: T.border }} />
-          <div style={{ fontWeight: 800, fontSize: 16, color: T.text }}>Шалгалтууд</div>
+          <div style={{ fontWeight: 800, fontSize: 16, color: T.text }}>📋 Шалгалтууд</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {appState.isPremium && (
@@ -168,6 +167,7 @@ export default function ExamListPage() {
         );
       })()}
     </div>
+    </SubpageShell>
   );
 }
 

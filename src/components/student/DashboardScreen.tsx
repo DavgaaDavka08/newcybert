@@ -49,6 +49,7 @@ export function DashboardScreen({ onNav, state }: Props) {
   const [leaderboard, setLeaderboard] = useState<LbEntry[]>([]);
   const [gData, setGData] = useState<GamificationData | null>(null);
   const [streakToast, setStreakToast] = useState<{ coins: number; streak: number; milestone?: string } | null>(null);
+  const [premiumToast, setPremiumToast] = useState(false);
 
   const loadGamification = useCallback(() => {
     fetch("/api/user/gamification")
@@ -101,6 +102,30 @@ export function DashboardScreen({ onNav, state }: Props) {
     loadLeaderboard("all");
   }, [loadGamification, loadLeaderboard]);
 
+  // Poll for payment approval and notify user
+  useEffect(() => {
+    const STORAGE_KEY = 'cy_seen_payment_success';
+    const check = async () => {
+      try {
+        const res = await fetch('/api/payment/me', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json() as { payments?: { _id: string; status: string }[] };
+        const approved = data.payments?.find((p) => p.status === 'success');
+        if (!approved) return;
+        const seen = localStorage.getItem(STORAGE_KEY);
+        if (seen === approved._id) return;
+        localStorage.setItem(STORAGE_KEY, approved._id);
+        if (!seen) return; // First load, don't toast
+        setPremiumToast(true);
+        void refreshStats();
+        setTimeout(() => setPremiumToast(false), 8000);
+      } catch { /* silent */ }
+    };
+    void check();
+    const id = setInterval(() => void check(), 30_000);
+    return () => clearInterval(id);
+  }, [refreshStats]);
+
   useEffect(() => {
     fetch("/api/exam/exams")
       .then((r) => (r.ok ? r.json() : []))
@@ -112,6 +137,26 @@ export function DashboardScreen({ onNav, state }: Props) {
   const maxLives = gData?.maxLives ?? 5;
   return (
     <div className="dash-page">
+      {premiumToast && (
+        <div
+          style={{
+            position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)",
+            zIndex: 300, background: "linear-gradient(135deg, #4F46E5, #7C3AED)",
+            color: "#fff", padding: "18px 28px", borderRadius: 18,
+            boxShadow: "0 16px 48px rgba(79,70,229,0.45)",
+            border: "1px solid rgba(255,255,255,0.15)",
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+            minWidth: 260, textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: 32, marginBottom: 2 }}>🎉</div>
+          <div style={{ fontWeight: 900, fontSize: 16 }}>Premium идэвхжлээ!</div>
+          <div style={{ fontSize: 13, opacity: 0.85 }}>
+            Таны төлбөр баталгаажлаа. Бүх хязгааргүй боломж нээгдлээ!
+          </div>
+        </div>
+      )}
+
       {streakToast && (
         <div
           style={{

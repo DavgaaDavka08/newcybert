@@ -7,7 +7,7 @@ export { Card, StatCard } from './Card';
 export { BackButton } from './BackButton';
 export { ToastProvider, useToast } from './Toast';
 export type { ToastType, ToastItem } from './Toast';
-export { Loading, LOADING_LOTTIE_SRC } from './Loading';
+export { Loading } from './Loading';
 export { ConfirmProvider, useConfirm } from './confirm-dialog';
 export type { ConfirmOptions } from './confirm-dialog';
 export { StatusAlert } from './status-alert';

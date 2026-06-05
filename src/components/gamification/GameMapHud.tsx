@@ -91,6 +91,7 @@ export function GameMapHud({
             lives={displayLives}
             maxLives={maxLives}
             nextRefillAt={state.isPremium ? null : refill}
+            isPremium={state.isPremium}
             compact
             variant="dark"
             heartStyle="dots"

@@ -47,7 +47,7 @@ export function Topbar({
           <StreakIcon size="md" glow />
           <span className="cy-chip-streak-val">{appState.streak}</span>
         </div>
-        <LivesHearts lives={displayLives} maxLives={maxLives} nextRefillAt={nextRefillAt} compact />
+        <LivesHearts lives={displayLives} maxLives={maxLives} nextRefillAt={nextRefillAt} isPremium={appState.isPremium} compact />
         <CoinChip coins={appState.coins} isPremium={appState.isPremium} compact showGoal={false} coinGoal={coinGoal} />
         <button type="button" className="dash-topbar-icon-btn" style={{ width: 40, height: 40, borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Ic n="bell" size={15} color={T.muted} />

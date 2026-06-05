@@ -12,10 +12,10 @@ const Page = () => {
   };
   return (
     <div>
-      <div>
+      <div className="flex flex-col gap-2 justify-between align-center">
         <input type="text" onChange={handleSearch} />
         <button onClick={() => handleAdd()}>add</button>
-        <div>
+        <div className="w-screen h-screen query-2xl">
           <h1>
             {serachValue.map((item: any) => (
               <div key={item}>{item}</div>
@@ -31,6 +31,10 @@ const Page = () => {
           <div>
             <button>delete</button>
           </div>
+        </div>
+        <div>
+          <input type="text" placeholder="search value" />
+
         </div>
       </div>
     </div>
